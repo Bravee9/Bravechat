@@ -1,0 +1,101 @@
+version: "3.9"
+
+# ============================================================
+# docker-compose.yml — Local Development Stack
+# Discord Clone Project
+# ============================================================
+# Khởi chạy: docker-compose up -d
+# Dừng:      docker-compose down
+# Reset DB:  docker-compose down -v (xóa volumes)
+# ============================================================
+
+services:
+  # ─── PostgreSQL Database ──────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: discord_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: discord_db
+      POSTGRES_USER: discord_user
+      POSTGRES_PASSWORD: discord_secret_2024
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U discord_user -d discord_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - discord_network
+
+  # ─── Redis Cache + Message Broker ─────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: discord_redis
+    restart: unless-stopped
+    command: redis-server --requirepass redis_secret_2024 --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_secret_2024", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - discord_network
+
+  # ─── Redis Commander (DB GUI - Dev only) ──────────────────
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: discord_redis_ui
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:redis_secret_2024
+    ports:
+      - "8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - discord_network
+    profiles:
+      - tools
+
+  # ─── pgAdmin (DB GUI - Dev only) ──────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: discord_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@bravechat.dev
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - discord_network
+    profiles:
+      - tools
+
+# ─── Volumes ──────────────────────────────────────────────
+volumes:
+  postgres_data:
+    name: discord_postgres_data
+  redis_data:
+    name: discord_redis_data
+
+# ─── Networks ─────────────────────────────────────────────
+networks:
+  discord_network:
+    name: discord_network
+    driver: bridge

@@ -1,0 +1,319 @@
+/*
+ * globals.css — Global styles for Discord Clone
+ * Ocean Swiss Minimalist Design System
+ * ─────────────────────────────────────────────────────────
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS CUSTOM PROPERTIES ──────────────────────────────── */
+:root {
+  /* Ocean palette as CSS variables for non-Tailwind usage */
+  --ocean-primary:        #0D5C75;
+  --ocean-secondary:      #639FAD;
+  --ocean-light:          #D6E8ED;
+  --ocean-dark-bg:        #051014;
+  --ocean-dark-surface:   #0A1C23;
+  --ocean-dark-border:    #16323D;
+  --ocean-light-bg:       #F0F5F7;
+  --ocean-light-surface:  #FFFFFF;
+  --ocean-light-border:   #C9D8DD;
+  --ocean-light-text:     #081E26;
+
+  /* Scrollbar */
+  --scrollbar-track: #0A1C23;
+  --scrollbar-thumb: #16323D;
+  --scrollbar-thumb-hover: #0D5C75;
+}
+
+/* ─── BASE LAYER ─────────────────────────────────────────── */
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-ocean-dark-bg text-ocean-light font-sans;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Swiss Minimalist: sharp corners everywhere */
+  * {
+    border-radius: 0 !important;
+  }
+
+  /* Custom scrollbar — Ocean theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 0;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+
+  /* Selection highlight */
+  ::selection {
+    background: rgba(13, 92, 117, 0.4);
+    color: #D6E8ED;
+  }
+
+  /* Focus ring — Ocean style */
+  :focus-visible {
+    outline: 2px solid var(--ocean-primary);
+    outline-offset: 2px;
+  }
+
+  /* Headings */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sans font-bold tracking-tight;
+  }
+
+  /* Links */
+  a {
+    @apply text-ocean-secondary hover:text-ocean-light transition-colors duration-200;
+    text-decoration: none;
+  }
+
+  /* Images */
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Input/textarea reset */
+  input, textarea, select {
+    @apply bg-transparent font-sans;
+  }
+}
+
+/* ─── COMPONENT LAYER ────────────────────────────────────── */
+@layer components {
+
+  /* ─── BUTTONS ─────────────────────────────────────────── */
+  .btn-primary {
+    @apply bg-ocean-primary text-white
+           hover:bg-ocean-hover
+           active:scale-[0.98]
+           px-6 py-3
+           font-bold uppercase tracking-widest text-sm
+           transition-all duration-200
+           border border-transparent
+           cursor-pointer select-none;
+  }
+
+  .btn-secondary {
+    @apply bg-transparent text-ocean-secondary
+           border border-ocean-dark-border
+           hover:border-ocean-secondary hover:text-ocean-light
+           px-6 py-3
+           font-bold uppercase tracking-widest text-sm
+           transition-all duration-200
+           cursor-pointer select-none;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-ocean-light/70
+           hover:text-ocean-light hover:bg-ocean-dark-surface
+           px-4 py-2
+           font-medium text-sm
+           transition-all duration-200
+           cursor-pointer select-none;
+  }
+
+  /* ─── INPUTS ──────────────────────────────────────────── */
+  .input-ocean {
+    @apply w-full bg-ocean-dark-bg
+           border border-ocean-dark-border
+           text-ocean-light placeholder:text-ocean-light/60
+           px-4 py-3
+           font-sans text-sm
+           transition-all duration-200
+           focus:outline-none focus:border-ocean-secondary focus:bg-ocean-dark-surface;
+  }
+
+  .input-label {
+    @apply block text-ocean-secondary text-xs font-bold uppercase tracking-wider mb-2;
+  }
+
+  /* ─── CARDS ───────────────────────────────────────────── */
+  .card-ocean {
+    @apply bg-ocean-dark-surface border border-ocean-dark-border
+           transition-all duration-200;
+  }
+
+  .card-ocean-hover {
+    @apply card-ocean hover:border-ocean-secondary hover:bg-ocean-dark-hover;
+  }
+
+  /* ─── BADGES ──────────────────────────────────────────── */
+  .badge-online {
+    @apply w-3 h-3 bg-emerald-500 border-2 border-ocean-dark-surface inline-block;
+  }
+
+  .badge-idle {
+    @apply w-3 h-3 bg-amber-400 border-2 border-ocean-dark-surface inline-block;
+  }
+
+  .badge-dnd {
+    @apply w-3 h-3 bg-red-500 border-2 border-ocean-dark-surface inline-block;
+  }
+
+  .badge-offline {
+    @apply w-3 h-3 bg-ocean-secondary/40 border-2 border-ocean-dark-surface inline-block;
+  }
+
+  /* ─── DIVIDERS ────────────────────────────────────────── */
+  .divider-ocean {
+    @apply border-t border-ocean-dark-border my-4;
+  }
+
+  .divider-label {
+    @apply flex items-center gap-4 text-ocean-light/70 text-xs font-bold uppercase tracking-widest;
+  }
+
+  .divider-label::before,
+  .divider-label::after {
+    content: '';
+    @apply flex-1 border-t border-ocean-dark-border;
+  }
+
+  /* ─── SIDEBAR ─────────────────────────────────────────── */
+  .sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2
+           text-ocean-secondary text-sm font-medium
+           hover:text-ocean-light hover:bg-ocean-dark-hover
+           cursor-pointer transition-all duration-150
+           border-l-2 border-transparent;
+  }
+
+  .sidebar-item-active {
+    @apply sidebar-item text-ocean-light bg-ocean-dark-hover border-l-ocean-primary;
+  }
+
+  /* ─── GLASS EFFECT (subtle) ───────────────────────────── */
+  .glass-ocean {
+    backdrop-filter: blur(12px) saturate(1.5);
+    -webkit-backdrop-filter: blur(12px) saturate(1.5);
+    @apply bg-ocean-dark-bg/80 border border-ocean-dark-border/60;
+  }
+
+  /* ─── GRADIENT TEXT ───────────────────────────────────── */
+  .text-gradient-ocean {
+    background: linear-gradient(135deg, #0D5C75 0%, #639FAD 50%, #D6E8ED 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    padding-top: 0.1em;
+    padding-bottom: 0.15em;
+  }
+
+  /* ─── SECTION HEADING ─────────────────────────────────── */
+  .section-tag {
+    @apply inline-flex items-center gap-2
+           border border-ocean-secondary/30 bg-ocean-secondary/10
+           text-ocean-secondary text-xs font-bold uppercase tracking-widest
+           px-3 py-1.5 mb-6;
+  }
+
+  /* ─── LOADING SKELETON ────────────────────────────────── */
+  .skeleton {
+    @apply bg-ocean-dark-border animate-pulse;
+    background: linear-gradient(
+      90deg,
+      #16323D 25%,
+      #1a3a47 50%,
+      #16323D 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s linear infinite;
+  }
+}
+
+/* ─── UTILITIES LAYER ────────────────────────────────────── */
+@layer utilities {
+
+  /* Text balance for headings */
+  .text-balance { text-wrap: balance; }
+
+  /* Noise texture overlay */
+  .noise-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+    opacity: 0.04;
+    pointer-events: none;
+  }
+
+  /* Animated gradient background */
+  .bg-ocean-animated {
+    background: linear-gradient(
+      -45deg,
+      #051014,
+      #0A1C23,
+      #0D3040,
+      #051014
+    );
+    background-size: 400% 400%;
+    animation: gradient-shift 12s ease infinite;
+  }
+
+  /* Hide scrollbar but keep scroll functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ─── KEYFRAMES (not in Tailwind layer) ──────────────────── */
+@keyframes gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ─── LIGHT MODE OVERRIDES ───────────────────────────────── */
+.light body {
+  @apply bg-ocean-light-bg text-ocean-light-text;
+}
+
+.light ::-webkit-scrollbar-track {
+  background: #C9D8DD;
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: #639FAD;
+}

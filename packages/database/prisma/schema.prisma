@@ -1,0 +1,409 @@
+// ============================================================
+// packages/database/prisma/schema.prisma
+// Database schema cho Discord Clone
+// Mô tả: Định nghĩa toàn bộ data models cho PostgreSQL
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// USER MODEL
+// Lưu thông tin tài khoản người dùng
+// ============================================================
+model User {
+  id               String   @id @default(cuid())
+  username         String   @unique @db.VarChar(32)
+  discriminator    String   @default("0000") @db.VarChar(4)
+  email            String   @unique @db.VarChar(254)
+  passwordHash     String   @map("password_hash")
+  avatarKey        String?  @map("avatar_key")       // R2 object key
+  bannerKey        String?  @map("banner_key")        // R2 object key
+  displayName      String?  @map("display_name") @db.VarChar(32)
+  bio              String?  @db.VarChar(190)
+  status           UserStatus @default(OFFLINE)
+  customStatus     String?  @map("custom_status") @db.VarChar(128)
+  isEmailVerified  Boolean  @default(false) @map("is_email_verified")
+  isBot            Boolean  @default(false) @map("is_bot")
+  isBanned         Boolean  @default(false) @map("is_banned")
+  banReason        String?  @map("ban_reason")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  lastSeenAt       DateTime? @map("last_seen_at")
+
+  // Relations
+  ownedServers     Server[]         @relation("ServerOwner")
+  memberships      ServerMember[]
+  sentMessages     Message[]        @relation("MessageAuthor")
+  sentDMs          DirectMessage[]  @relation("DMSender")
+  receivedDMs      DirectMessage[]  @relation("DMReceiver")
+  friendships      Friendship[]     @relation("FriendshipUser")
+  friendOf         Friendship[]     @relation("FriendshipFriend")
+  refreshTokens    RefreshToken[]
+  reactions        MessageReaction[]
+
+  @@map("users")
+}
+
+enum UserStatus {
+  ONLINE
+  IDLE
+  DO_NOT_DISTURB
+  INVISIBLE
+  OFFLINE
+}
+
+// ============================================================
+// SERVER MODEL (GUILD)
+// Mỗi server là một cộng đồng độc lập
+// ============================================================
+model Server {
+  id               String   @id @default(cuid())
+  name             String   @db.VarChar(100)
+  description      String?  @db.VarChar(500)
+  iconKey          String?  @map("icon_key")          // R2 object key
+  bannerKey        String?  @map("banner_key")         // R2 object key
+  splashKey        String?  @map("splash_key")         // R2 object key
+  isPublic         Boolean  @default(false) @map("is_public")
+  verificationLevel VerificationLevel @default(NONE) @map("verification_level")
+  ownerId          String   @map("owner_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  owner            User             @relation("ServerOwner", fields: [ownerId], references: [id])
+  members          ServerMember[]
+  channels         Channel[]
+  roles            Role[]
+  invites          ServerInvite[]
+  categories       ChannelCategory[]
+
+  @@map("servers")
+}
+
+enum VerificationLevel {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+}
+
+// ============================================================
+// SERVER MEMBER MODEL
+// Quan hệ User ↔ Server với role và metadata
+// ============================================================
+model ServerMember {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  serverId    String   @map("server_id")
+  nickname    String?  @db.VarChar(32)
+  joinedAt    DateTime @default(now()) @map("joined_at")
+  isOwner     Boolean  @default(false) @map("is_owner")
+  isMuted     Boolean  @default(false) @map("is_muted")
+  isDeafened  Boolean  @default(false) @map("is_deafened")
+  isBanned    Boolean  @default(false) @map("is_banned")
+  banReason   String?  @map("ban_reason")
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  server      Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  roles       MemberRole[]
+
+  @@unique([userId, serverId])
+  @@map("server_members")
+}
+
+// ============================================================
+// ROLE MODEL
+// Phân quyền trong server
+// ============================================================
+model Role {
+  id          String   @id @default(cuid())
+  serverId    String   @map("server_id")
+  name        String   @db.VarChar(100)
+  color       Int      @default(0)          // RGB integer
+  position    Int      @default(0)
+  permissions BigInt   @default(0)          // Bitfield permissions
+  isHoisted   Boolean  @default(false) @map("is_hoisted")
+  isMentionable Boolean @default(false) @map("is_mentionable")
+  isManaged   Boolean  @default(false) @map("is_managed")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  server      Server       @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  members     MemberRole[]
+
+  @@map("roles")
+}
+
+model MemberRole {
+  memberId  String       @map("member_id")
+  roleId    String       @map("role_id")
+  member    ServerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role      Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([memberId, roleId])
+  @@map("member_roles")
+}
+
+// ============================================================
+// CHANNEL CATEGORY
+// Nhóm các channel trong server
+// ============================================================
+model ChannelCategory {
+  id        String    @id @default(cuid())
+  serverId  String    @map("server_id")
+  name      String    @db.VarChar(100)
+  position  Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  server    Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  channels  Channel[]
+
+  @@map("channel_categories")
+}
+
+// ============================================================
+// CHANNEL MODEL
+// Kênh text, voice, video, announcement trong server
+// ============================================================
+model Channel {
+  id           String      @id @default(cuid())
+  serverId     String      @map("server_id")
+  categoryId   String?     @map("category_id")
+  name         String      @db.VarChar(100)
+  type         ChannelType @default(TEXT)
+  topic        String?     @db.VarChar(1024)
+  position     Int         @default(0)
+  isNsfw       Boolean     @default(false) @map("is_nsfw")
+  slowModeDelay Int        @default(0) @map("slow_mode_delay") // seconds
+  bitrate      Int?        // for VOICE channels (bps)
+  userLimit    Int?        @map("user_limit") // for VOICE channels
+  lastMessageId String?    @map("last_message_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  server       Server          @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  category     ChannelCategory? @relation(fields: [categoryId], references: [id])
+  messages     Message[]
+
+  @@map("channels")
+}
+
+enum ChannelType {
+  TEXT
+  VOICE
+  VIDEO
+  ANNOUNCEMENT
+  STAGE
+  FORUM
+}
+
+// ============================================================
+// MESSAGE MODEL
+// Tin nhắn trong channel
+// ============================================================
+model Message {
+  id            String      @id @default(cuid())
+  channelId     String      @map("channel_id")
+  authorId      String      @map("author_id")
+  content       String?     @db.Text
+  type          MessageType @default(DEFAULT)
+  isPinned      Boolean     @default(false) @map("is_pinned")
+  isEdited      Boolean     @default(false) @map("is_edited")
+  isDeleted     Boolean     @default(false) @map("is_deleted")
+  replyToId     String?     @map("reply_to_id")
+  nonce         String?                              // Client deduplication ID
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  editedAt      DateTime?   @map("edited_at")
+  deletedAt     DateTime?   @map("deleted_at")
+
+  // Relations
+  channel       Channel          @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  author        User             @relation("MessageAuthor", fields: [authorId], references: [id])
+  replyTo       Message?         @relation("MessageReply", fields: [replyToId], references: [id])
+  replies       Message[]        @relation("MessageReply")
+  attachments   Attachment[]
+  reactions     MessageReaction[]
+  embeds        MessageEmbed[]
+
+  @@index([channelId, createdAt])
+  @@map("messages")
+}
+
+enum MessageType {
+  DEFAULT
+  REPLY
+  JOIN             // User joined server
+  LEAVE            // User left server
+  BOOST            // Server boost
+  SYSTEM
+}
+
+// ============================================================
+// ATTACHMENT MODEL
+// File đính kèm trong tin nhắn (stored on R2)
+// ============================================================
+model Attachment {
+  id          String         @id @default(cuid())
+  messageId   String         @map("message_id")
+  filename    String         @db.VarChar(255)
+  contentType String         @map("content_type") @db.VarChar(127)
+  size        Int                                // bytes
+  r2Key       String         @map("r2_key")      // Cloudflare R2 object key
+  width       Int?                               // for images/videos
+  height      Int?                               // for images/videos
+  duration    Float?                             // for audio/video (seconds)
+  type        AttachmentType @default(FILE)
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  message     Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+enum AttachmentType {
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+  GIF
+}
+
+// ============================================================
+// MESSAGE EMBED MODEL
+// Link preview / rich embeds
+// ============================================================
+model MessageEmbed {
+  id          String   @id @default(cuid())
+  messageId   String   @map("message_id")
+  title       String?  @db.VarChar(256)
+  description String?  @db.VarChar(2048)
+  url         String?
+  color       Int?
+  imageUrl    String?  @map("image_url")
+  thumbnailUrl String? @map("thumbnail_url")
+  authorName  String?  @map("author_name") @db.VarChar(256)
+  authorUrl   String?  @map("author_url")
+  footer      String?  @db.VarChar(2048)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("message_embeds")
+}
+
+// ============================================================
+// MESSAGE REACTION MODEL
+// Emoji reactions trên tin nhắn
+// ============================================================
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+  emoji     String   @db.VarChar(64)          // Unicode emoji or custom emoji id
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@map("message_reactions")
+}
+
+// ============================================================
+// DIRECT MESSAGE MODEL
+// Tin nhắn riêng tư giữa 2 users
+// ============================================================
+model DirectMessage {
+  id          String   @id @default(cuid())
+  senderId    String   @map("sender_id")
+  receiverId  String   @map("receiver_id")
+  content     String?  @db.Text
+  isRead      Boolean  @default(false) @map("is_read")
+  isDeleted   Boolean  @default(false) @map("is_deleted")
+  r2Key       String?  @map("r2_key")         // Optional file attachment
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  sender      User     @relation("DMSender", fields: [senderId], references: [id])
+  receiver    User     @relation("DMReceiver", fields: [receiverId], references: [id])
+
+  @@index([senderId, receiverId, createdAt])
+  @@map("direct_messages")
+}
+
+// ============================================================
+// FRIENDSHIP MODEL
+// Quan hệ bạn bè giữa 2 users
+// ============================================================
+model Friendship {
+  id         String           @id @default(cuid())
+  userId     String           @map("user_id")
+  friendId   String           @map("friend_id")
+  status     FriendshipStatus @default(PENDING)
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  user       User @relation("FriendshipUser", fields: [userId], references: [id])
+  friend     User @relation("FriendshipFriend", fields: [friendId], references: [id])
+
+  @@unique([userId, friendId])
+  @@map("friendships")
+}
+
+enum FriendshipStatus {
+  PENDING    // User gửi lời mời
+  ACCEPTED   // Đã là bạn
+  BLOCKED    // Đã block
+}
+
+// ============================================================
+// SERVER INVITE MODEL
+// Mã mời vào server
+// ============================================================
+model ServerInvite {
+  id         String    @id @default(cuid())
+  code       String    @unique @db.VarChar(10)
+  serverId   String    @map("server_id")
+  channelId  String?   @map("channel_id")
+  creatorId  String    @map("creator_id")
+  maxUses    Int?      @map("max_uses")
+  uses       Int       @default(0)
+  expiresAt  DateTime? @map("expires_at")
+  isTemporary Boolean  @default(false) @map("is_temporary")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  server     Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@map("server_invites")
+}
+
+// ============================================================
+// REFRESH TOKEN MODEL
+// JWT refresh token management
+// ============================================================
+model RefreshToken {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  token       String   @unique @db.VarChar(512)
+  expiresAt   DateTime @map("expires_at")
+  isRevoked   Boolean  @default(false) @map("is_revoked")
+  userAgent   String?  @map("user_agent") @db.VarChar(500)
+  ipAddress   String?  @map("ip_address") @db.VarChar(45)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
