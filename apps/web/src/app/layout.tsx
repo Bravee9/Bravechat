@@ -24,21 +24,30 @@ export const metadata: Metadata = {
   authors: [{ name: "Bravee9", url: "https://github.com/Bravee9" }],
   creator: "Bravee9",
   openGraph: {
-    type: "website",
-    locale: "vi_VN",
+    title: "Bravechat — Communicate, Freely.",
+    description: "Bravechat is a real-time communication platform for communities, teams, and friends. Text, voice, video — all in one place.",
     url: "https://bravechat.app",
     siteName: "Bravechat",
-    title: "Bravechat — Communicate, Freely.",
-    description:
-      "Real-time communication platform for communities, teams, and friends.",
+    images: [
+      {
+        url: "/brave-chat.png",
+        width: 1200,
+        height: 630,
+        alt: "Bravechat Logo",
+      },
+    ],
+    locale: "vi_VN",
+    type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Bravechat — Communicate, Freely.",
-    description: "Real-time chat, voice, and video for everyone.",
+    title: "Bravechat",
+    description: "Real-time communication platform.",
+    images: ["/brave-chat.png"],
   },
+
   icons: {
-    icon: "/favicon.ico",
+    icon: "/favicon.png",
   },
 };
 

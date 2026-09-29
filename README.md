@@ -1,5 +1,8 @@
-# Bravechat
+<p align="center">
+  <img src="./apps/web/public/brave-chat.png" alt="Bravechat Logo" width="400" />
+</p>
 
+# Bravechat
 Bravechat is a highly scalable, real-time communication platform engineered for communities, teams, and friends. Built with a modern monolithic-repo architecture, it delivers a seamless and secure messaging experience with a distinct Swiss Modern Minimalist design language.
 
 **Authors**: [Bravee9](https://github.com/Bravee9) & [Shuji7245](https://github.com/Shuji7245)
