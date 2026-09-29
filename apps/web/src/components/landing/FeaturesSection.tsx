@@ -11,45 +11,45 @@ const FEATURES = [
   {
     id: "text-chat",
     icon: <MessageIcon />,
-    title: "Nhắn tin tức thời",
+    title: "Nhắn tin thời gian thực",
     description:
-      "Tin nhắn real-time với độ trễ cực thấp. Hỗ trợ định dạng Markdown, emoji tùy chỉnh, GIF và link preview tự động.",
+      "Giao tiếp bằng văn bản với độ trễ tối thiểu. Tích hợp định dạng Markdown, biểu tượng cảm xúc tùy chỉnh và tính năng xem trước liên kết tự động.",
     tags: ["WebSocket", "Markdown", "Emoji"],
     accent: "#0D5C75",
   },
   {
     id: "voice-video",
     icon: <VoiceIcon />,
-    title: "Giọng nói & Video",
+    title: "Đàm thoại & Video",
     description:
-      "Kênh voice và video chất lượng cao. Chia sẻ màn hình, stream trực tiếp — kết nối không giới hạn số người tham gia.",
+      "Kênh liên lạc âm thanh và video chất lượng cao. Hỗ trợ chia sẻ màn hình và phát trực tiếp không giới hạn số lượng người tham gia.",
     tags: ["WebRTC", "1080p60", "Screen Share"],
     accent: "#639FAD",
   },
   {
     id: "file-media",
     icon: <MediaIcon />,
-    title: "Chia sẻ Media",
+    title: "Chia sẻ đa phương tiện",
     description:
-      "Upload hình ảnh, video lên Cloudflare R2. Xem trực tiếp trong chat mà không cần rời khỏi ứng dụng.",
+      "Hệ thống lưu trữ độc lập. Truy xuất và hiển thị nội dung trực tiếp trong cuộc hội thoại mà không cần sử dụng ứng dụng bên thứ ba.",
     tags: ["Cloudflare R2", "50MB", "Stream"],
     accent: "#0D5C75",
   },
   {
     id: "servers",
     icon: <ServerIcon />,
-    title: "Quản lý Server",
+    title: "Quản lý máy chủ",
     description:
-      "Tạo server với nhiều kênh, phân quyền theo role. Hệ thống mã mời linh hoạt — thời hạn và số lần sử dụng.",
+      "Khởi tạo không gian làm việc với đa kênh giao tiếp, phân quyền quản trị chi tiết. Hệ thống liên kết mời truy cập có kiểm soát thời hạn.",
     tags: ["Permissions", "Roles", "Invites"],
     accent: "#639FAD",
   },
   {
     id: "security",
     icon: <SecurityIcon />,
-    title: "Bảo mật cao",
+    title: "Bảo mật toàn diện",
     description:
-      "JWT authentication, rate limiting, refresh token rotation. Mọi request được xác thực và mã hóa end-to-end.",
+      "Tích hợp hệ thống phân quyền và giới hạn tần suất truy cập. Toàn bộ dữ liệu được xác thực định kỳ và đảm bảo an toàn thông tin tối đa.",
     tags: ["JWT", "Bcrypt", "Rate Limit"],
     accent: "#0D5C75",
   },
@@ -58,7 +58,7 @@ const FEATURES = [
     icon: <NotifIcon />,
     title: "Thông báo thông minh",
     description:
-      "Ping @mention, thông báo DM, đề cập server. Tùy chỉnh mức thông báo cho từng channel theo ý muốn.",
+      "Hệ thống đề cập cá nhân, thông báo tin nhắn trực tiếp và toàn máy chủ. Linh hoạt tùy chỉnh chi tiết cấu hình thông báo cho từng kênh riêng biệt.",
     tags: ["@Mentions", "Push", "DND Mode"],
     accent: "#639FAD",
   },
@@ -147,12 +147,7 @@ function FeatureCard({
         {feature.tags.map((tag) => (
           <span
             key={tag}
-            className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 border"
-            style={{
-              borderColor: `${feature.accent}30`,
-              color: `${feature.accent}CC`,
-              background: `${feature.accent}08`,
-            }}
+            className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 border border-ocean-secondary/30 text-ocean-secondary bg-ocean-secondary/10"
           >
             {tag}
           </span>

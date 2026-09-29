@@ -19,7 +19,7 @@ const TESTIMONIALS = [
   {
     id: 1,
     content:
-      "Bravechat thay đổi cách team mình giao tiếp. Real-time messaging mượt mà, không một giây delay.",
+      "Bravechat đã thay đổi cách đội ngũ của chúng tôi giao tiếp. Hệ thống nhắn tin thời gian thực hoạt động vô cùng ổn định và nhanh chóng.",
     author: "Nguyễn Minh Tú",
     role: "Lead Developer @ TechVN",
     avatar: "NT",
@@ -27,15 +27,15 @@ const TESTIMONIALS = [
   {
     id: 2,
     content:
-      "Giao diện đẹp, tốc độ nhanh. Tính năng quản lý server rất mạnh, phù hợp cộng đồng gaming của mình.",
+      "Giao diện được thiết kế hiện đại, tốc độ phản hồi nhanh. Tính năng quản lý máy chủ mạnh mẽ, phù hợp với quy mô cộng đồng lớn.",
     author: "Trần Gia Huy",
-    role: "Game Streamer",
+    role: "Community Manager",
     avatar: "GH",
   },
   {
     id: 3,
     content:
-      "Đã thử nhiều platform nhưng Bravechat là lựa chọn tốt nhất. Bảo mật cao, dữ liệu được mã hóa.",
+      "Đã trải nghiệm nhiều nền tảng nhưng Bravechat là sự lựa chọn tối ưu nhất. Độ bảo mật cao, toàn bộ dữ liệu đều được mã hóa an toàn.",
     author: "Lê Thị Hương",
     role: "Security Engineer",
     avatar: "LH",

@@ -31,25 +31,9 @@ export function AuthLayout({
       {/* Left panel — branding (hidden on mobile) */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-16 relative z-10 border-r border-ocean-dark-border">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-3 group w-fit">
-          <div className="w-8 h-8 bg-ocean-primary flex items-center justify-center">
-            <svg viewBox="0 0 32 32" fill="none" className="w-5 h-5">
-              <path
-                d="M4 22C8 16 12 20 16 16C20 12 24 18 28 14"
-                stroke="#D6E8ED"
-                strokeWidth="2.5"
-                strokeLinecap="square"
-              />
-              <path
-                d="M4 26C8 20 12 24 16 20C20 16 24 22 28 18"
-                stroke="#639FAD"
-                strokeWidth="2"
-                strokeLinecap="square"
-                opacity="0.6"
-              />
-            </svg>
-          </div>
-          <span className="font-bold text-lg text-ocean-light tracking-tight">
+        <Link href="/" className="flex items-center gap-3 group w-fit mb-8">
+          <img src="/favicon.png" alt="Bravechat Icon" className="w-10 h-10 object-contain" />
+          <span className="font-bold text-2xl text-ocean-light tracking-tight">
             Brave<span className="text-ocean-secondary">chat</span>
           </span>
         </Link>
@@ -108,13 +92,9 @@ export function AuthLayout({
       {/* Right panel — auth form */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
         {/* Mobile logo */}
-        <Link href="/" className="flex items-center gap-3 mb-10 lg:hidden">
-          <div className="w-7 h-7 bg-ocean-primary flex items-center justify-center">
-            <svg viewBox="0 0 32 32" fill="none" className="w-4 h-4">
-              <path d="M4 22C8 16 12 20 16 16C20 12 24 18 28 14" stroke="#D6E8ED" strokeWidth="2.5" strokeLinecap="square" />
-            </svg>
-          </div>
-          <span className="font-bold text-ocean-light">
+        <Link href="/" className="flex justify-center items-center gap-3 mb-12 lg:hidden group">
+          <img src="/favicon.png" alt="Bravechat Icon" className="w-10 h-10 object-contain" />
+          <span className="font-bold text-xl text-ocean-light tracking-tight">
             Brave<span className="text-ocean-secondary">chat</span>
           </span>
         </Link>

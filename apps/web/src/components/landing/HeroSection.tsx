@@ -82,8 +82,8 @@ export function HeroSection() {
         className="mt-8 text-center text-ocean-light/90 text-base md:text-lg max-w-2xl leading-relaxed animate-fade-in"
         style={{ animationDelay: "0.4s" }}
       >
-        Tạo server, mời bạn bè, trò chuyện qua tin nhắn, giọng nói và video.
-        Bravechat mang lại trải nghiệm giao tiếp mượt mà, an toàn và không giới hạn.
+        Khởi tạo máy chủ, kết nối thành viên, trao đổi qua tin nhắn, giọng nói và video.
+        Bravechat mang lại trải nghiệm giao tiếp liền mạch, bảo mật và không giới hạn.
       </p>
 
       {/* CTA Buttons */}
@@ -324,7 +324,7 @@ const MOCK_MESSAGES = [
     avatar: "B9",
     user: "Bravee9",
     time: "hôm nay lúc 09:41",
-    content: "Chào mọi người! Bravechat đã sẵn sàng 🌊",
+    content: "Xin chào! Nền tảng Bravechat đã chính thức đi vào hoạt động.",
     isHighlighted: true,
   },
   {
@@ -332,7 +332,7 @@ const MOCK_MESSAGES = [
     avatar: "SJ",
     user: "Shuji",
     time: "hôm nay lúc 09:43",
-    content: "Giao diện đẹp quá! Tông màu ocean rất hợp.",
+    content: "Giao diện được thiết kế hiện đại, tinh giản và chuyên nghiệp.",
     isHighlighted: false,
   },
   {
@@ -340,7 +340,7 @@ const MOCK_MESSAGES = [
     avatar: "CH",
     user: "Châu",
     time: "hôm nay lúc 09:44",
-    content: "Real-time messaging mượt mà, không lag 🎉",
+    content: "Hệ thống nhắn tin thời gian thực hoạt động ổn định và tối ưu.",
     isHighlighted: false,
   },
 ];

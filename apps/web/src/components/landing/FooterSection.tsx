@@ -16,7 +16,7 @@ const FOOTER_LINKS = {
     { label: "API Reference", href: "/docs/api-reference" },
     { label: "Kiến trúc", href: "/docs/architecture" },
     { label: "Database Schema", href: "/docs/database-schema" },
-    { label: "GitHub", href: "https://github.com/Bravee9/discord" },
+    { label: "GitHub", href: "https://github.com/Bravee9/Bravechat" },
   ],
   "Pháp lý": [
     { label: "Điều khoản sử dụng", href: "/terms" },
@@ -34,30 +34,14 @@ export function FooterSection() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 bg-ocean-primary flex items-center justify-center">
-                <svg viewBox="0 0 32 32" fill="none" className="w-5 h-5">
-                  <path
-                    d="M4 22C8 16 12 20 16 16C20 12 24 18 28 14"
-                    stroke="#D6E8ED"
-                    strokeWidth="2.5"
-                    strokeLinecap="square"
-                  />
-                  <path
-                    d="M4 26C8 20 12 24 16 20C20 16 24 22 28 18"
-                    stroke="#639FAD"
-                    strokeWidth="2"
-                    strokeLinecap="square"
-                    opacity="0.6"
-                  />
-                </svg>
-              </div>
-              <span className="font-bold text-lg text-ocean-light tracking-tight">
+              <img src="/favicon.png" alt="Bravechat Icon" className="w-8 h-8 object-contain" />
+              <span className="font-bold text-xl text-ocean-light tracking-tight">
                 Brave<span className="text-ocean-secondary">chat</span>
               </span>
             </div>
             <p className="text-ocean-light/70 text-sm leading-relaxed max-w-xs">
-              Nền tảng giao tiếp thời gian thực cho cộng đồng, nhóm và bạn bè.
-              Xây dựng bởi{" "}
+              Nền tảng giao tiếp thời gian thực dành cho cộng đồng, tổ chức và doanh nghiệp.
+              Phát triển bởi{" "}
               <a
                 href="https://github.com/Bravee9"
                 target="_blank"
@@ -117,14 +101,13 @@ export function FooterSection() {
         {/* Bottom bar */}
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-ocean-light/70 text-xs font-mono">
-            © {new Date().getFullYear()} Bravechat. Được xây dựng với ❤️ tại
-            Việt Nam.
+            © {new Date().getFullYear()} Bravechat. Phát triển tại Việt Nam.
           </p>
           <div className="flex items-center gap-6">
             {/* GitHub */}
             <a
               id="footer-github"
-              href="https://github.com/Bravee9/discord"
+              href="https://github.com/Bravee9/Bravechat"
               target="_blank"
               rel="noreferrer"
               className="text-ocean-light/70 hover:text-ocean-secondary transition-colors"

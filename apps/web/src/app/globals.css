@@ -216,7 +216,7 @@
   .glass-ocean {
     backdrop-filter: blur(12px) saturate(1.5);
     -webkit-backdrop-filter: blur(12px) saturate(1.5);
-    @apply bg-ocean-dark-bg/80 border border-ocean-dark-border/60;
+    @apply bg-ocean-dark-bg/95;
   }
 
   /* ─── GRADIENT TEXT ───────────────────────────────────── */
@@ -316,4 +316,40 @@
 
 .light ::-webkit-scrollbar-thumb {
   background: #639FAD;
+}
+
+/* ─── LEGAL / DOCS PROSE ─────────────────────────────────── */
+.prose-legal p,
+.docs-content p {
+  @apply text-ocean-light/80 text-sm leading-relaxed mb-4;
+}
+
+.prose-legal ul,
+.docs-content ul {
+  @apply list-none pl-0 flex flex-col gap-2 mb-4;
+}
+
+.prose-legal ul li,
+.docs-content ul li {
+  @apply text-ocean-light/80 text-sm leading-relaxed pl-5 relative;
+}
+
+.prose-legal ul li::before,
+.docs-content ul li::before {
+  content: '';
+  @apply absolute left-0 top-2 w-1.5 h-1.5 bg-ocean-secondary inline-block;
+}
+
+.prose-legal strong,
+.docs-content strong {
+  @apply text-ocean-light font-bold;
+}
+
+.prose-legal em {
+  @apply text-ocean-light/70 italic;
+}
+
+.prose-legal a,
+.docs-content a {
+  @apply text-ocean-secondary hover:text-ocean-light underline;
 }

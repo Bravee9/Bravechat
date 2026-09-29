@@ -9,10 +9,10 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { label: "Tính năng", href: "#features" },
-  { label: "Cộng đồng", href: "#community" },
-  { label: "Về chúng tôi", href: "#about" },
-  { label: "Docs", href: "/docs" },
+  { label: "Tính năng", href: "/#features" },
+  { label: "Cộng đồng", href: "/#community" },
+  { label: "Lộ trình", href: "/roadmap" },
+  { label: "Tài liệu", href: "/docs" },
 ];
 
 export function Navbar() {
@@ -30,18 +30,15 @@ export function Navbar() {
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
         isScrolled
-          ? "glass-ocean border-b border-ocean-dark-border/60"
+          ? "glass-ocean shadow-md shadow-black/20"
           : "bg-transparent"
       )}
     >
       <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3 group">
-          {/* Ocean wave logo mark */}
-          <div className="w-8 h-8 bg-ocean-primary flex items-center justify-center relative overflow-hidden">
-            <OceanLogoMark />
-          </div>
-          <span className="font-bold text-lg text-ocean-light tracking-tight group-hover:text-white transition-colors">
+          <img src="/favicon.png" alt="Bravechat Icon" className="w-8 h-8 object-contain" />
+          <span className="font-bold text-xl text-ocean-light tracking-tight group-hover:text-white transition-colors">
             Brave<span className="text-ocean-secondary">chat</span>
           </span>
         </Link>
