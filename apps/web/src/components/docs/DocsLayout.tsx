@@ -61,7 +61,7 @@ export function DocsLayout({ children, title, description }: DocsLayoutProps) {
               <nav className="flex flex-col gap-6">
                 {DOCS_NAV.map((group) => (
                   <div key={group.group}>
-                    <p className="text-ocean-secondary text-[10px] font-bold uppercase tracking-widest mb-2">
+                    <p className="text-ocean-secondary text-xs font-bold uppercase tracking-widest mb-2">
                       {group.group}
                     </p>
                     <div className="flex flex-col gap-0.5">

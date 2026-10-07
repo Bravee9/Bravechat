@@ -29,7 +29,7 @@ export function AuthLayout({
       <OceanBackground />
 
       {/* Left panel — branding (hidden on mobile) */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-16 relative z-10 border-r border-ocean-dark-border">
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-16 relative z-10 border-r border-white/5 bg-ocean-dark-bg/20 backdrop-blur-sm">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3 group w-fit mb-8">
           <img src="/favicon.png" alt="Bravechat Icon" className="w-10 h-10 object-contain" />
@@ -47,40 +47,14 @@ export function AuthLayout({
           <h1 className="text-5xl font-black text-ocean-light tracking-tighter leading-normal mb-6 py-2">
             GIAO TIẾP
             <br />
-            <span className="text-gradient-ocean inline-block pt-1 pb-3">BẮT ĐẦU TỪ ĐÂY</span>
+            <span className="text-gradient-ocean">BẮT ĐẦU TỪ ĐÂY</span>
           </h1>
           <p className="text-ocean-light/80 leading-relaxed">
             Tham gia hàng triệu người dùng trên Bravechat — nền tảng giao tiếp
             thời gian thực dành cho cộng đồng, nhóm và bạn bè.
           </p>
 
-          {/* Feature list */}
-          <ul className="mt-10 flex flex-col gap-4">
-            {[
-              "Nhắn tin, giọng nói và video không giới hạn",
-              "Mã hóa JWT, bảo mật cấp doanh nghiệp",
-              "Lưu trữ media trên Cloudflare R2",
-              "Real-time với WebSocket & Redis",
-            ].map((item) => (
-              <li key={item} className="flex items-start gap-3">
-                <span className="w-5 h-5 border border-ocean-primary bg-ocean-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg
-                    className="w-3 h-3 text-ocean-secondary"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="square"
-                      strokeWidth={3}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                </span>
-                <span className="text-ocean-light/80 text-sm">{item}</span>
-              </li>
-            ))}
-          </ul>
+
         </div>
 
         {/* Bottom */}
@@ -101,7 +75,7 @@ export function AuthLayout({
 
         <div className="w-full max-w-md">
           {/* Card */}
-          <div className="card-ocean p-8 md:p-10 animate-fade-in">
+          <div className="bg-ocean-dark-surface/40 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-black/50 p-8 md:p-10 animate-fade-in">
             {/* Header */}
             <div className="mb-8">
               <h2 className="text-2xl font-black text-ocean-light tracking-tight">

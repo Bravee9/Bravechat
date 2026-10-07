@@ -27,7 +27,7 @@ const FOOTER_LINKS = {
 
 export function FooterSection() {
   return (
-    <footer className="bg-[#030C10] border-t border-ocean-dark-border">
+    <footer className="bg-ocean-dark-bg border-t border-ocean-dark-border">
       <div className="max-w-7xl mx-auto px-6 py-16">
         {/* Top section */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 pb-12 border-b border-ocean-dark-border">
@@ -61,19 +61,7 @@ export function FooterSection() {
               </a>
             </p>
 
-            {/* Tech stack badges */}
-            <div className="mt-6 flex flex-wrap gap-2">
-              {["Next.js", "Fastify", "PostgreSQL", "Redis", "R2"].map(
-                (tech) => (
-                  <span
-                    key={tech}
-                    className="text-[10px] font-bold uppercase tracking-wider text-ocean-light/60 border border-ocean-dark-border px-2 py-1"
-                  >
-                    {tech}
-                  </span>
-                )
-              )}
-            </div>
+
           </div>
 
           {/* Links */}
@@ -101,7 +89,7 @@ export function FooterSection() {
         {/* Bottom bar */}
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-ocean-light/70 text-xs font-mono">
-            © {new Date().getFullYear()} Bravechat. Phát triển tại Việt Nam.
+            © {new Date().getFullYear()} Bravechat.
           </p>
           <div className="flex items-center gap-6">
             {/* GitHub */}

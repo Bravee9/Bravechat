@@ -164,7 +164,7 @@ export function RegisterForm() {
       {errors.general && (
         <div
           id="register-error-general"
-          className="border border-red-900/50 bg-red-950/30 px-4 py-3 text-red-400 text-sm"
+          className="border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm"
           role="alert"
         >
           {errors.general}
@@ -185,11 +185,11 @@ export function RegisterForm() {
           value={form.email}
           onChange={handleChange}
           placeholder="ten@example.com"
-          className={cn("input-ocean", errors.email && "border-red-700")}
+          className={cn("input-ocean", errors.email && "border-rose-500/50 focus:border-rose-500/70")}
         />
         {errors.email && (
-          <p className="text-red-400 text-xs mt-1 flex items-center gap-1">
-            <span className="w-1 h-1 bg-red-400 inline-block" />
+          <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
+            <span className="w-1 h-1 bg-rose-400 inline-block" />
             {errors.email}
           </p>
         )}
@@ -210,10 +210,10 @@ export function RegisterForm() {
             onChange={handleChange}
             placeholder="nguyen_minh"
             maxLength={32}
-            className={cn("input-ocean font-mono", errors.username && "border-red-700")}
+            className={cn("input-ocean font-mono", errors.username && "border-rose-500/50 focus:border-rose-500/70")}
           />
           {errors.username ? (
-            <p className="text-red-400 text-xs mt-1">{errors.username}</p>
+            <p className="text-rose-400 text-xs mt-1">{errors.username}</p>
           ) : (
             <p className="text-ocean-light/70 text-xs mt-1">
               Chỉ a-z, 0-9, dấu . và _
@@ -233,10 +233,10 @@ export function RegisterForm() {
             onChange={handleChange}
             placeholder="Nguyễn Minh"
             maxLength={32}
-            className={cn("input-ocean", errors.displayName && "border-red-700")}
+            className={cn("input-ocean", errors.displayName && "border-rose-500/50 focus:border-rose-500/70")}
           />
           {errors.displayName && (
-            <p className="text-red-400 text-xs mt-1">{errors.displayName}</p>
+            <p className="text-rose-400 text-xs mt-1">{errors.displayName}</p>
           )}
         </div>
       </div>
@@ -256,7 +256,7 @@ export function RegisterForm() {
             onChange={handleChange}
             onFocus={() => setShowPasswordHints(true)}
             placeholder="••••••••"
-            className={cn("input-ocean pr-12", errors.password && "border-red-700")}
+            className={cn("input-ocean pr-12", errors.password && "border-rose-500/50 focus:border-rose-500/70")}
           />
           <button
             type="button"
@@ -297,7 +297,7 @@ export function RegisterForm() {
               Độ mạnh:{" "}
               <span className={cn(
                 "font-bold",
-                passwordStrength <= 1 && "text-red-400",
+                passwordStrength <= 1 && "text-rose-400",
                 passwordStrength === 2 && "text-amber-400",
                 passwordStrength === 3 && "text-yellow-400",
                 passwordStrength === 4 && "text-emerald-400",
@@ -331,7 +331,7 @@ export function RegisterForm() {
         )}
 
         {errors.password && (
-          <p className="text-red-400 text-xs mt-1">{errors.password}</p>
+          <p className="text-rose-400 text-xs mt-1">{errors.password}</p>
         )}
       </div>
 
@@ -348,10 +348,10 @@ export function RegisterForm() {
           value={form.confirmPassword}
           onChange={handleChange}
           placeholder="••••••••"
-          className={cn("input-ocean", errors.confirmPassword && "border-red-700")}
+          className={cn("input-ocean", errors.confirmPassword && "border-rose-500/50 focus:border-rose-500/70")}
         />
         {errors.confirmPassword && (
-          <p className="text-red-400 text-xs mt-1">{errors.confirmPassword}</p>
+          <p className="text-rose-400 text-xs mt-1">{errors.confirmPassword}</p>
         )}
         {!errors.confirmPassword &&
           form.confirmPassword &&
@@ -386,7 +386,7 @@ export function RegisterForm() {
                 form.agreeToTerms
                   ? "bg-ocean-primary border-ocean-primary"
                   : "border-ocean-dark-border group-hover:border-ocean-secondary",
-                errors.agreeToTerms && "border-red-700"
+                errors.agreeToTerms && "border-rose-500/50 focus:border-rose-500/70"
               )}
             >
               {form.agreeToTerms && (
@@ -414,7 +414,7 @@ export function RegisterForm() {
           </span>
         </label>
         {errors.agreeToTerms && (
-          <p className="text-red-400 text-xs mt-1 ml-7">{errors.agreeToTerms}</p>
+          <p className="text-rose-400 text-xs mt-1 ml-7">{errors.agreeToTerms}</p>
         )}
       </div>
 

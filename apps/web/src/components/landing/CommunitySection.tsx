@@ -85,7 +85,7 @@ export function CommunitySection() {
           <h2 className="text-4xl md:text-5xl font-black text-ocean-light tracking-tight leading-normal py-2">
             ĐƯỢC TIN TƯỞNG BỞI
             <br />
-            <span className="text-gradient-ocean inline-block pt-1 pb-3">HÀNG TRIỆU NGƯỜI</span>
+            <span className="text-gradient-ocean">HÀNG TRIỆU NGƯỜI</span>
           </h2>
         </div>
 

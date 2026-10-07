@@ -77,7 +77,7 @@ export function FeaturesSection() {
           <h2 className="text-4xl md:text-5xl font-black text-ocean-light tracking-tight leading-normal py-2">
             MỌI THỨ BẠN
             <br />
-            <span className="text-gradient-ocean inline-block pt-1 pb-3">CẦN ĐỂ KẾT NỐI</span>
+            <span className="text-gradient-ocean">CẦN ĐỂ KẾT NỐI</span>
           </h2>
           <p className="mt-6 text-ocean-light/80 text-base leading-relaxed">
             Được xây dựng trên nền tảng công nghệ hiện đại nhất — real-time,
@@ -142,17 +142,7 @@ function FeatureCard({
         {feature.description}
       </p>
 
-      {/* Tags */}
-      <div className="flex flex-wrap gap-2">
-        {feature.tags.map((tag) => (
-          <span
-            key={tag}
-            className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 border border-ocean-secondary/30 text-ocean-secondary bg-ocean-secondary/10"
-          >
-            {tag}
-          </span>
-        ))}
-      </div>
+
 
       {/* Hover arrow */}
       <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">

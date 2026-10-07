@@ -36,7 +36,7 @@ const config: Config = {
 
       // ─── TYPOGRAPHY ──────────────────────────────────────────
       fontFamily: {
-        sans:  ["Inter", "system-ui", "sans-serif"],
+        sans:  ["Be Vietnam Pro", "Inter", "system-ui", "sans-serif"],
         mono:  ["JetBrains Mono", "Fira Code", "monospace"],
       },
 

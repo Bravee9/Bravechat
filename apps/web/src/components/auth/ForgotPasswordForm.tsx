@@ -79,7 +79,7 @@ export function ForgotPasswordForm() {
       {error && (
         <div
           id="forgot-password-error"
-          className="border border-red-900/50 bg-red-950/30 px-4 py-3 text-red-400 text-sm flex items-start gap-2"
+          className="border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-start gap-2"
           role="alert"
         >
           <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,7 +103,7 @@ export function ForgotPasswordForm() {
           value={email}
           onChange={(e) => { setEmail(e.target.value); setError(""); }}
           placeholder="ten@example.com"
-          className={cn("input-ocean", error && "border-red-700")}
+          className={cn("input-ocean", error && "border-rose-500/50 focus:border-rose-500/70")}
         />
         <p className="text-ocean-light/60 text-xs mt-2 leading-relaxed">
           Nhập địa chỉ email được dùng để đăng ký tài khoản Bravechat.

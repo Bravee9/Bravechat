@@ -4,7 +4,7 @@
  * ─────────────────────────────────────────────────────────
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -228,8 +228,9 @@
     color: transparent;
     -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
-    padding-top: 0.1em;
-    padding-bottom: 0.15em;
+    padding-top: 0.4em;
+    padding-bottom: 0.2em;
+    display: inline-block;
   }
 
   /* ─── SECTION HEADING ─────────────────────────────────── */
