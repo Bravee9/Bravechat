@@ -53,11 +53,7 @@ export function HeroSection() {
       id="hero"
       className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-16"
     >
-      {/* Section tag */}
-      <div className="section-tag animate-fade-in" style={{ animationDelay: "0.1s" }}>
-        <span className="w-1.5 h-1.5 bg-ocean-secondary inline-block animate-pulse" />
-        Phiên bản Beta · Đang phát triển
-      </div>
+
 
       {/* Main heading */}
       <h1

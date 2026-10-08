@@ -58,4 +58,11 @@ coverage/
 
 # ─── Misc ────────────────────────────────────────────
 *.pem
-.vercel
+.vercel 
+
+# ─── AI / Agent Configs ──────────────────────────────
+.agents/
+skills-lock.json
+replace.js
+*.ai.txt
+*.prompt
