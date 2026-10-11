@@ -16,21 +16,25 @@ const config: Config = {
 
   theme: {
     extend: {
-      // ─── OCEAN COLOR PALETTE ──────────────────────────────────
+      // ─── OCEAN COLOR PALETTE (Xanh dương hàn lâm, chống mỏi mắt) ───
+      // Gốc LaTeX: OceanBluePrimary 1A659E · OceanBlueSecondary 5B92C2
+      //            OceanBlueLightBg EAF2F8 · OceanBlueDark 0E3D60 · OceanBlueLightText 0A233A
+      // Nền tối là navy (không đen tuyền) để giảm chói; chữ là EAF2F8 thay vì trắng.
       colors: {
         ocean: {
-          primary:       "#0D5C75",  // Biển sâu — Header, Nút bấm chính
-          secondary:     "#639FAD",  // Xanh thép — Viền, icon, text phụ
-          light:         "#D6E8ED",  // Xanh băng — Text dark mode, highlight
-          "dark-bg":     "#051014",  // Đen biển thẳm — Body background dark
-          "dark-surface":"#0A1C23",  // Nền Card/Sidebar dark
-          "dark-border": "#16323D",  // Viền dark
-          "light-bg":    "#F0F5F7",  // Xám trắng lạnh — Body light
-          "light-surface":"#FFFFFF", // Trắng tinh — Card light
-          "light-border":"#C9D8DD",  // Viền light
-          "light-text":  "#081E26",  // Đen ánh lam — Text chính light
-          hover:         "#0A4A5E",  // Hover state cho primary button
-          "dark-hover":  "#0E2832",  // Hover state dark
+          primary:       "#1A659E",  // OceanBluePrimary — nút chính, nhấn
+          secondary:     "#5B92C2",  // OceanBlueSecondary — viền, icon, text phụ
+          light:         "#EAF2F8",  // OceanBlueLightBg — chữ trên nền tối
+          "dark-bg":     "#071A2C",  // Navy thẫm (dẫn xuất từ 0A233A) — nền body tối
+          "dark-surface":"#0A233A",  // OceanBlueLightText — nền card/sidebar tối
+          "dark-border": "#173B5C",  // Viền tối
+          "light-bg":    "#EAF2F8",  // OceanBlueLightBg — nền body sáng
+          "light-surface":"#FFFFFF", // Card sáng
+          "light-border":"#C5D9EA",  // Viền sáng
+          "light-text":  "#0A233A",  // OceanBlueLightText — chữ chính nền sáng
+          hover:         "#15568A",  // Hover của primary
+          "dark-hover":  "#0F2D4A",  // Hover trên nền tối
+          deep:          "#0E3D60",  // OceanBlueDark — mảng tối, gradient
         },
       },
 
@@ -51,8 +55,8 @@ const config: Config = {
       // ─── BOX SHADOW ──────────────────────────────────────────
       // Swiss Minimalist: tối giản, không shadow nặng
       boxShadow: {
-        "ocean-glow": "0 0 20px rgba(13, 92, 117, 0.3)",
-        "ocean-panel": "4px 0 16px rgba(5, 16, 20, 0.5)",
+        "ocean-glow": "0 0 20px rgba(26, 101, 158, 0.3)",
+        "ocean-panel": "4px 0 16px rgba(7, 26, 44, 0.5)",
         none: "none",
       },
 
@@ -88,7 +92,7 @@ const config: Config = {
         },
         "blink-caret": {
           "from, to": { borderColor: "transparent" },
-          "50%":      { borderColor: "#0D5C75" },
+          "50%":      { borderColor: "#1A659E" },
         },
         "float": {
           "0%, 100%": { transform: "translateY(0) rotate(0deg)" },

@@ -4,6 +4,7 @@
  */
 
 import Link from "next/link";
+import { CookieSettingsButton } from "@/components/consent/CookieSettingsButton";
 
 const FOOTER_LINKS = {
   "Sản phẩm": [
@@ -34,7 +35,7 @@ export function FooterSection() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <div className="flex items-center gap-3 mb-6">
-              <img src="/favicon.png" alt="Bravechat Icon" className="w-8 h-8 object-contain" />
+              <img src="/logo-96.png" alt="Logo Bravechat" width={32} height={32} loading="lazy" className="w-8 h-8 object-contain" />
               <span className="font-bold text-xl text-ocean-light tracking-tight">
                 Brave<span className="text-ocean-secondary">chat</span>
               </span>
@@ -81,6 +82,11 @@ export function FooterSection() {
                     </Link>
                   </li>
                 ))}
+                {category === "Pháp lý" && (
+                  <li>
+                    <CookieSettingsButton />
+                  </li>
+                )}
               </ul>
             </div>
           ))}

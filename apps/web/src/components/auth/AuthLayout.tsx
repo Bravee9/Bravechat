@@ -32,7 +32,7 @@ export function AuthLayout({
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-16 relative z-10 border-r border-white/5 bg-ocean-dark-bg/20 backdrop-blur-sm">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3 group w-fit mb-8">
-          <img src="/favicon.png" alt="Bravechat Icon" className="w-10 h-10 object-contain" />
+          <img src="/logo-96.png" alt="Logo Bravechat" width={40} height={40} className="w-10 h-10 object-contain" />
           <span className="font-bold text-2xl text-ocean-light tracking-tight">
             Brave<span className="text-ocean-secondary">chat</span>
           </span>
@@ -67,7 +67,7 @@ export function AuthLayout({
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
         {/* Mobile logo */}
         <Link href="/" className="flex justify-center items-center gap-3 mb-12 lg:hidden group">
-          <img src="/favicon.png" alt="Bravechat Icon" className="w-10 h-10 object-contain" />
+          <img src="/logo-96.png" alt="Logo Bravechat" width={40} height={40} className="w-10 h-10 object-contain" />
           <span className="font-bold text-xl text-ocean-light tracking-tight">
             Brave<span className="text-ocean-secondary">chat</span>
           </span>

@@ -5,8 +5,12 @@
 
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { CookieBanner } from "@/components/consent/CookieBanner";
+import { Analytics } from "@/components/consent/Analytics";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Bravechat — Communicate, Freely.",
     template: "%s | Bravechat",
@@ -26,16 +30,8 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Bravechat — Communicate, Freely.",
     description: "Bravechat is a real-time communication platform for communities, teams, and friends. Text, voice, video — all in one place.",
-    url: "https://bravechat.app",
     siteName: "Bravechat",
-    images: [
-      {
-        url: "/brave-chat.png",
-        width: 1200,
-        height: 630,
-        alt: "Bravechat Logo",
-      },
-    ],
+    // Ảnh OG lấy từ app/opengraph-image.tsx (1200x630)
     locale: "vi_VN",
     type: "website",
   },
@@ -43,18 +39,23 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Bravechat",
     description: "Real-time communication platform.",
-    images: ["/brave-chat.png"],
+    // Ảnh Twitter lấy từ app/twitter-image.tsx
   },
-
   icons: {
-    icon: "/favicon.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    shortcut: "/favicon.ico",
   },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#051014",
+  themeColor: "#071A2C",
 };
 
 export default function RootLayout({
@@ -74,6 +75,8 @@ export default function RootLayout({
       </head>
       <body className="bg-ocean-dark-bg text-ocean-light font-sans antialiased">
         {children}
+        <CookieBanner />
+        <Analytics />
       </body>
     </html>
   );

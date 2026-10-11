@@ -38,7 +38,7 @@ export default function PrivacyPage() {
       <Section id="overview">
         <SectionHeading en="Overview">1. Tổng quan</SectionHeading>
         <p>
-          Bravechat ("chúng tôi") cam kết bảo vệ quyền riêng tư và dữ liệu cá nhân của người dùng.
+          Bravechat (&quot;chúng tôi&quot;) cam kết bảo vệ quyền riêng tư và dữ liệu cá nhân của người dùng.
           Chính sách Bảo mật này mô tả cách chúng tôi thu thập, sử dụng, lưu trữ và bảo vệ thông
           tin của bạn khi bạn sử dụng nền tảng Bravechat.
         </p>
@@ -47,7 +47,7 @@ export default function PrivacyPage() {
           bảo vệ dữ liệu được áp dụng tại Việt Nam.
         </p>
         <Bilingual>
-          Bravechat ("we") is committed to protecting the privacy and personal data of our users.
+          Bravechat (&quot;we&quot;) is committed to protecting the privacy and personal data of our users.
           This Privacy Policy describes how we collect, use, store, and safeguard your information
           when you use the Bravechat platform. This Policy applies to all users worldwide and
           complies with applicable data protection regulations in Vietnam.
@@ -240,7 +240,7 @@ export default function PrivacyPage() {
         <Bilingual>
           We retain account data for the duration the account remains active. After account
           deletion: profile information and identifying data are deleted within 30 days; message
-          content is anonymized or deleted depending on the relevant server's settings; system logs
+          content is anonymized or deleted depending on the relevant server&apos;s settings; system logs
           may be retained for up to 90 days for security purposes.
         </Bilingual>
       </Section>
@@ -321,8 +321,9 @@ function SectionHeading({ children, en }: { children: React.ReactNode; en: strin
   );
 }
 
-function Bilingual({ children }: { children: React.ReactNode }) {
+function Bilingual({ children }: { children?: React.ReactNode }) {
   // Tạm ẩn bản tiếng Anh cho bớt dài, có thể thêm state chuyển đổi sau
+  if (Boolean(children)) return null;
   return null;
 }
 

@@ -155,7 +155,7 @@ export default function TermsPage() {
         <Bilingual>
           You retain full ownership of the content you create and share on Bravechat. However, by
           posting content, you grant Bravechat a non-exclusive, royalty-free license to store,
-          display, and distribute that content within the scope of the platform's operations.
+          display, and distribute that content within the scope of the platform&apos;s operations.
           Bravechat reserves the right to remove any content that violates these Terms or applicable
           laws without prior notice.
         </Bilingual>
@@ -202,13 +202,13 @@ export default function TermsPage() {
           8. Giới hạn Trách nhiệm
         </SectionHeading>
         <p>
-          Dịch vụ được cung cấp "nguyên trạng" (<em>as-is</em>) và "theo tình trạng hiện có"
+          Dịch vụ được cung cấp &quot;nguyên trạng&quot; (<em>as-is</em>) và &quot;theo tình trạng hiện có&quot;
           (<em>as-available</em>). Trong phạm vi tối đa cho phép của pháp luật, Bravechat không
           chịu trách nhiệm về bất kỳ thiệt hại gián tiếp, ngẫu nhiên, đặc biệt hoặc hệ quả nào
           phát sinh từ việc sử dụng hoặc không thể sử dụng dịch vụ.
         </p>
         <Bilingual>
-          The service is provided "as-is" and "as-available." To the maximum extent permitted by
+          The service is provided &quot;as-is&quot; and &quot;as-available.&quot; To the maximum extent permitted by
           law, Bravechat is not liable for any indirect, incidental, special, or consequential
           damages arising from your use of or inability to use the service.
         </Bilingual>
@@ -274,7 +274,8 @@ function SectionHeading({ children, en }: { children: React.ReactNode; en: strin
   );
 }
 
-function Bilingual({ children }: { children: React.ReactNode }) {
+function Bilingual({ children }: { children?: React.ReactNode }) {
   // Tạm ẩn bản tiếng Anh cho bớt dài, có thể thêm state chuyển đổi sau
+  if (Boolean(children)) return null;
   return null;
 }

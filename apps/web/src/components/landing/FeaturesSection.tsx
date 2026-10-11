@@ -15,7 +15,7 @@ const FEATURES = [
     description:
       "Giao tiếp bằng văn bản với độ trễ tối thiểu. Tích hợp định dạng Markdown, biểu tượng cảm xúc tùy chỉnh và tính năng xem trước liên kết tự động.",
     tags: ["WebSocket", "Markdown", "Emoji"],
-    accent: "#0D5C75",
+    accent: "#1A659E",
   },
   {
     id: "voice-video",
@@ -24,7 +24,7 @@ const FEATURES = [
     description:
       "Kênh liên lạc âm thanh và video chất lượng cao. Hỗ trợ chia sẻ màn hình và phát trực tiếp không giới hạn số lượng người tham gia.",
     tags: ["WebRTC", "1080p60", "Screen Share"],
-    accent: "#639FAD",
+    accent: "#5B92C2",
   },
   {
     id: "file-media",
@@ -33,7 +33,7 @@ const FEATURES = [
     description:
       "Hệ thống lưu trữ độc lập. Truy xuất và hiển thị nội dung trực tiếp trong cuộc hội thoại mà không cần sử dụng ứng dụng bên thứ ba.",
     tags: ["Cloudflare R2", "50MB", "Stream"],
-    accent: "#0D5C75",
+    accent: "#1A659E",
   },
   {
     id: "servers",
@@ -42,7 +42,7 @@ const FEATURES = [
     description:
       "Khởi tạo không gian làm việc với đa kênh giao tiếp, phân quyền quản trị chi tiết. Hệ thống liên kết mời truy cập có kiểm soát thời hạn.",
     tags: ["Permissions", "Roles", "Invites"],
-    accent: "#639FAD",
+    accent: "#5B92C2",
   },
   {
     id: "security",
@@ -51,7 +51,7 @@ const FEATURES = [
     description:
       "Tích hợp hệ thống phân quyền và giới hạn tần suất truy cập. Toàn bộ dữ liệu được xác thực định kỳ và đảm bảo an toàn thông tin tối đa.",
     tags: ["JWT", "Bcrypt", "Rate Limit"],
-    accent: "#0D5C75",
+    accent: "#1A659E",
   },
   {
     id: "notifications",
@@ -60,7 +60,7 @@ const FEATURES = [
     description:
       "Hệ thống đề cập cá nhân, thông báo tin nhắn trực tiếp và toàn máy chủ. Linh hoạt tùy chỉnh chi tiết cấu hình thông báo cho từng kênh riêng biệt.",
     tags: ["@Mentions", "Push", "DND Mode"],
-    accent: "#639FAD",
+    accent: "#5B92C2",
   },
 ];
 

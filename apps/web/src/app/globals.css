@@ -13,21 +13,21 @@
 /* ─── CSS CUSTOM PROPERTIES ──────────────────────────────── */
 :root {
   /* Ocean palette as CSS variables for non-Tailwind usage */
-  --ocean-primary:        #0D5C75;
-  --ocean-secondary:      #639FAD;
-  --ocean-light:          #D6E8ED;
-  --ocean-dark-bg:        #051014;
-  --ocean-dark-surface:   #0A1C23;
-  --ocean-dark-border:    #16323D;
-  --ocean-light-bg:       #F0F5F7;
+  --ocean-primary:        #1A659E;
+  --ocean-secondary:      #5B92C2;
+  --ocean-light:          #EAF2F8;
+  --ocean-dark-bg:        #071A2C;
+  --ocean-dark-surface:   #0A233A;
+  --ocean-dark-border:    #173B5C;
+  --ocean-light-bg:       #EAF2F8;
   --ocean-light-surface:  #FFFFFF;
-  --ocean-light-border:   #C9D8DD;
-  --ocean-light-text:     #081E26;
+  --ocean-light-border:   #C5D9EA;
+  --ocean-light-text:     #0A233A;
 
   /* Scrollbar */
-  --scrollbar-track: #0A1C23;
-  --scrollbar-thumb: #16323D;
-  --scrollbar-thumb-hover: #0D5C75;
+  --scrollbar-track: #0A233A;
+  --scrollbar-thumb: #173B5C;
+  --scrollbar-thumb-hover: #1A659E;
 }
 
 /* ─── BASE LAYER ─────────────────────────────────────────── */
@@ -50,6 +50,17 @@
     @apply bg-ocean-dark-bg text-ocean-light font-sans;
     min-height: 100vh;
     overflow-x: hidden;
+    /* Chống mỏi mắt: giãn dòng thoáng, không chữ trắng tuyền trên nền đen tuyền */
+    line-height: 1.65;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /* Swiss Minimalist: sharp corners everywhere */
@@ -75,8 +86,8 @@
 
   /* Selection highlight */
   ::selection {
-    background: rgba(13, 92, 117, 0.4);
-    color: #D6E8ED;
+    background: rgba(26, 101, 158, 0.4);
+    color: #EAF2F8;
   }
 
   /* Focus ring — Ocean style */
@@ -221,7 +232,7 @@
 
   /* ─── GRADIENT TEXT ───────────────────────────────────── */
   .text-gradient-ocean {
-    background: linear-gradient(135deg, #0D5C75 0%, #639FAD 50%, #D6E8ED 100%);
+    background: linear-gradient(135deg, #1A659E 0%, #5B92C2 50%, #EAF2F8 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -246,9 +257,9 @@
     @apply bg-ocean-dark-border animate-pulse;
     background: linear-gradient(
       90deg,
-      #16323D 25%,
-      #1a3a47 50%,
-      #16323D 75%
+      #173B5C 25%,
+      #1D4569 50%,
+      #173B5C 75%
     );
     background-size: 200% 100%;
     animation: shimmer 1.5s linear infinite;
@@ -275,10 +286,10 @@
   .bg-ocean-animated {
     background: linear-gradient(
       -45deg,
-      #051014,
-      #0A1C23,
-      #0D3040,
-      #051014
+      #071A2C,
+      #0A233A,
+      #0E3D60,
+      #071A2C
     );
     background-size: 400% 400%;
     animation: gradient-shift 12s ease infinite;
@@ -312,11 +323,11 @@
 }
 
 .light ::-webkit-scrollbar-track {
-  background: #C9D8DD;
+  background: #C5D9EA;
 }
 
 .light ::-webkit-scrollbar-thumb {
-  background: #639FAD;
+  background: #5B92C2;
 }
 
 /* ─── LEGAL / DOCS PROSE ─────────────────────────────────── */

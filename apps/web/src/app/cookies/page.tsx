@@ -170,8 +170,9 @@ function SectionHeading({ children, en }: { children: React.ReactNode; en: strin
   );
 }
 
-function Bilingual({ children }: { children: React.ReactNode }) {
+function Bilingual({ children }: { children?: React.ReactNode }) {
   // Tạm ẩn bản tiếng Anh cho bớt dài, có thể thêm state chuyển đổi sau
+  if (Boolean(children)) return null;
   return null;
 }
 

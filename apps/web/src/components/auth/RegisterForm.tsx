@@ -131,8 +131,8 @@ export function RegisterForm() {
         return;
       }
 
-      // Redirect to login or onboarding
-      window.location.href = "/login?registered=true";
+      // Redirect to thank-you page
+      window.location.href = "/thank-you";
     } catch {
       setErrors({ general: "Không thể kết nối đến máy chủ. Vui lòng thử lại." });
     } finally {

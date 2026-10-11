@@ -37,7 +37,7 @@ export function Navbar() {
       <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-3 group">
-          <img src="/favicon.png" alt="Bravechat Icon" className="w-8 h-8 object-contain" />
+          <img src="/logo-96.png" alt="Logo Bravechat" width={32} height={32} className="w-8 h-8 object-contain" />
           <span className="font-bold text-xl text-ocean-light tracking-tight group-hover:text-white transition-colors">
             Brave<span className="text-ocean-secondary">chat</span>
           </span>
@@ -79,7 +79,9 @@ export function Navbar() {
           id="mobile-menu-toggle"
           onClick={() => setIsMobileOpen(!isMobileOpen)}
           className="md:hidden text-ocean-secondary hover:text-ocean-light transition-colors p-2"
-          aria-label="Toggle menu"
+          aria-label="Mở/đóng menu"
+          aria-expanded={isMobileOpen}
+          aria-controls="mobile-menu"
         >
           <svg
             className="w-5 h-5"
@@ -108,7 +110,7 @@ export function Navbar() {
 
       {/* Mobile menu */}
       {isMobileOpen && (
-        <div className="md:hidden bg-ocean-dark-surface border-t border-ocean-dark-border animate-fade-in">
+        <div id="mobile-menu" className="md:hidden bg-ocean-dark-surface border-t border-ocean-dark-border animate-fade-in">
           <div className="px-6 py-4 flex flex-col gap-4">
             {NAV_LINKS.map((link) => (
               <Link
@@ -131,25 +133,5 @@ export function Navbar() {
         </div>
       )}
     </header>
-  );
-}
-
-function OceanLogoMark() {
-  return (
-    <svg viewBox="0 0 32 32" fill="none" className="w-5 h-5">
-      <path
-        d="M4 22C8 16 12 20 16 16C20 12 24 18 28 14"
-        stroke="#D6E8ED"
-        strokeWidth="2.5"
-        strokeLinecap="square"
-      />
-      <path
-        d="M4 26C8 20 12 24 16 20C20 16 24 22 28 18"
-        stroke="#639FAD"
-        strokeWidth="2"
-        strokeLinecap="square"
-        opacity="0.6"
-      />
-    </svg>
   );
 }

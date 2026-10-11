@@ -22,21 +22,21 @@ export function OceanBackground() {
       <div
         className="absolute top-1/4 -left-32 w-96 h-96 opacity-20"
         style={{
-          background: "radial-gradient(circle, #0D5C75 0%, transparent 70%)",
+          background: "radial-gradient(circle, #1A659E 0%, transparent 70%)",
           animation: "float 8s ease-in-out infinite",
         }}
       />
       <div
         className="absolute bottom-1/3 -right-32 w-80 h-80 opacity-15"
         style={{
-          background: "radial-gradient(circle, #639FAD 0%, transparent 70%)",
+          background: "radial-gradient(circle, #5B92C2 0%, transparent 70%)",
           animation: "float 12s ease-in-out infinite reverse",
         }}
       />
       <div
         className="absolute top-2/3 left-1/3 w-64 h-64 opacity-10"
         style={{
-          background: "radial-gradient(circle, #0D5C75 0%, transparent 70%)",
+          background: "radial-gradient(circle, #1A659E 0%, transparent 70%)",
           animation: "float 10s ease-in-out infinite",
           animationDelay: "2s",
         }}
@@ -47,8 +47,8 @@ export function OceanBackground() {
         className="absolute inset-0 opacity-[0.04]"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(99, 159, 173, 0.5) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(99, 159, 173, 0.5) 1px, transparent 1px)
+            linear-gradient(rgba(91, 146, 194, 0.5) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(91, 146, 194, 0.5) 1px, transparent 1px)
           `,
           backgroundSize: "80px 80px",
         }}
@@ -65,12 +65,12 @@ export function OceanBackground() {
         >
           <path
             d="M0 60C240 20 480 100 720 60C960 20 1200 100 1440 60V120H0V60Z"
-            fill="#0A1C23"
+            fill="#0A233A"
             fillOpacity="0.4"
           />
           <path
             d="M0 80C240 40 480 110 720 80C960 40 1200 110 1440 80V120H0V80Z"
-            fill="#0A1C23"
+            fill="#0A233A"
             fillOpacity="0.6"
           />
         </svg>

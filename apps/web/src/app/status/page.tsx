@@ -9,6 +9,12 @@ import { FooterSection } from "@/components/landing/FooterSection";
 import { OceanBackground } from "@/components/ui/OceanBackground";
 import Link from "next/link";
 
+export const metadata: Metadata = {
+  title: "Trạng thái hệ thống",
+  description:
+    "Theo dõi trạng thái hoạt động theo thời gian thực của các dịch vụ Bravechat: API, WebSocket, cơ sở dữ liệu, lưu trữ và xác thực.",
+};
+
 // Static status data — replace with real API call when backend is ready
 const SERVICES = [
   { id: "api", name: "API Server", nameEn: "REST API", status: "operational" as const },
