@@ -6,9 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@discord-clone/shared": "workspace:*",
     "react": "^18",
     "react-dom": "^18",
     "next": "14.2.35",

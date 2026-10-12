@@ -276,6 +276,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@discord-clone/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -315,6 +318,12 @@ importers:
         version: 3.4.19(tsx@4.23.15)
       typescript:
         specifier: ^5
+        version: 5.9.3
+
+  packages/shared:
+    devDependencies:
+      typescript:
+        specifier: ^5.4.0
         version: 5.9.3
 
 packages:
