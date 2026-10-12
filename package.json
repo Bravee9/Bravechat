@@ -18,9 +18,10 @@
     "clean": "turbo run clean"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
+    "prisma": "^5.22.0",
     "turbo": "^2.0.0",
-    "typescript": "^5.4.0",
-    "@types/node": "^20.0.0"
+    "typescript": "^5.4.0"
   },
   "workspaces": [
     "apps/*",
@@ -36,5 +37,8 @@
       "unrs-resolver",
       "@next/swc-win32-x64-msvc"
     ]
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
   }
 }
