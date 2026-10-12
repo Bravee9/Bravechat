@@ -11,6 +11,7 @@ import websocket from '@fastify/websocket'
 import cookie from '@fastify/cookie'
 import rateLimit from '@fastify/rate-limit'
 import { env } from '../config/env'
+import r2 from './r2'
 
 export async function registerPlugins(server: FastifyInstance) {
   // CORS — allow frontend origin
@@ -35,6 +36,14 @@ export async function registerPlugins(server: FastifyInstance) {
     },
   })
 
+  server.decorate('authenticate', async function (request: any, reply: any) {
+    try {
+      await request.jwtVerify()
+    } catch (err) {
+      reply.send(err)
+    }
+  })
+
   // Multipart (file upload)
   await server.register(multipart, {
     limits: {
@@ -56,6 +65,9 @@ export async function registerPlugins(server: FastifyInstance) {
       message: 'Bạn đang gửi quá nhiều yêu cầu. Vui lòng thử lại sau.',
     }),
   })
+
+  // Cloudflare R2 / S3
+  await server.register(r2)
 
   // Health check route
   server.get('/health', async () => ({

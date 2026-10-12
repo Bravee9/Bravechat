@@ -10,10 +10,17 @@ import { serverRoutes } from './server.routes'
 import { channelRoutes } from './channel.routes'
 import { messageRoutes } from './message.routes'
 import { uploadRoutes } from './upload.routes'
+import { websocketRoutes } from './websocket.routes'
 
 export async function registerRoutes(server: FastifyInstance) {
-  // All routes are prefixed with /api
+  // Direct WebSocket at /ws
+  await server.register(websocketRoutes)
+
+  // All routes prefixed with /api
   await server.register(async (api) => {
+    // WebSocket at /api/ws
+    await api.register(websocketRoutes)
+
     // Auth: /api/auth/*
     await api.register(authRoutes, { prefix: '/auth' })
 
@@ -33,3 +40,4 @@ export async function registerRoutes(server: FastifyInstance) {
     await api.register(uploadRoutes, { prefix: '/uploads' })
   }, { prefix: '/api' })
 }
+
