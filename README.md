@@ -1,121 +1,227 @@
 <p align="center">
-  <img src="./apps/web/public/brave-chat.png" alt="Bravechat Logo" width="400" />
+  <img src="./apps/web/public/brave-chat.png" alt="Bravechat Logo" width="380" />
 </p>
 
 # Bravechat
-Bravechat is a highly scalable, real-time communication platform engineered for communities, teams, and friends. Built with a modern monolithic-repo architecture, it delivers a seamless and secure messaging experience with a distinct Swiss Modern Minimalist design language.
 
-**Authors**: [Bravee9](https://github.com/Bravee9) & [Shuji7245](https://github.com/Shuji7245)
+Bravechat là nền tảng giao tiếp thời gian thực (Real-time Communication Platform) hiệu năng cao dành cho cộng đồng, nhóm làm việc và bạn bè. Dự án được xây dựng theo kiến trúc **Monorepo (Turborepo)** chuẩn doanh nghiệp, áp dụng mô hình **Phân tầng (Layered Architecture)** chặt chẽ và ngôn ngữ thiết kế **Ocean Swiss Minimalist** dịu mắt, tối giản và hiện đại.
 
----
-
-## Architecture & Technology Stack
-
-Bravechat utilizes a Turborepo-based monorepo structure to share types and configurations across the frontend and backend efficiently.
-
-### Frontend (Web Application)
-- **Framework**: Next.js 14 (App Router)
-- **Styling**: Tailwind CSS (Custom Ocean Swiss Minimalist Design System)
-- **State Management & Validation**: Zod, React Hook Form
-
-### Backend (API & Real-time Server)
-- **Core Framework**: Fastify (Node.js)
-- **Database ORM**: Prisma
-- **Real-time Engine**: Socket.io with Redis Pub/Sub Adapter
-- **Authentication**: JWT-based with HttpOnly cookies and Refresh Token rotation
-
-### Infrastructure & Storage
-- **Database**: PostgreSQL 16
-- **Caching**: Redis 7
-- **Object Storage**: Cloudflare R2 (S3-compatible API for media storage)
-- **Containerization**: Docker & Docker Compose
+**Tác giả**: [Bravee9](https://github.com/Bravee9) & [Shuji7245](https://github.com/Shuji7245)
 
 ---
 
-## Project Structure
+## 🏛️ Kiến trúc Hệ thống Phân tầng (Layered Architecture)
+
+Bravechat phân tách trách nhiệm rõ ràng theo các tầng độc lập để đảm bảo Frontend và Backend phát triển song song mà không bị xung đột, dễ bảo trì và mở rộng quy mô.
 
 ```text
-discord/
+┌─────────────────────────────────────────────────────────────────┐
+│                 TẦNG HỢP ĐỒNG DÙNG CHUNG (CONTRACTS)             │
+│            packages/shared (Domain DTOs, API & WS Events)       │
+└────────────────────────────────┬────────────────────────────────┘
+                                 │
+            ┌────────────────────┴────────────────────┐
+            ▼                                         ▼
+┌───────────────────────────────┐         ┌───────────────────────────────┐
+│       TẦNG FRONTEND (WEB)     │         │       TẦNG BACKEND (API)      │
+│          apps/web             │         │          apps/api             │
+├───────────────────────────────┤         ├───────────────────────────────┤
+│ Presentation (Next.js 14)     │         │ Routes & Controllers          │
+│ Features & UI Components      │         │ Business Services             │
+│ State & Typed Services        │         │ Prisma Repositories           │
+│ HTTP Client & WS Realtime     │         │ Plugins (JWT, R2, WS, Redis)  │
+└───────────────────────────────┘         └───────────────┬───────────────┘
+                                                          ▼
+                                          ┌───────────────────────────────┐
+                                          │   TẦNG CƠ SỞ DỮ LIỆU & CACHE │
+                                          │  PostgreSQL 16 + Redis 7 + R2 │
+                                          └───────────────────────────────┘
+```
+
+### 1. Tầng Hợp đồng dùng chung (`packages/shared`)
+- **Domain DTOs**: `UserSummary`, `CurrentUser`, `ServerListItem`, `ServerDetail`, `Channel`, `DirectConversation`, `Message`.
+- **API Envelope**: Chuẩn hóa định dạng phản hồi `{ statusCode, data, message }` và lỗi `{ statusCode, error, message, details }`.
+- **API Route Map (`API_ROUTES`)**: Single Source of Truth cho toàn bộ URL endpoint RESTful.
+- **Realtime Contracts**: Định nghĩa kiểu dữ liệu sự kiện 2 chiều WebSocket (`ClientEvent` và `ServerEvent`).
+
+### 2. Tầng Ứng dụng Web (`apps/web`)
+Áp dụng **Next.js 14 App Router** với Route Groups phân lập và cấu trúc Discord Multi-layered Layout:
+
+- **Route Groups**:
+  - `(marketing)`: Landing page, tài liệu (`/docs`), điều khoản (`/terms`, `/privacy`), roadmap (`/roadmap`), trạng thái (`/status`).
+  - `(auth)`: Đăng nhập (`/login`), đăng ký (`/register`), quên mật khẩu (`/forgot-password`).
+  - `(app)`: Không gian ứng dụng chat Discord (`/channels/*`).
+- **Discord 3-Layer Layout (Không reload khi đổi Server/Kênh)**:
+  - **Layer 1 - Server Rail (`ServerRail`)**: Cột máy chủ cố định bên trái (`w-[72px]`), đặt tại `app/(app)/channels/layout.tsx`. Nút `@me` ở trên cùng, các icon máy chủ bo squircle mượt mà, pill hiển thị trạng thái active/hover/unread, huy hiệu mention đỏ và tooltip nổi. **Thanh này được giữ cố định (Persistent), không bao giờ bị re-render hay reload lại khi người dùng chuyển server.**
+  - **Layer 2 - Channel Sidebar (`ChannelSidebar`)**: Cột danh sách kênh và bạn bè, đặt tại `app/(app)/channels/[serverId]/layout.tsx`. Tự động tải category, kênh voice/text, tin nhắn trực tiếp và thanh User Profile Bar dưới cùng (mic, tai nghe, cài đặt).
+  - **Layer 3 - Main Chat View (`ChatView`)**: Khu vực trò chuyện chính, đặt tại `app/(app)/channels/[serverId]/[channelId]/page.tsx`. Kết nối WebSocket thời gian thực theo room kênh, hiển thị danh sách tin nhắn, typing indicator và cột thành viên bên phải (`MemberList`) có thể bật/tắt.
+- **Cấu trúc Thư mục Nội bộ `apps/web/src`**:
+  - `config/`: Cấu hình môi trường tập trung (`env.ts`).
+  - `services/`: Tầng giao tiếp mạng (`http.ts`), các service nghiệp vụ (`server.service.ts`, `channel.service.ts`, `user.service.ts`) và bộ dữ liệu mẫu (`services/mock/`).
+  - `features/`: Module hóa theo nghiệp vụ (`servers/`, `channels/`, `messages/`, `members/`, `auth/`).
+  - `components/`: UI nguyên tử dùng chung (`components/ui/`) và layout marketing (`components/marketing/`).
+
+### 3. Tầng Dịch vụ API Backend (`apps/api`)
+- **Fastify Framework**: Xử lý HTTP REST API và WebSocket với tốc độ tối ưu.
+- **Kiến trúc Khuyến nghị khi triển khai**:
+  - `src/routes/`: Đăng ký endpoint và gắn hook xác thực `server.authenticate`.
+  - `src/controllers/`: Nhận request, validate Zod schema, trả về response envelope.
+  - `src/services/`: Nghiệp vụ cốt lõi, tương tác với database và pub/sub Redis.
+  - `src/plugins/`: `r2.ts` (Cloudflare R2 Object Storage), `websocket.routes.ts` (Realtime chat), JWT, rate-limit.
+- **Database & Cache**:
+  - **PostgreSQL 16**: Lưu trữ quan hệ Users, Servers, Channels, Messages, Memberships.
+  - **Redis 7**: Bộ nhớ đệm phiên, WebSocket Pub/Sub phân tán.
+  - **Cloudflare R2**: Lưu trữ file media (ảnh đại diện, banner, tệp đính kèm) qua cơ chế Presigned URL.
+
+---
+
+## 🌳 Quy trình Phân nhánh Git Doanh nghiệp (Branching Strategy)
+
+Dự án tuân thủ mô hình phân nhánh chuẩn để đảm bảo mã nguồn ổn định:
+
+| Nhánh | Mục đích & Trách nhiệm |
+|---|---|
+| `main` | Nhánh sản phẩm (Production). Chỉ merge mã nguồn đã được kiểm thử kỹ lưỡng từ `dev`. |
+| `dev` | Nhánh tích hợp chính (Staging / Development). Mọi tính năng hoàn thành đều merge vào đây. |
+| `feature/*` | Nhánh phát triển tính năng mới (Ví dụ: `feature/api-realtime-websocket`, `feature/voice-chat`). |
+| `refactor/*` | Nhánh tái cấu trúc code và kiến trúc (Ví dụ: `refactor/web-layered-architecture`). |
+| `chore/*` | Nhánh cấu hình hạ tầng, tooling, thư viện dùng chung (Ví dụ: `chore/shared-contracts`). |
+| `fix/*` | Nhánh sửa lỗi phát sinh từ `dev` hoặc hotfix từ `main`. |
+| `docs/*` | Nhánh cập nhật tài liệu kỹ thuật, ADR, README. |
+
+---
+
+## 📁 Cấu trúc Thư mục Dự án
+
+```text
+Bravechat/
 ├── apps/
-│   ├── web/          # Next.js 14 frontend client (Port 3000)
-│   └── api/          # Fastify REST & WebSocket server (Port 4000)
+│   ├── web/                          # Ứng dụng Next.js 14 Frontend Client (Port 3000)
+│   │   ├── src/
+│   │   │   ├── app/
+│   │   │   │   ├── (marketing)/      # Landing page, docs, changelog, legal
+│   │   │   │   ├── (auth)/           # Login, Register, Forgot Password
+│   │   │   │   └── (app)/            # Discord-like Chat Workspace
+│   │   │   │       └── channels/
+│   │   │   │           ├── layout.tsx                # Layer 1: Persistent ServerRail
+│   │   │   │           ├── page.tsx                  # Redirect -> /channels/@me
+│   │   │   │           └── [serverId]/
+│   │   │   │               ├── layout.tsx            # Layer 2: ChannelSidebar
+│   │   │   │               ├── page.tsx              # Redirect -> #general
+│   │   │   │               └── [channelId]/page.tsx  # Layer 3: ChatView
+│   │   │   ├── config/               # Typed environment configuration
+│   │   │   ├── services/             # HTTP client seam, API services & Mocks
+│   │   │   ├── features/             # Feature-driven UI (servers, channels, messages, members)
+│   │   │   ├── components/           # Reusable UI atoms (Tooltip, Button) & Marketing
+│   │   │   ├── hooks/                # Custom React hooks
+│   │   │   └── lib/                  # Utility helpers & site metadata
+│   │   └── package.json
+│   │
+│   └── api/                          # Máy chủ Fastify REST API & WebSocket (Port 4000)
+│       ├── src/
+│       │   ├── config/               # Prisma, Redis, Env config
+│       │   ├── plugins/              # Fastify plugins (JWT, R2, Cookie, RateLimit)
+│       │   ├── routes/               # REST & WebSocket route handlers
+│       │   └── index.ts              # Entry point khởi chạy Fastify
+│       ├── Dockerfile
+│       └── package.json
+│
 ├── packages/
-│   ├── shared/       # Shared TypeScript interfaces and utility functions
-│   └── database/     # Prisma schema, migrations, and seed data
-├── docs/             # Technical specifications and architecture decisions
-├── docker-compose.yml
-├── turbo.json
-└── pnpm-workspace.yaml
+│   ├── shared/                       # Tầng Hợp đồng dùng chung giữa Web và API
+│   │   ├── src/
+│   │   │   ├── domain/               # DTOs: User, Server, Channel, Message
+│   │   │   ├── api/                  # API_ROUTES map & Response Envelopes
+│   │   │   ├── realtime/             # WebSocket event contracts
+│   │   │   └── index.ts
+│   │   └── package.json
+│   │
+│   └── database/                     # Tầng Quản lý Cơ sở Dữ liệu Prisma
+│       ├── prisma/
+│       │   ├── schema.prisma         # PostgreSQL ERD & models
+│       │   └── migrations/           # Database schema migrations
+│       └── package.json
+│
+├── docs/                             # Tài liệu kỹ thuật chi tiết
+│   ├── adr/                          # Architecture Decision Records (e.g., 001-use-cloudflare-r2)
+│   ├── architecture.md               # Thiết kế chi tiết kiến trúc
+│   ├── database-schema.md            # Sơ đồ quan hệ bảng (ERD)
+│   └── api-reference.md              # Đặc tả REST API & WebSocket events
+├── docker-compose.yml                # Cấu hình container (Postgres, Redis, API, Nginx)
+├── nginx.conf                        # Reverse proxy config
+├── turbo.json                        # Cấu hình Turborepo pipeline
+└── pnpm-workspace.yaml               # Cấu hình pnpm monorepo
 ```
 
 ---
 
-## Getting Started
+## 🚀 Hướng dẫn Cài đặt & Chạy Dự án
 
-### Prerequisites
-- Node.js (v18 or higher)
-- pnpm (v8 or higher)
-- Docker and Docker Compose
+### Yêu cầu Tiên quyết
+- **Node.js**: Phiên bản 18.x hoặc 20.x LTS
+- **pnpm**: Phiên bản 8.x hoặc cao hơn (`npm i -g pnpm`)
+- **Docker & Docker Compose**: Dùng cho PostgreSQL 16 và Redis 7
 
-### 1. Installation
-Clone the repository and install dependencies using pnpm workspaces:
+### 1. Cài đặt Dependencies
+Cài đặt toàn bộ workspace monorepo bằng pnpm:
 ```bash
 git clone https://github.com/Bravee9/Bravechat.git
 cd Bravechat
 pnpm install
 ```
 
-### 2. Environment Configuration
-Create a `.env` file in the root directory based on the provided example:
+### 2. Cấu hình Biến Môi trường
+Sao chép file `.env.example` thành `.env` ở thư mục gốc:
 ```bash
 cp .env.example .env
 ```
-Update the `.env` file with your specific Cloudflare R2 credentials and JWT secrets.
-
-### 3. Start Infrastructure
-Launch the PostgreSQL and Redis containers:
-```bash
-docker-compose up -d
+Điền các giá trị thích hợp cho cơ sở dữ liệu, JWT Secret và thông tin Cloudflare R2:
+```env
+DATABASE_URL=postgresql://discord_user:discord_secret_2024@localhost:5432/discord_db
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=super_secret_jwt_key_that_is_at_least_32_chars_long
+NEXT_PUBLIC_API_URL=http://localhost:4000/api
+NEXT_PUBLIC_WS_URL=ws://localhost:4000/api/ws
 ```
 
-### 4. Database Initialization
-Run Prisma migrations to set up the database schema and seed initial data:
+### 3. Khởi động Cơ sở Hạ tầng (PostgreSQL & Redis)
+Khởi chạy cơ sở dữ liệu qua Docker:
+```bash
+docker-compose up -d postgres redis
+```
+
+### 4. Khởi tạo Cơ sở Dữ liệu với Prisma
+Đồng bộ hóa schema và tạo Prisma Client:
 ```bash
 cd packages/database
 pnpm prisma migrate dev --name init
 pnpm prisma db seed
+cd ../..
 ```
 
-### 5. Start Development Servers
-Start both the frontend and backend development servers concurrently:
+### 5. Chạy Môi trường Phát triển (Development)
+Chạy đồng thời cả Frontend và Backend qua Turborepo:
 ```bash
-# From the root directory
 pnpm dev
 ```
-- Frontend Application: `http://localhost:3000`
-- API Server: `http://localhost:4000`
+- **Ứng dụng Web**: [http://localhost:3000](http://localhost:3000)
+- **API Server**: [http://localhost:4000](http://localhost:4000)
+- **API Health Check**: [http://localhost:4000/health](http://localhost:4000/health)
 
 ---
 
-## Technical Documentation
+## 🛠️ Kiểm tra Chất lượng Mã nguồn (Lint & Type-Check)
 
-Detailed documentation regarding system design and specific modules can be found in the `/docs` directory:
+Chạy kiểm tra toàn bộ workspace trước khi commit:
+```bash
+# Kiểm tra TypeScript toàn bộ monorepo
+pnpm type-check
 
-- [System Architecture](./docs/architecture.md)
-- [Database Schema & ERD](./docs/database-schema.md)
-- [API & WebSocket Reference](./docs/api-reference.md)
-- [Authentication Flow](./docs/auth-flow.md)
-- [Cloudflare R2 Integration](./docs/r2-storage.md)
+# Kiểm tra cú pháp và quy chuẩn ESLint
+pnpm lint
+```
 
 ---
 
-## Current Status (Phase 1)
+## 📜 Giấy phép (License)
 
-- **User Interface**: Implemented responsive Landing, Login, and Registration pages adhering to the Ocean UI design system.
-- **Database**: Designed comprehensive PostgreSQL schema (Users, Servers, Channels, Messages, Direct Messages).
-- **Backend Core**: Established Fastify application structure with Zod input validation and rate limiting.
-- **Documentation**: Completed core architecture and flow documentation.
-
-## License
-
-This project is licensed under the MIT License.
+Dự án được phân phối dưới giấy phép **MIT License**. Mọi đóng góp xin vui lòng tuân thủ quy trình Git Flow qua Pull Request vào nhánh `dev`.
