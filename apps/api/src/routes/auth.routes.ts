@@ -95,21 +95,22 @@ export async function authRoutes(server: FastifyInstance) {
         })
       }
 
-      // TODO: Implement in AuthService
-      // - Find user by email
-      // - Compare password with bcrypt
-      // - Generate access token (JWT, 15m)
-      // - Generate refresh token (random, store in Redis + DB)
-      // - Set refresh token as HttpOnly cookie
-      // - Return access token + user info
+      // Mock JWT generation cho việc test
+      const token = await reply.jwtSign({ 
+        id: 'test-user-id',
+        email: request.body.email,
+        username: request.body.email.split('@')[0]
+      })
 
       return reply.status(200).send({
         statusCode: 200,
-        message: 'Đăng nhập thành công.',
+        message: 'Đăng nhập thành công (MOCK).',
         data: {
-          accessToken: 'jwt_access_token_here',
+          accessToken: token,
           user: {
-            /* user object */
+            id: 'test-user-id',
+            email: request.body.email,
+            username: request.body.email.split('@')[0]
           },
         },
       })
@@ -171,16 +172,25 @@ export async function authRoutes(server: FastifyInstance) {
   )
 }
 
-// Extend FastifyInstance với custom authenticate
+// Extend FastifyInstance với custom authenticate và JWT types
 declare module 'fastify' {
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
   }
-  interface FastifyRequest {
-    user?: {
+}
+
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
+    payload: {
+      id: string
+      email: string
+      username: string
+    }
+    user: {
       id: string
       email: string
       username: string
     }
   }
 }
+
