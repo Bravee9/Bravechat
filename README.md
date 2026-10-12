@@ -10,7 +10,7 @@ Bravechat là nền tảng giao tiếp thời gian thực (Real-time Communicati
 
 ---
 
-## 🏛️ Kiến trúc Hệ thống Phân tầng (Layered Architecture)
+## Kiến trúc Hệ thống Phân tầng (Layered Architecture)
 
 Bravechat phân tách trách nhiệm rõ ràng theo các tầng độc lập để đảm bảo Frontend và Backend phát triển song song mà không bị xung đột, dễ bảo trì và mở rộng quy mô.
 
@@ -75,7 +75,7 @@ Bravechat phân tách trách nhiệm rõ ràng theo các tầng độc lập đ�
 
 ---
 
-## 🌳 Quy trình Phân nhánh Git Doanh nghiệp (Branching Strategy)
+## Quy trình Phân nhánh Git Doanh nghiệp (Branching Strategy)
 
 Dự án tuân thủ mô hình phân nhánh chuẩn để đảm bảo mã nguồn ổn định:
 
@@ -91,7 +91,7 @@ Dự án tuân thủ mô hình phân nhánh chuẩn để đảm bảo mã ngu�
 
 ---
 
-## 📁 Cấu trúc Thư mục Dự án
+## Cấu trúc Thư mục Dự án
 
 ```text
 Bravechat/
@@ -154,7 +154,7 @@ Bravechat/
 
 ---
 
-## 🚀 Hướng dẫn Cài đặt & Chạy Dự án
+## Hướng dẫn Cài đặt & Chạy Dự án
 
 ### Yêu cầu Tiên quyết
 - **Node.js**: Phiên bản 18.x hoặc 20.x LTS
@@ -209,7 +209,7 @@ pnpm dev
 
 ---
 
-## 🛠️ Kiểm tra Chất lượng Mã nguồn (Lint & Type-Check)
+## Kiểm tra Chất lượng Mã nguồn (Lint & Type-Check)
 
 Chạy kiểm tra toàn bộ workspace trước khi commit:
 ```bash
@@ -222,6 +222,6 @@ pnpm lint
 
 ---
 
-## 📜 Giấy phép (License)
+## Giấy phép (License)
 
 Dự án được phân phối dưới giấy phép **MIT License**. Mọi đóng góp xin vui lòng tuân thủ quy trình Git Flow qua Pull Request vào nhánh `dev`.
