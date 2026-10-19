@@ -1,15 +1,20 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useParams, usePathname } from "next/navigation";
-import type { ServerListItem } from "@discord-clone/shared";
-import { serverService } from "@/services/server.service";
+import { useServers } from "@/stores/workspace.store";
 import { HomeRailItem } from "./HomeRailItem";
 import { ServerRailItem } from "./ServerRailItem";
 import { RailActionItem } from "./RailActionItem";
 import { RailSeparator } from "./RailSeparator";
+import { useRouter } from "next/navigation";
+import { http } from "@/services/http";
+import { loadServers } from "@/stores/workspace.store";
+import type { ServerDetail } from "@discord-clone/shared";
+import { env } from "@/config/env";
 
 export function ServerRail() {
+  const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
 
@@ -17,23 +22,31 @@ export function ServerRail() {
   const currentServerId = decodeURIComponent(rawServerId);
   const isHomeActive = currentServerId === "@me";
 
-  const [servers, setServers] = useState<ServerListItem[]>([]);
-  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+  // Dữ liệu từ store dùng chung: tải một lần, không refetch khi đổi server.
+  const servers = useServers();
 
-  useEffect(() => {
-    let isMounted = true;
-    serverService.getMyServers().then((list) => {
-      if (isMounted) setServers(list);
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const handleCreateServer = async () => {
+    const name = window.prompt("Tên máy chủ mới:")?.trim();
+    if (!name) return;
+    if (env.useMocks) {
+      window.alert("Tắt chế độ mock để tạo server và dùng dữ liệu thật.");
+      return;
+    }
+    try {
+      const result = await http.post<{ server: ServerDetail }>("/servers", { name });
+      await loadServers(true);
+      router.push(`/channels/${encodeURIComponent(result.server.id)}`);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Không thể tạo server.");
+    }
+  };
+  // Chỉ dành cho Home / nút hành động. Server items tự quản hover để không re-render cả danh sách.
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
   return (
     <nav
       aria-label="Danh sách máy chủ"
-      className="w-[72px] bg-[#030a0d] border-r border-ocean-dark-border flex flex-col items-center py-3 gap-2 flex-shrink-0 z-30 select-none"
+      className="w-[72px] bg-[#030a0d] border-r border-ocean-dark-border flex flex-col items-center pt-3 pb-16 gap-2 flex-shrink-0 z-30 select-none"
       data-testid="server-rail"
     >
       {/* 1. Nút Trang chủ / Direct Messages (@me) */}
@@ -53,8 +66,6 @@ export function ServerRail() {
             key={server.id}
             server={server}
             isActive={currentServerId === server.id}
-            isHovered={hoveredItemId === server.id}
-            onHover={(hovered) => setHoveredItemId(hovered ? server.id : null)}
           />
         ))}
 
@@ -66,7 +77,7 @@ export function ServerRail() {
           variant="emerald"
           isHovered={hoveredItemId === "add"}
           onHover={(hovered) => setHoveredItemId(hovered ? "add" : null)}
-          onClick={() => alert("Chức năng tạo máy chủ: đang kết nối với POST /api/servers")}
+          onClick={() => void handleCreateServer()}
         >
           <svg
             className="w-5 h-5 group-hover:scale-110 transition-transform duration-200"
@@ -101,5 +112,3 @@ export function ServerRail() {
     </nav>
   );
 }
-
-export const ServerSidebar = ServerRail;

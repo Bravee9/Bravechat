@@ -13,7 +13,8 @@ export const userService = {
       return MOCK_CURRENT_USER;
     }
     try {
-      return await http.get<CurrentUser>(API_ROUTES.auth.me);
+      const response = await http.get<{ user: CurrentUser }>(API_ROUTES.auth.me);
+      return response.user;
     } catch {
       return MOCK_CURRENT_USER;
     }

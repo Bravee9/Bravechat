@@ -1,9 +1,16 @@
-import { ChannelSidebar } from "@/features/channels/components/ChannelSidebar";
+import { ServerChannelSidebar } from "@/features/channels/components/ServerChannelSidebar";
 
-export default function ServerLayout({ children }: { children: React.ReactNode }) {
+/** LAYER 2 — nhánh server. Sidebar đọc từ store nên đổi server không bị nhấp nháy. */
+export default function ServerLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: { serverId: string };
+}) {
   return (
     <>
-      <ChannelSidebar />
+      <ServerChannelSidebar serverId={decodeURIComponent(params.serverId)} />
       {children}
     </>
   );

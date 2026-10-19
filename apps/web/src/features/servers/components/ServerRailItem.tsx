@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { memo, useState } from "react";
 import Link from "next/link";
 import type { ServerListItem } from "@discord-clone/shared";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -9,16 +9,24 @@ import { cn } from "@/lib/utils";
 interface ServerRailItemProps {
   server: ServerListItem;
   isActive: boolean;
-  isHovered: boolean;
-  onHover: (hovered: boolean) => void;
+  /** Tùy chọn: nếu không truyền, item tự quản hover (tránh re-render cả rail). */
+  isHovered?: boolean;
+  onHover?: (hovered: boolean) => void;
 }
 
-export function ServerRailItem({
+function ServerRailItemBase({
   server,
   isActive,
-  isHovered,
-  onHover,
+  isHovered: isHoveredProp,
+  onHover: onHoverProp,
 }: ServerRailItemProps) {
+  const [localHovered, setLocalHovered] = useState(false);
+  const isHovered = isHoveredProp ?? localHovered;
+  const onHover = (hovered: boolean) => {
+    setLocalHovered(hovered);
+    onHoverProp?.(hovered);
+  };
+
   const initials = server.name
     .split(/\s+/)
     .slice(0, 2)
@@ -86,3 +94,5 @@ export function ServerRailItem({
     </div>
   );
 }
+
+export const ServerRailItem = memo(ServerRailItemBase);
