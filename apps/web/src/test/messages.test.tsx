@@ -110,5 +110,21 @@ describe("Message Components", () => {
       fireEvent.click(sendBtn);
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
+
+    it("passes selected media files to the upload handler", () => {
+      const onFiles = vi.fn();
+      render(
+        <ChatInput
+          value=""
+          placeholder="Nhắn tin..."
+          onChange={vi.fn()}
+          onSubmit={vi.fn()}
+          onFiles={onFiles}
+        />
+      );
+      const file = new File(["image"], "image.png", { type: "image/png" });
+      fireEvent.change(screen.getByTestId("attachment-file-input"), { target: { files: [file] } });
+      expect(onFiles).toHaveBeenCalledWith([file]);
+    });
   });
 });

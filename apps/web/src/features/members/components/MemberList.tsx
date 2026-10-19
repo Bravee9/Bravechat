@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { MemberGroup } from "./MemberGroup";
+import React, { useState } from "react";
+import { MemberItem } from "./MemberItem";
 import type { Member } from "./MemberItem";
 
 const MOCK_MEMBERS: Member[] = [
@@ -14,10 +14,26 @@ const MOCK_MEMBERS: Member[] = [
 ];
 
 export function MemberList({ isVisible }: { isVisible: boolean }) {
-  if (!isVisible) return null;
-
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(600);
   const onlineMembers = MOCK_MEMBERS.filter((m) => m.status !== "OFFLINE");
   const offlineMembers = MOCK_MEMBERS.filter((m) => m.status === "OFFLINE");
+  const rows = [
+    { type: "header" as const, title: "Trực tuyến", count: onlineMembers.length },
+    ...onlineMembers.map((member) => ({ type: "member" as const, member })),
+    { type: "header" as const, title: "Ngoại tuyến", count: offlineMembers.length },
+    ...offlineMembers.map((member) => ({ type: "member" as const, member })),
+  ];
+  const offsets: number[] = [];
+  let totalHeight = 0;
+  for (const row of rows) {
+    offsets.push(totalHeight);
+    totalHeight += row.type === "header" ? 26 : 56;
+  }
+  const firstVisible = Math.max(0, offsets.findIndex((offset, index) => offset + (rows[index].type === "header" ? 26 : 56) >= scrollTop - 300));
+  const visibleEnd = scrollTop + viewportHeight + 300;
+  const visibleRows = rows.map((row, index) => ({ row, index })).filter(({ index }) => offsets[index] <= visibleEnd && index >= firstVisible);
+  if (!isVisible) return null;
 
   return (
     <aside
@@ -25,12 +41,24 @@ export function MemberList({ isVisible }: { isVisible: boolean }) {
       className="w-60 bg-[#051424] border-l border-ocean-dark-border flex flex-col h-full select-none flex-shrink-0 animate-fade-in"
       data-testid="member-list"
     >
-      <div className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar space-y-4">
-        {/* 1. Nhóm trực tuyến */}
-        <MemberGroup title="Trực tuyến" members={onlineMembers} />
-
-        {/* 2. Nhóm ngoại tuyến */}
-        <MemberGroup title="Ngoại tuyến" members={offlineMembers} />
+      <div
+        className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar"
+        onScroll={(event) => {
+          setScrollTop(event.currentTarget.scrollTop);
+          setViewportHeight(event.currentTarget.clientHeight);
+        }}
+      >
+        <div className="relative" style={{ height: totalHeight }}>
+          {visibleRows.map(({ row, index }) => (
+            <div key={row.type === "header" ? row.title : row.member.id} className="absolute left-0 right-0" style={{ top: offsets[index], height: row.type === "header" ? 26 : 56 }}>
+              {row.type === "header" ? (
+                <h3 className="px-2 mb-1.5 text-ocean-light/50 text-[11px] font-extrabold uppercase tracking-wider select-none" data-testid={`member-group-${row.title}`}>
+                  {row.title} — {row.count}
+                </h3>
+              ) : <MemberItem member={row.member} />}
+            </div>
+          ))}
+        </div>
       </div>
     </aside>
   );

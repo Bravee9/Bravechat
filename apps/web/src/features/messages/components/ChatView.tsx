@@ -9,6 +9,8 @@ import { MessageList } from "./MessageList";
 import { TypingIndicator } from "./TypingIndicator";
 import { ChatInput } from "./ChatInput";
 import type { ChatMessage } from "./MessageItem";
+import { http } from "@/services/http";
+import { VoiceRoom } from "./VoiceRoom";
 
 const DEFAULT_MESSAGES: ChatMessage[] = [
   {
@@ -29,10 +31,26 @@ const DEFAULT_MESSAGES: ChatMessage[] = [
   },
 ];
 
-export function ChatView() {
+interface ChatViewProps {
+  /** Truyền từ route page. Nếu bỏ trống sẽ đọc từ URL params. */
+  serverId?: string;
+  channelId?: string;
+}
+
+interface CreatedMessageResponse {
+  id: string;
+  avatar: string;
+  user: string;
+  time: string;
+  content: string;
+  createdAt: string;
+  attachments: NonNullable<ChatMessage["attachments"]>;
+}
+
+export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
   const params = useParams();
-  const rawServerId = decodeURIComponent((params?.serverId as string) || "@me");
-  const rawChannelId = decodeURIComponent((params?.channelId as string) || "general");
+  const rawServerId = decodeURIComponent(serverId ?? (params?.serverId as string) ?? "@me");
+  const rawChannelId = decodeURIComponent(channelId ?? (params?.channelId as string) ?? "general");
 
   const isMe = rawServerId === "@me";
 
@@ -51,10 +69,15 @@ export function ChatView() {
 
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>(DEFAULT_MESSAGES);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<string>("Bravee9");
   const [showMemberList, setShowMemberList] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [channelType, setChannelType] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -82,7 +105,7 @@ export function ChatView() {
   }, [messages, typingUsers]);
 
   // Kết nối WebSocket theo channelId
-  const effectiveChannelId = `${rawServerId}_${rawChannelId}`;
+  const effectiveChannelId = env.useMocks ? `${rawServerId}_${rawChannelId}` : rawChannelId;
 
   const connectWebSocket = useCallback(() => {
     const wsUrl = env.wsUrl;
@@ -98,6 +121,8 @@ export function ChatView() {
           JSON.stringify({
             type: "join_channel",
             channelId: effectiveChannelId,
+            serverId: rawServerId,
+            channelKey: rawChannelId,
             user: {
               username: currentUser,
               avatar: currentUser.slice(0, 2).toUpperCase(),
@@ -111,11 +136,14 @@ export function ChatView() {
           const data = JSON.parse(event.data);
 
           if (data.type === "channel_joined") {
-            if (data.messages && data.messages.length > 0) {
-              setMessages(data.messages);
-            }
+            setMessages(data.messages ?? []);
+            setHasOlderMessages((data.messages?.length ?? 0) >= 50);
+          } else if (data.type === "older_messages") {
+            setMessages((previous) => [...data.messages, ...previous]);
+            setHasOlderMessages(data.messages.length >= 50);
+            setIsLoadingOlder(false);
           } else if (data.type === "message_create") {
-            setMessages((prev) => [...prev, data.message]);
+            setMessages((prev) => prev.some((item) => item.id === data.message.id) ? prev : [...prev, data.message]);
           } else if (data.type === "typing_start") {
             if (data.username && data.username !== currentUser) {
               setTypingUsers((prev) => Array.from(new Set([...prev, data.username])));
@@ -129,6 +157,7 @@ export function ChatView() {
       };
 
       ws.onclose = () => {
+        setIsLoadingOlder(false);
         setConnectionStatus("disconnected");
       };
 
@@ -140,7 +169,21 @@ export function ChatView() {
       console.error("Không thể khởi tạo WebSocket:", err);
       setConnectionStatus("disconnected");
     }
-  }, [effectiveChannelId, currentUser]);
+  }, [effectiveChannelId, currentUser, rawChannelId, rawServerId]);
+
+  useEffect(() => {
+    if (env.useMocks || isMe) return;
+    http.get<{ channel: { type: string } }>(`/channels/${encodeURIComponent(rawChannelId)}`)
+      .then(({ channel }) => setChannelType(channel.type))
+      .catch(() => setChannelType(null));
+  }, [rawChannelId, isMe]);
+
+  useEffect(() => {
+    if (env.useMocks) return;
+    http.get<{ user: { username: string; displayName?: string | null } }>("/auth/me")
+      .then(({ user }) => setCurrentUser(user.displayName || user.username))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     connectWebSocket();
@@ -194,6 +237,8 @@ export function ChatView() {
         JSON.stringify({
           type: "send_message",
           channelId: effectiveChannelId,
+          serverId: rawServerId,
+          channelKey: rawChannelId,
           content,
           user: {
             username: currentUser,
@@ -221,6 +266,72 @@ export function ChatView() {
     }
 
     setMessage("");
+  };
+
+  const handleFiles = async (files: File[]) => {
+    if (env.useMocks || isMe) {
+      setUploadError("Đăng nhập và mở channel server để tải file lên.");
+      return;
+    }
+    setIsUploading(true);
+    setUploadError("");
+    const uploaded: Array<{ filename: string; contentType: string; key: string }> = [];
+    try {
+      for (const file of files.slice(0, 10)) {
+        const signed = await http.post<{ uploadUrl: string; key: string }>("/uploads/presign", {
+          channelId: rawChannelId,
+          filename: file.name,
+          contentType: file.type || "application/octet-stream",
+          size: file.size,
+        });
+        const response = await fetch(signed.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+        if (!response.ok) throw new Error(`Upload ${file.name} thất bại.`);
+        uploaded.push({ filename: file.name, contentType: file.type || "application/octet-stream", key: signed.key });
+      }
+      const result = await http.post<{ message: CreatedMessageResponse }>(`/channels/${encodeURIComponent(rawChannelId)}/messages`, {
+        content: message.trim(),
+        attachments: uploaded,
+      });
+      setMessages((previous) => previous.some((item) => item.id === result.message.id) ? previous : [...previous, {
+        id: result.message.id,
+        avatar: result.message.avatar,
+        user: result.message.user,
+        time: result.message.time,
+        content: result.message.content,
+        createdAt: result.message.createdAt,
+        attachments: result.message.attachments,
+      }]);
+      setMessage("");
+    } catch (error) {
+      await Promise.all(uploaded.map(({ key }) => http.delete("/uploads/pending", { body: { key } }).catch(() => undefined)));
+      setUploadError(error instanceof Error ? error.message : "Không thể tải tệp lên.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const loadOlderMessages = () => {
+    const oldestMessage = messages[0];
+    if (!oldestMessage?.createdAt || isLoadingOlder) return;
+    if (!env.useMocks) {
+      setIsLoadingOlder(true);
+      void http.get<{ messages: Array<CreatedMessageResponse & { id: string }>; hasMore: boolean }>(`/channels/${encodeURIComponent(rawChannelId)}/messages`, {
+        query: { before: String(oldestMessage.id), limit: 50 },
+      }).then(({ messages: olderMessages, hasMore }) => {
+        setMessages((previous) => [...olderMessages.map((item) => ({ ...item, createdAt: item.createdAt })), ...previous]);
+        setHasOlderMessages(hasMore);
+      }).catch((error) => setUploadError(error instanceof Error ? error.message : "Không thể tải tin nhắn cũ hơn."))
+        .finally(() => setIsLoadingOlder(false));
+      return;
+    }
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    setIsLoadingOlder(true);
+    wsRef.current.send(JSON.stringify({
+      type: "load_older_messages",
+      channelId: effectiveChannelId,
+      channelKey: rawChannelId,
+      before: oldestMessage.createdAt,
+    }));
   };
 
   // Đổi tên test nhanh
@@ -264,12 +375,19 @@ export function ChatView() {
           onToggleMemberList={() => setShowMemberList((prev) => !prev)}
         />
 
+        {channelType === "VOICE" || channelType === "VIDEO" ? (
+          <VoiceRoom channelId={rawChannelId} channelType={channelType} />
+        ) : null}
+
         {/* 2. Message List */}
         <MessageList
           ref={messagesEndRef}
           channelName={displayChannelName}
           messages={messages}
           currentUser={currentUser}
+          hasOlder={hasOlderMessages}
+          isLoadingOlder={isLoadingOlder}
+          onLoadOlder={loadOlderMessages}
         />
 
         {/* 3. Typing Indicator */}
@@ -281,7 +399,10 @@ export function ChatView() {
           placeholder={`Nhắn tin tới #${displayChannelName} (Nhấn Enter để gửi)...`}
           onChange={handleInputChange}
           onSubmit={handleSendMessage}
+          onFiles={handleFiles}
+          isUploading={isUploading}
         />
+        {uploadError ? <p role="alert" className="px-6 pb-2 text-xs text-rose-400">{uploadError}</p> : null}
       </main>
 
       {/* Cột Phải: Member List (Collapsible) */}
