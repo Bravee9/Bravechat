@@ -11,6 +11,8 @@
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { z } from 'zod'
+import bcrypt from 'bcryptjs'
+import { prisma } from '../config/prisma'
 
 // ─── Validation Schemas ──────────────────────────────────
 const RegisterSchema = z.object({
@@ -59,18 +61,22 @@ export async function authRoutes(server: FastifyInstance) {
         })
       }
 
-      // TODO: Implement in AuthService
-      // - Check email/username uniqueness
-      // - Hash password with bcrypt
-      // - Create user record
-      // - Send verification email (Phase 2)
-      // - Return created user (without password)
+      const { username, password, displayName } = parseResult.data
+      const email = parseResult.data.email.toLowerCase()
+      const existingUser = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] } })
+      if (existingUser) return reply.status(409).send({ statusCode: 409, message: 'Email hoặc tên người dùng đã tồn tại.' })
+      const user = await prisma.user.create({
+        data: { email, username, displayName, passwordHash: await bcrypt.hash(password, 12) },
+        select: { id: true, email: true, username: true, displayName: true },
+      })
+      const token = await reply.jwtSign(user)
+      reply.setCookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 7 * 24 * 60 * 60 })
 
       return reply.status(201).send({
         statusCode: 201,
         message: 'Tài khoản đã được tạo thành công.',
         data: {
-          /* user object */
+          user,
         },
       })
     }
@@ -95,22 +101,22 @@ export async function authRoutes(server: FastifyInstance) {
         })
       }
 
-      // Mock JWT generation cho việc test
-      const token = await reply.jwtSign({ 
-        id: 'test-user-id',
-        email: request.body.email,
-        username: request.body.email.split('@')[0]
-      })
+      const user = await prisma.user.findUnique({ where: { email: request.body.email.toLowerCase() } })
+      if (!user || !(await bcrypt.compare(request.body.password, user.passwordHash)) || user.isBanned) {
+        return reply.status(401).send({ statusCode: 401, message: 'Email hoặc mật khẩu không chính xác.' })
+      }
+      const token = await reply.jwtSign({ id: user.id, email: user.email, username: user.username })
+      reply.setCookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 7 * 24 * 60 * 60 })
 
       return reply.status(200).send({
         statusCode: 200,
-        message: 'Đăng nhập thành công (MOCK).',
+        message: 'Đăng nhập thành công.',
         data: {
-          accessToken: token,
           user: {
-            id: 'test-user-id',
-            email: request.body.email,
-            username: request.body.email.split('@')[0]
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            displayName: user.displayName,
           },
         },
       })
@@ -142,16 +148,7 @@ export async function authRoutes(server: FastifyInstance) {
   server.post(
     '/refresh',
     async (request: FastifyRequest, reply: FastifyReply) => {
-      // TODO: Implement in AuthService
-      // - Get refresh token from HttpOnly cookie
-      // - Validate against database + Redis
-      // - Issue new access token
-      // - Rotate refresh token (invalidate old, create new)
-
-      return reply.send({
-        statusCode: 200,
-        data: { accessToken: 'new_jwt_access_token' },
-      })
+      return reply.status(501).send({ statusCode: 501, message: 'Refresh token chưa được cấu hình.' })
     }
   )
 
@@ -163,10 +160,11 @@ export async function authRoutes(server: FastifyInstance) {
     '/me',
     { preHandler: [server.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      // TODO: Return request.user populated by authenticate hook
+      const user = await prisma.user.findUnique({ where: { id: request.user.id }, select: { id: true, username: true, displayName: true, email: true, avatarKey: true } })
+      if (!user) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy người dùng.' })
       return reply.send({
         statusCode: 200,
-        data: { user: request.user },
+        data: { user },
       })
     }
   )

@@ -13,10 +13,26 @@
  */
 
 import type { FastifyInstance } from 'fastify'
+import { prisma } from '../config/prisma'
 
 export async function userRoutes(server: FastifyInstance) {
   // All user routes require authentication
   server.addHook('preHandler', server.authenticate)
+
+  server.get('/@me/servers', async (request, reply) => {
+    const memberships = await prisma.serverMember.findMany({
+      where: { userId: request.user.id, isBanned: false },
+      include: { server: { select: { id: true, name: true, iconKey: true } } },
+      orderBy: { joinedAt: 'asc' },
+    })
+    return reply.send({ statusCode: 200, data: memberships.map(({ server: item }) => ({
+      id: item.id,
+      name: item.name,
+      iconUrl: null,
+      hasUnread: false,
+      mentionCount: 0,
+    })) })
+  })
 
   server.get('/:userId', async (request, reply) => {
     // TODO: UserService.getPublicProfile(userId)
