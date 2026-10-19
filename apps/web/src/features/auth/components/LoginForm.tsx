@@ -49,7 +49,6 @@ export function LoginForm() {
     setIsLoading(true);
 
     try {
-      // TODO: Call API POST /api/auth/login
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
         {

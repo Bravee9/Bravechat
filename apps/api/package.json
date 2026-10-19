@@ -27,6 +27,7 @@
     "dotenv": "^16.4.5",
     "fastify": "^4.27.0",
     "ioredis": "^5.4.1",
+    "livekit-server-sdk": "^2.9.6",
     "pino": "^9.3.1",
     "pino-pretty": "^11.2.1",
     "socket.io": "^4.7.5",

@@ -7,10 +7,18 @@ FROM base AS builder
 # Cài đặt libc6-compat cho turbo (thường cần trên alpine)
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
+ARG NEXT_PUBLIC_API_URL=http://localhost/api
+ARG NEXT_PUBLIC_WS_URL=ws://localhost/api/ws
+ARG NEXT_PUBLIC_USE_MOCKS=false
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+ENV NEXT_PUBLIC_USE_MOCKS=$NEXT_PUBLIC_USE_MOCKS
 
 # Copy package files để install cache
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/package.json
+COPY apps/api/package.json ./apps/api/package.json
+COPY packages/shared/package.json ./packages/shared/package.json
 RUN pnpm install --frozen-lockfile
 
 # Copy source code

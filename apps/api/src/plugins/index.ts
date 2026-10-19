@@ -14,6 +14,7 @@ import { env } from '../config/env'
 import r2 from './r2'
 
 export async function registerPlugins(server: FastifyInstance) {
+  server.addContentTypeParser('application/webhook+json', { parseAs: 'string' }, (_request, body, done) => done(null, body))
   // CORS — allow frontend origin
   await server.register(cors, {
     origin: [env.FRONTEND_URL],
@@ -39,8 +40,8 @@ export async function registerPlugins(server: FastifyInstance) {
   server.decorate('authenticate', async function (request: any, reply: any) {
     try {
       await request.jwtVerify()
-    } catch (err) {
-      reply.send(err)
+    } catch {
+      return reply.status(401).send({ statusCode: 401, message: 'Authentication required' })
     }
   })
 

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
+import { env } from "@/config/env";
 
 export interface ChatMessage {
   id: string | number;
@@ -9,7 +10,9 @@ export interface ChatMessage {
   user: string;
   time: string;
   content: string;
+  createdAt?: string | Date;
   isHighlighted?: boolean;
+  attachments?: Array<{ id: string; filename: string; contentType: string; size: number; url?: string }>;
 }
 
 interface MessageItemProps {
@@ -69,6 +72,18 @@ export function MessageItem({ message, isCurrentUser }: MessageItemProps) {
         <p className="text-ocean-light/90 text-sm leading-relaxed whitespace-pre-wrap break-words">
           {message.content}
         </p>
+        {message.attachments?.length ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {message.attachments.map((attachment) => (
+              <div key={attachment.id} className="max-w-full rounded border border-ocean-dark-border p-2 text-xs text-ocean-secondary">
+                {attachment.contentType.startsWith("image/") ? <img src={attachment.url ?? `${env.apiUrl}/uploads/${attachment.id}/url`} alt={attachment.filename} className="max-h-72 max-w-full rounded object-contain" /> : null}
+                {attachment.contentType.startsWith("video/") ? <video controls preload="metadata" src={attachment.url ?? `${env.apiUrl}/uploads/${attachment.id}/url`} className="max-h-72 max-w-full rounded" /> : null}
+                {attachment.contentType.startsWith("audio/") ? <audio controls preload="metadata" src={attachment.url ?? `${env.apiUrl}/uploads/${attachment.id}/url`} className="max-w-full" /> : null}
+                <a href={attachment.url ?? `${env.apiUrl}/uploads/${attachment.id}/url`} target="_blank" rel="noreferrer" className="mt-1 block truncate hover:underline">{attachment.filename} · {Math.ceil(attachment.size / 1024)} KB</a>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

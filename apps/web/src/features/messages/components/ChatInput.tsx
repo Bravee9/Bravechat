@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface ChatInputProps {
@@ -8,6 +8,8 @@ interface ChatInputProps {
   placeholder: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (e?: React.FormEvent) => void;
+  onFiles?: (files: File[]) => void;
+  isUploading?: boolean;
 }
 
 export function ChatInput({
@@ -15,17 +17,34 @@ export function ChatInput({
   placeholder,
   onChange,
   onSubmit,
+  onFiles,
+  isUploading = false,
 }: ChatInputProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="px-6 pb-6 flex-shrink-0 z-10" data-testid="chat-input-container">
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        hidden
+        data-testid="attachment-file-input"
+        accept="image/*,video/*,audio/*,.pdf,.txt,.zip"
+        onChange={(event) => {
+          if (event.target.files?.length) onFiles?.(Array.from(event.target.files));
+          event.target.value = "";
+        }}
+      />
       <form
         onSubmit={onSubmit}
         className="relative flex items-center bg-ocean-dark-surface/50 border border-ocean-dark-border focus-within:border-ocean-secondary/60 focus-within:bg-ocean-dark-surface focus-within:shadow-ocean-glow transition-all duration-300 rounded-lg"
       >
         <button
           type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
           className="pl-4 pr-3 py-3 text-ocean-light/50 hover:text-ocean-light transition-colors"
-          title="Đính kèm tệp"
+          title={isUploading ? "Đang tải tệp..." : "Đính kèm tệp"}
           data-testid="attach-file-btn"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -45,7 +64,7 @@ export function ChatInput({
         <div className="pr-3 pl-2 py-3 flex items-center gap-2 text-ocean-light/50">
           <button
             type="submit"
-            disabled={!value.trim()}
+          disabled={!value.trim() || isUploading}
             data-testid="send-message-btn"
             className={cn(
               "p-1.5 rounded-md transition-all",
