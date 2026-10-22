@@ -136,8 +136,17 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
           const data = JSON.parse(event.data);
 
           if (data.type === "channel_joined") {
-            setMessages(data.messages ?? []);
-            setHasOlderMessages((data.messages?.length ?? 0) >= 50);
+            if (env.useMocks) {
+              setMessages(data.messages ?? []);
+              setHasOlderMessages((data.messages?.length ?? 0) >= 50);
+            } else {
+              void http.get<{ messages: CreatedMessageResponse[]; hasMore: boolean }>(`/channels/${encodeURIComponent(rawChannelId)}/messages`, { query: { limit: 50 } })
+                .then((history) => {
+                  setMessages(history.messages.map((item) => ({ ...item, createdAt: item.createdAt })));
+                  setHasOlderMessages(history.hasMore);
+                })
+                .catch((error) => setUploadError(error instanceof Error ? error.message : "Không thể tải lịch sử tin nhắn."));
+            }
           } else if (data.type === "older_messages") {
             setMessages((previous) => [...data.messages, ...previous]);
             setHasOlderMessages(data.messages.length >= 50);
@@ -278,15 +287,15 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
     const uploaded: Array<{ filename: string; contentType: string; key: string }> = [];
     try {
       for (const file of files.slice(0, 10)) {
-        const signed = await http.post<{ uploadUrl: string; key: string }>("/uploads/presign", {
-          channelId: rawChannelId,
-          filename: file.name,
-          contentType: file.type || "application/octet-stream",
-          size: file.size,
-        });
-        const response = await fetch(signed.uploadUrl, { method: "PUT", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file });
+        const form = new FormData();
+        form.append("purpose", "attachment");
+        form.append("channelId", rawChannelId);
+        form.append("file", file, file.name);
+        const response = await fetch(`${env.apiUrl.replace(/\/$/, "")}/uploads`, { method: "POST", credentials: "include", body: form });
         if (!response.ok) throw new Error(`Upload ${file.name} thất bại.`);
-        uploaded.push({ filename: file.name, contentType: file.type || "application/octet-stream", key: signed.key });
+        const result = await response.json();
+        const item = result.data as { key: string; filename: string; contentType: string };
+        uploaded.push({ filename: item.filename, contentType: item.contentType, key: item.key });
       }
       const result = await http.post<{ message: CreatedMessageResponse }>(`/channels/${encodeURIComponent(rawChannelId)}/messages`, {
         content: message.trim(),

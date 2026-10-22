@@ -12,19 +12,14 @@ export const serverService = {
     if (env.useMocks) {
       return MOCK_SERVER_LIST;
     }
-    try {
-      return await http.get<ServerListItem[]>(API_ROUTES.users.myServers);
-    } catch {
-      // Fallback graceful
-      return MOCK_SERVER_LIST;
-    }
+    return http.get<ServerListItem[]>(API_ROUTES.users.myServers);
   },
 
   /**
    * Lấy thông tin chi tiết của server kèm theo categories & channels
    */
   async getServerDetail(serverId: string): Promise<ServerDetail | null> {
-    if (env.useMocks || MOCK_SERVER_DETAILS[serverId]) {
+    if (env.useMocks) {
       return (
         MOCK_SERVER_DETAILS[serverId] || {
           id: serverId,
@@ -53,10 +48,6 @@ export const serverService = {
       );
     }
 
-    try {
-      return await http.get<ServerDetail>(API_ROUTES.servers.detail(serverId));
-    } catch {
-      return MOCK_SERVER_DETAILS[serverId] ?? null;
-    }
+    return http.get<ServerDetail>(API_ROUTES.servers.detail(serverId));
   },
 };

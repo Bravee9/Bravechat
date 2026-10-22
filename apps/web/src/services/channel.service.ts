@@ -12,10 +12,6 @@ export const channelService = {
     if (env.useMocks) {
       return MOCK_DIRECT_CONVERSATIONS;
     }
-    try {
-      return await http.get<DirectConversation[]>(API_ROUTES.users.myConversations);
-    } catch {
-      return MOCK_DIRECT_CONVERSATIONS;
-    }
+    return http.get<DirectConversation[]>(API_ROUTES.users.myConversations);
   },
 };
