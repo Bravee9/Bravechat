@@ -12,7 +12,9 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
+import { createHash, randomBytes } from 'node:crypto'
 import { prisma } from '../config/prisma'
+import { mediaUrl } from '../services/storage.service'
 
 // ─── Validation Schemas ──────────────────────────────────
 const RegisterSchema = z.object({
@@ -37,6 +39,27 @@ const LoginSchema = z.object({
 // ─── Route Handler Types ──────────────────────────────────
 type RegisterBody = z.infer<typeof RegisterSchema>
 type LoginBody = z.infer<typeof LoginSchema>
+
+const REFRESH_COOKIE = 'refreshToken'
+const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const ACCESS_TTL_SECONDS = 15 * 60
+const secureCookie = process.env.NODE_ENV === 'production'
+const cookieOptions = { httpOnly: true, secure: secureCookie, sameSite: 'lax' as const, path: '/' }
+const digestToken = (token: string) => createHash('sha256').update(token).digest('hex')
+
+async function issueSession(reply: FastifyReply, user: { id: string; email: string; username: string }, request: FastifyRequest) {
+  const refresh = randomBytes(48).toString('base64url')
+  await prisma.refreshToken.create({ data: {
+    userId: user.id,
+    token: digestToken(refresh),
+    expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
+    userAgent: request.headers['user-agent']?.slice(0, 500),
+    ipAddress: request.ip,
+  } })
+  const access = await reply.jwtSign(user, { expiresIn: ACCESS_TTL_SECONDS })
+  reply.setCookie('token', access, { ...cookieOptions, maxAge: ACCESS_TTL_SECONDS })
+  reply.setCookie(REFRESH_COOKIE, refresh, { ...cookieOptions, maxAge: REFRESH_TTL_MS / 1000 })
+}
 
 // ─── Routes ──────────────────────────────────────────────
 export async function authRoutes(server: FastifyInstance) {
@@ -69,8 +92,7 @@ export async function authRoutes(server: FastifyInstance) {
         data: { email, username, displayName, passwordHash: await bcrypt.hash(password, 12) },
         select: { id: true, email: true, username: true, displayName: true },
       })
-      const token = await reply.jwtSign(user)
-      reply.setCookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 7 * 24 * 60 * 60 })
+      await issueSession(reply, user, request)
 
       return reply.status(201).send({
         statusCode: 201,
@@ -105,8 +127,7 @@ export async function authRoutes(server: FastifyInstance) {
       if (!user || !(await bcrypt.compare(request.body.password, user.passwordHash)) || user.isBanned) {
         return reply.status(401).send({ statusCode: 401, message: 'Email hoặc mật khẩu không chính xác.' })
       }
-      const token = await reply.jwtSign({ id: user.id, email: user.email, username: user.username })
-      reply.setCookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 7 * 24 * 60 * 60 })
+      await issueSession(reply, user, request)
 
       return reply.status(200).send({
         statusCode: 200,
@@ -129,14 +150,11 @@ export async function authRoutes(server: FastifyInstance) {
    */
   server.post(
     '/logout',
-    { preHandler: [server.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      // TODO: Implement in AuthService
-      // - Get refresh token from cookie
-      // - Revoke in database + Redis blacklist
-      // - Clear cookie
-
-      reply.clearCookie('token')
+      const refresh = request.cookies?.[REFRESH_COOKIE]
+      if (refresh) await prisma.refreshToken.updateMany({ where: { token: digestToken(refresh), isRevoked: false }, data: { isRevoked: true } })
+      reply.clearCookie('token', { path: '/' })
+      reply.clearCookie(REFRESH_COOKIE, { path: '/' })
       return reply.send({ statusCode: 200, message: 'Đã đăng xuất.' })
     }
   )
@@ -148,7 +166,25 @@ export async function authRoutes(server: FastifyInstance) {
   server.post(
     '/refresh',
     async (request: FastifyRequest, reply: FastifyReply) => {
-      return reply.status(501).send({ statusCode: 501, message: 'Refresh token chưa được cấu hình.' })
+      const refresh = request.cookies?.[REFRESH_COOKIE]
+      if (!refresh) return reply.status(401).send({ statusCode: 401, message: 'Phiên đăng nhập đã hết hạn.' })
+      const tokenHash = digestToken(refresh)
+      const stored = await prisma.refreshToken.findUnique({ where: { token: tokenHash }, include: { user: true } })
+      if (!stored || stored.isRevoked || stored.expiresAt <= new Date() || stored.user.isBanned) {
+        reply.clearCookie('token', { path: '/' })
+        reply.clearCookie(REFRESH_COOKIE, { path: '/' })
+        return reply.status(401).send({ statusCode: 401, message: 'Phiên đăng nhập đã hết hạn.' })
+      }
+      const nextRefresh = randomBytes(48).toString('base64url')
+      const nextHash = digestToken(nextRefresh)
+      await prisma.$transaction([
+        prisma.refreshToken.update({ where: { id: stored.id }, data: { isRevoked: true } }),
+        prisma.refreshToken.create({ data: { userId: stored.userId, token: nextHash, expiresAt: new Date(Date.now() + REFRESH_TTL_MS), userAgent: request.headers['user-agent']?.slice(0, 500), ipAddress: request.ip } }),
+      ])
+      const access = await reply.jwtSign({ id: stored.user.id, email: stored.user.email, username: stored.user.username }, { expiresIn: ACCESS_TTL_SECONDS })
+      reply.setCookie('token', access, { ...cookieOptions, maxAge: ACCESS_TTL_SECONDS })
+      reply.setCookie(REFRESH_COOKIE, nextRefresh, { ...cookieOptions, maxAge: REFRESH_TTL_MS / 1000 })
+      return reply.send({ statusCode: 200, message: 'Phiên đăng nhập đã được gia hạn.' })
     }
   )
 
@@ -160,11 +196,11 @@ export async function authRoutes(server: FastifyInstance) {
     '/me',
     { preHandler: [server.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = await prisma.user.findUnique({ where: { id: request.user.id }, select: { id: true, username: true, displayName: true, email: true, avatarKey: true } })
+      const user = await prisma.user.findUnique({ where: { id: request.user.id }, select: { id: true, username: true, displayName: true, email: true, avatarKey: true, status: true, customStatus: true, discriminator: true, bio: true } })
       if (!user) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy người dùng.' })
       return reply.send({
         statusCode: 200,
-        data: { user },
+        data: { user: { ...user, avatarUrl: mediaUrl(user.avatarKey) } },
       })
     }
   )

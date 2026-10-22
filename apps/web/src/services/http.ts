@@ -36,7 +36,9 @@ function buildUrl(path: string, query?: Query): string {
   return url.toString();
 }
 
-async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function request<T>(method: string, path: string, options: RequestOptions = {}, retryAuth = true): Promise<T> {
   const { query, body, headers, ...init } = options;
 
   // TODO(auth): on the server, forward the refresh cookie / access token
@@ -54,6 +56,14 @@ async function request<T>(method: string, path: string, options: RequestOptions 
   });
 
   const json: unknown = await response.json().catch(() => null);
+
+  if (response.status === 401 && retryAuth && !path.startsWith("/auth/")) {
+    refreshInFlight ??= fetch(buildUrl("/auth/refresh"), { method: "POST", credentials: "include", headers: { Accept: "application/json" } })
+      .then((refresh) => refresh.ok)
+      .catch(() => false)
+      .finally(() => { refreshInFlight = null; });
+    if (await refreshInFlight) return request<T>(method, path, options, false);
+  }
 
   if (!response.ok) {
     throw new ApiError(response.status, json as ApiErrorBody | null);
