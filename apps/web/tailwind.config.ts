@@ -18,13 +18,13 @@ const config: Config = {
   theme: {
     extend: {
       // ─── OCEAN COLOR PALETTE (Xanh dương hàn lâm, chống mỏi mắt) ───
-      // Gốc LaTeX: OceanBluePrimary 1A659E · OceanBlueSecondary 5B92C2
+      // Màu phụ sáng hơn để chữ/icon tách rõ khỏi nền navy.
       //            OceanBlueLightBg EAF2F8 · OceanBlueDark 0E3D60 · OceanBlueLightText 0A233A
       // Nền tối là navy (không đen tuyền) để giảm chói; chữ là EAF2F8 thay vì trắng.
       colors: {
         ocean: {
           primary:       "#1A659E",  // OceanBluePrimary — nút chính, nhấn
-          secondary:     "#5B92C2",  // OceanBlueSecondary — viền, icon, text phụ
+          secondary:     "#86B8DE",  // Xanh sáng dịu — chữ phụ, viền, icon
           light:         "#EAF2F8",  // OceanBlueLightBg — chữ trên nền tối
           "dark-bg":     "#071A2C",  // Navy thẫm (dẫn xuất từ 0A233A) — nền body tối
           "dark-surface":"#0A233A",  // OceanBlueLightText — nền card/sidebar tối

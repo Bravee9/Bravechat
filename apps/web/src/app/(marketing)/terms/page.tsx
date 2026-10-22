@@ -13,16 +13,16 @@ export const metadata: Metadata = {
 };
 
 const SECTIONS = [
-  { id: "acceptance", label: "1. Chấp nhận điều khoản" },
-  { id: "service", label: "2. Mô tả dịch vụ" },
-  { id: "account", label: "3. Tài khoản người dùng" },
-  { id: "conduct", label: "4. Quy tắc ứng xử" },
-  { id: "content", label: "5. Nội dung người dùng" },
-  { id: "ip", label: "6. Sở hữu trí tuệ" },
-  { id: "termination", label: "7. Chấm dứt dịch vụ" },
-  { id: "disclaimer", label: "8. Giới hạn trách nhiệm" },
-  { id: "governing", label: "9. Luật áp dụng" },
-  { id: "contact", label: "10. Liên hệ" },
+  { id: "acceptance", label: "1. Chấp nhận điều khoản", labelEn: "1. Acceptance of terms" },
+  { id: "service", label: "2. Mô tả dịch vụ", labelEn: "2. Service description" },
+  { id: "account", label: "3. Tài khoản người dùng", labelEn: "3. User accounts" },
+  { id: "conduct", label: "4. Quy tắc ứng xử", labelEn: "4. Code of conduct" },
+  { id: "content", label: "5. Nội dung người dùng", labelEn: "5. User content" },
+  { id: "ip", label: "6. Sở hữu trí tuệ", labelEn: "6. Intellectual property" },
+  { id: "termination", label: "7. Chấm dứt dịch vụ", labelEn: "7. Termination" },
+  { id: "disclaimer", label: "8. Giới hạn trách nhiệm", labelEn: "8. Limitation of liability" },
+  { id: "governing", label: "9. Luật áp dụng", labelEn: "9. Governing law" },
+  { id: "contact", label: "10. Liên hệ", labelEn: "10. Contact" },
 ];
 
 export default function TermsPage() {
@@ -267,15 +267,12 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 function SectionHeading({ children, en }: { children: React.ReactNode; en: string }) {
   return (
     <div className="mb-5">
-      <h2 className="text-xl font-black text-ocean-light tracking-tight">{children}</h2>
-      <p className="text-ocean-secondary text-xs italic mt-0.5 font-mono">{en}</p>
+      <h2 className="text-xl font-black text-ocean-light tracking-tight"><span className="vi-only">{children}</span><span className="en-only">{en}</span></h2>
       <div className="mt-3 h-px bg-ocean-dark-border" />
     </div>
   );
 }
 
 function Bilingual({ children }: { children?: React.ReactNode }) {
-  // Tạm ẩn bản tiếng Anh cho bớt dài, có thể thêm state chuyển đổi sau
-  if (Boolean(children)) return null;
-  return null;
+  return <div className="legal-english-content">{children}</div>;
 }

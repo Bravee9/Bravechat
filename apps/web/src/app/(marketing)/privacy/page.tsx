@@ -13,17 +13,17 @@ export const metadata: Metadata = {
 };
 
 const SECTIONS = [
-  { id: "overview", label: "1. Tổng quan" },
-  { id: "data-collected", label: "2. Dữ liệu chúng tôi thu thập" },
-  { id: "purpose", label: "3. Mục đích xử lý" },
-  { id: "storage", label: "4. Lưu trữ & Bảo mật" },
-  { id: "sharing", label: "5. Chia sẻ dữ liệu" },
-  { id: "cookies", label: "6. Cookie & Công nghệ theo dõi" },
-  { id: "rights", label: "7. Quyền của bạn" },
-  { id: "retention", label: "8. Thời gian lưu trữ" },
-  { id: "minors", label: "9. Trẻ em" },
-  { id: "changes", label: "10. Thay đổi chính sách" },
-  { id: "contact", label: "11. Liên hệ" },
+  { id: "overview", label: "1. Tổng quan", labelEn: "1. Overview" },
+  { id: "data-collected", label: "2. Dữ liệu chúng tôi thu thập", labelEn: "2. Data we collect" },
+  { id: "purpose", label: "3. Mục đích xử lý", labelEn: "3. Purpose of processing" },
+  { id: "storage", label: "4. Lưu trữ & Bảo mật", labelEn: "4. Storage & security" },
+  { id: "sharing", label: "5. Chia sẻ dữ liệu", labelEn: "5. Data sharing" },
+  { id: "cookies", label: "6. Cookie & Công nghệ theo dõi", labelEn: "6. Cookies & tracking" },
+  { id: "rights", label: "7. Quyền của bạn", labelEn: "7. Your rights" },
+  { id: "retention", label: "8. Thời gian lưu trữ", labelEn: "8. Data retention" },
+  { id: "minors", label: "9. Trẻ em", labelEn: "9. Children" },
+  { id: "changes", label: "10. Thay đổi chính sách", labelEn: "10. Policy changes" },
+  { id: "contact", label: "11. Liên hệ", labelEn: "11. Contact" },
 ];
 
 export default function PrivacyPage() {
@@ -314,17 +314,14 @@ function Section({ id, children }: { id: string; children: React.ReactNode }) {
 function SectionHeading({ children, en }: { children: React.ReactNode; en: string }) {
   return (
     <div className="mb-5">
-      <h2 className="text-xl font-black text-ocean-light tracking-tight">{children}</h2>
-      <p className="text-ocean-secondary text-xs italic mt-0.5 font-mono">{en}</p>
+      <h2 className="text-xl font-black text-ocean-light tracking-tight"><span className="vi-only">{children}</span><span className="en-only">{en}</span></h2>
       <div className="mt-3 h-px bg-ocean-dark-border" />
     </div>
   );
 }
 
 function Bilingual({ children }: { children?: React.ReactNode }) {
-  // Tạm ẩn bản tiếng Anh cho bớt dài, có thể thêm state chuyển đổi sau
-  if (Boolean(children)) return null;
-  return null;
+  return <div className="legal-english-content">{children}</div>;
 }
 
 function DataTable({

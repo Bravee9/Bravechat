@@ -10,11 +10,21 @@
 @tailwind components;
 @tailwind utilities;
 
+.en-only { display: none; }
+.legal-page[lang="en"] .en-only { display: inline; }
+.legal-page[lang="en"] .vi-only { display: none; }
+.legal-english .en-only { display: inline; }
+.legal-english .vi-only { display: none; }
+.legal-english section > :not(.legal-heading):not(.legal-english-content) { display: none; }
+.legal-english-content { display: none; }
+.legal-english .legal-english-content { display: block; }
+.legal-english .legal-english-content { color: rgb(203 213 225); line-height: 1.8; }
+
 /* ─── CSS CUSTOM PROPERTIES ──────────────────────────────── */
 :root {
   /* Ocean palette as CSS variables for non-Tailwind usage */
   --ocean-primary:        #1A659E;
-  --ocean-secondary:      #5B92C2;
+  --ocean-secondary:      #86B8DE;
   --ocean-light:          #EAF2F8;
   --ocean-dark-bg:        #071A2C;
   --ocean-dark-surface:   #0A233A;
