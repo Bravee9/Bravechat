@@ -6,7 +6,7 @@
 
 import { OPEN_COOKIE_SETTINGS_EVENT } from "./CookieBanner";
 
-export function CookieSettingsButton() {
+export function CookieSettingsButton({ language = "vi" }: { language?: "vi" | "en" }) {
   return (
     <button
       type="button"
@@ -14,7 +14,7 @@ export function CookieSettingsButton() {
       onClick={() => window.dispatchEvent(new Event(OPEN_COOKIE_SETTINGS_EVENT))}
       className="text-left text-sm text-ocean-light/70 transition-colors hover:text-ocean-secondary"
     >
-      Tùy chọn cookie
+      {language === "en" ? "Cookie settings" : "Tùy chọn cookie"}
     </button>
   );
 }

@@ -35,7 +35,7 @@ export function LegalLayout({
   return (
     <div className="legal-page relative min-h-screen" lang={language}>
       <OceanBackground />
-      <Navbar />
+      <Navbar language={language} />
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 pt-28 pb-20">
         {/* Breadcrumb */}
@@ -95,7 +95,7 @@ export function LegalLayout({
         </div>
       </main>
 
-      <FooterSection />
+      <FooterSection language={language} />
     </div>
   );
 }

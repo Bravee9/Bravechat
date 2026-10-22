@@ -26,7 +26,7 @@ const FOOTER_LINKS = {
   ],
 };
 
-export function FooterSection() {
+export function FooterSection({ language = "vi" }: { language?: "vi" | "en" }) {
   return (
     <footer className="bg-ocean-dark-bg border-t border-ocean-dark-border">
       <div className="max-w-7xl mx-auto px-6 py-16">
@@ -41,8 +41,7 @@ export function FooterSection() {
               </span>
             </div>
             <p className="text-ocean-light/70 text-sm leading-relaxed max-w-xs">
-              Nền tảng giao tiếp thời gian thực dành cho cộng đồng, tổ chức và doanh nghiệp.
-              Phát triển bởi{" "}
+              {language === "en" ? "A real-time communication platform for communities, teams, and businesses. Built by " : "Nền tảng giao tiếp thời gian thực dành cho cộng đồng, tổ chức và doanh nghiệp. Phát triển bởi "}{" "}
               <a
                 href="https://github.com/Bravee9"
                 target="_blank"
@@ -69,7 +68,7 @@ export function FooterSection() {
           {Object.entries(FOOTER_LINKS).map(([category, links]) => (
             <div key={category}>
               <h4 className="text-ocean-light text-xs font-bold uppercase tracking-widest mb-5">
-                {category}
+                {language === "en" ? ({ "Sản phẩm": "Product", "Phát triển": "Development", "Pháp lý": "Legal" }[category] ?? category) : category}
               </h4>
               <ul className="flex flex-col gap-3">
                 {links.map((link) => (
@@ -78,13 +77,13 @@ export function FooterSection() {
                       href={link.href}
                       className="text-ocean-light/70 text-sm hover:text-ocean-secondary transition-colors"
                     >
-                      {link.label}
+                      {language === "en" ? ({ "Tính năng": "Features", "Lộ trình": "Roadmap", "Changelog": "Changelog", "Trạng thái hệ thống": "System status", "Kiến trúc": "Architecture", "Điều khoản sử dụng": "Terms of Service", "Chính sách bảo mật": "Privacy Policy", "Cookie Policy": "Cookie Policy" }[link.label] ?? link.label) : link.label}
                     </Link>
                   </li>
                 ))}
                 {category === "Pháp lý" && (
                   <li>
-                    <CookieSettingsButton />
+                    <CookieSettingsButton language={language} />
                   </li>
                 )}
               </ul>
@@ -116,7 +115,7 @@ export function FooterSection() {
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-emerald-500 animate-pulse" />
               <span className="text-ocean-light/70 text-xs font-mono">
-                Hệ thống hoạt động bình thường
+                {language === "en" ? "All systems operational" : "Hệ thống hoạt động bình thường"}
               </span>
             </div>
           </div>
