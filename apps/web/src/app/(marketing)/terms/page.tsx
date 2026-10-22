@@ -30,7 +30,7 @@ export default function TermsPage() {
     <LegalLayout
       title="Điều khoản Sử dụng"
       titleEn="Terms of Service"
-      lastUpdated="28/09/2026"
+      lastUpdated="22/10/2026"
       sections={SECTIONS}
     >
       {/* ─── Introduction ─── */}

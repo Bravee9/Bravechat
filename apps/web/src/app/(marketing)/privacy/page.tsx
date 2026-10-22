@@ -31,7 +31,7 @@ export default function PrivacyPage() {
     <LegalLayout
       title="Chính sách Bảo mật"
       titleEn="Privacy Policy"
-      lastUpdated="28/09/2026"
+      lastUpdated="22/10/2026"
       sections={SECTIONS}
     >
       {/* ─── 1 ─── */}
