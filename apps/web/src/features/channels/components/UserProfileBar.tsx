@@ -4,6 +4,9 @@ import React, { useState } from "react";
 import type { CurrentUser } from "@discord-clone/shared";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import { ProfileSettingsModal } from "./ProfileSettingsModal";
+import { workspaceStore } from "@/stores/workspace.store";
+import { http } from "@/services/http";
 
 interface UserProfileBarProps {
   currentUser: CurrentUser | null;
@@ -12,17 +15,16 @@ interface UserProfileBarProps {
 export function UserProfileBar({ currentUser }: UserProfileBarProps) {
   const [isMicMuted, setIsMicMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <footer
       data-testid="user-profile-bar"
       className="h-14 bg-[#051424] border-t border-ocean-dark-border px-3 flex items-center justify-between flex-shrink-0 z-20 select-none"
     >
-      <div className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:bg-white/5 p-1 rounded transition-colors">
+      <button type="button" onClick={() => setSettingsOpen(true)} className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:bg-white/5 p-1 rounded transition-colors text-left">
         <div className="relative flex-shrink-0">
-          <div className="w-8 h-8 rounded-full bg-ocean-primary flex items-center justify-center text-white text-xs font-bold shadow-ocean-glow">
-            {currentUser?.displayName?.[0] || "B"}
-          </div>
+          {currentUser?.avatarUrl ? <img src={currentUser.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" /> : <div className="w-8 h-8 rounded-full bg-ocean-primary flex items-center justify-center text-white text-xs font-bold shadow-ocean-glow">{currentUser?.displayName?.[0] || "B"}</div>}
           <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#051424] bg-emerald-500" />
         </div>
         <div className="min-w-0">
@@ -33,7 +35,7 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
             #{currentUser?.discriminator || "0001"}
           </p>
         </div>
-      </div>
+      </button>
 
       {/* Quick action buttons: Mute Mic, Deafen, Settings */}
       <div className="flex items-center gap-0.5 text-ocean-light/60">
@@ -74,6 +76,7 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
         <Tooltip content="Cài đặt người dùng" side="top">
           <button
             type="button"
+            onClick={() => setSettingsOpen(true)}
             data-testid="user-settings-btn"
             className="p-1.5 rounded hover:bg-white/10 hover:text-ocean-light transition-colors cursor-pointer"
             aria-label="Cài đặt người dùng"
@@ -84,7 +87,9 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
             </svg>
           </button>
         </Tooltip>
+        {currentUser ? <button type="button" title="Đăng xuất" aria-label="Đăng xuất" onClick={async () => { await http.post("/auth/logout").catch(() => undefined); window.location.href = "/login"; }} className="rounded p-1.5 text-ocean-light/60 hover:bg-white/10 hover:text-rose-300">⏻</button> : null}
       </div>
+      {settingsOpen && currentUser ? <ProfileSettingsModal user={currentUser} onClose={() => setSettingsOpen(false)} onSaved={(user) => workspaceStore.set({ currentUser: user })} /> : null}
     </footer>
   );
 }

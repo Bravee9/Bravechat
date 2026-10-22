@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import type { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../config/prisma'
+import { mediaUrl } from '../services/storage.service'
 
 const createSchema = z.object({ name: z.string().trim().min(2).max(100) })
 
@@ -11,8 +12,8 @@ function toServerDetail(server: ServerDetailRecord) {
   return {
     id: server.id,
     name: server.name,
-    iconUrl: null,
-    bannerUrl: null,
+    iconUrl: mediaUrl(server.iconKey),
+    bannerUrl: mediaUrl(server.bannerKey),
     description: server.description,
     ownerId: server.ownerId,
     categories: server.categories.map((category) => ({ id: category.id, serverId: category.serverId, name: category.name, position: category.position })),
@@ -36,10 +37,10 @@ export async function serverRoutes(server: FastifyInstance) {
   server.get('/', async (request, reply) => {
     const memberships = await prisma.serverMember.findMany({
       where: { userId: request.user.id, isBanned: false },
-      include: { server: { select: { id: true, name: true } } },
+      include: { server: { select: { id: true, name: true, iconKey: true } } },
       orderBy: { joinedAt: 'asc' },
     })
-    return reply.send({ statusCode: 200, data: memberships.map(({ server: item }) => ({ id: item.id, name: item.name, iconUrl: null, hasUnread: false, mentionCount: 0 })) })
+    return reply.send({ statusCode: 200, data: memberships.map(({ server: item }) => ({ id: item.id, name: item.name, iconUrl: mediaUrl(item.iconKey), hasUnread: false, mentionCount: 0 })) })
   })
 
   server.post<{ Body: z.infer<typeof createSchema> }>('/', async (request, reply) => {

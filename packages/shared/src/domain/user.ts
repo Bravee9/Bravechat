@@ -21,4 +21,5 @@ export interface CurrentUser extends UserSummary {
   email: string;
   discriminator: string;
   customStatus: string | null;
+  bio?: string | null;
 }
