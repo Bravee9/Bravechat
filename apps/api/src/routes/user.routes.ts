@@ -45,6 +45,13 @@ export async function userRoutes(server: FastifyInstance) {
     })) })
   })
 
+  server.get('/search', async (request: import('fastify').FastifyRequest<{ Querystring: { username?: string } }>, reply) => {
+    const username = request.query.username?.trim().toLowerCase()
+    if (!username || username.length < 3) return reply.send({ statusCode: 200, data: { users: [] } })
+    const users = await prisma.user.findMany({ where: { username: { contains: username }, isBanned: false, id: { not: request.user.id } }, take: 10, select: { id: true, username: true, displayName: true, avatarKey: true, status: true } })
+    return reply.send({ statusCode: 200, data: { users: users.map((user) => ({ id: user.id, username: user.username, displayName: user.displayName, avatarUrl: mediaUrl(user.avatarKey), status: user.status })) } })
+  })
+
   server.get('/@me/conversations', async (request, reply) => {
     const userId = request.user.id
     const rows = await prisma.directMessage.findMany({
@@ -52,11 +59,11 @@ export async function userRoutes(server: FastifyInstance) {
       orderBy: { createdAt: 'desc' },
       distinct: ['senderId', 'receiverId'],
       take: 100,
-      include: { sender: { select: { id: true, username: true, displayName: true, avatarKey: true } }, receiver: { select: { id: true, username: true, displayName: true, avatarKey: true } } },
+      include: { sender: { select: { id: true, username: true, displayName: true, avatarKey: true, status: true } }, receiver: { select: { id: true, username: true, displayName: true, avatarKey: true, status: true } } },
     })
     const conversations = rows.map((row) => {
       const other = row.senderId === userId ? row.receiver : row.sender
-      return { id: other.id, user: { id: other.id, username: other.username, displayName: other.displayName, avatarUrl: mediaUrl(other.avatarKey), status: 'OFFLINE' as const }, lastMessage: row.content ?? 'Đã gửi tệp', lastMessageAt: row.createdAt.toISOString(), unreadCount: 0 }
+      return { id: other.id, recipient: { id: other.id, username: other.username, displayName: other.displayName, avatarUrl: mediaUrl(other.avatarKey), status: other.status }, lastMessageAt: row.createdAt.toISOString(), hasUnread: row.receiverId === userId && !row.isRead }
     })
     return reply.send({ statusCode: 200, data: conversations })
   })

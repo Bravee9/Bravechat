@@ -56,7 +56,7 @@ export function ChatHeader({
         {/* Tên test user */}
         <button
           onClick={onChangeUsername}
-          title="Nhấn để đổi tên test"
+          title="Đổi tên hiển thị"
           data-testid="change-username-btn"
           className="flex items-center gap-1.5 px-2.5 py-1 text-xs border border-ocean-dark-border bg-ocean-dark-surface/60 hover:bg-ocean-dark-surface hover:border-ocean-secondary/50 text-ocean-light transition-all rounded"
         >

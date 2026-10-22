@@ -11,6 +11,7 @@ import { ChatInput } from "./ChatInput";
 import type { ChatMessage } from "./MessageItem";
 import { http } from "@/services/http";
 import { VoiceRoom } from "./VoiceRoom";
+import { loadConversations } from "@/stores/workspace.store";
 
 const DEFAULT_MESSAGES: ChatMessage[] = [
   {
@@ -54,21 +55,9 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
 
   const isMe = rawServerId === "@me";
 
-  // Tên kênh hiển thị
-  let displayChannelName = rawChannelId;
-  let isChannelTopic = true;
-  if (isMe) {
-    if (rawChannelId.startsWith("dm_")) {
-      displayChannelName = rawChannelId.replace("dm_", "");
-      isChannelTopic = false;
-    } else {
-      displayChannelName = "Trang chủ";
-      isChannelTopic = false;
-    }
-  }
-
   const [message, setMessage] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>(DEFAULT_MESSAGES);
+  const [dmDisplayName, setDmDisplayName] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>(() => env.useMocks ? DEFAULT_MESSAGES : []);
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
@@ -79,12 +68,16 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
   const [uploadError, setUploadError] = useState("");
   const [channelType, setChannelType] = useState<string | null>(null);
 
+  const displayChannelName = isMe ? (rawChannelId === "friends" ? "Trang chủ" : (dmDisplayName || rawChannelId)) : rawChannelId;
+  const isChannelTopic = !isMe;
+
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Khởi tạo danh tính người dùng (để test dễ dàng giữa 2 tab)
   useEffect(() => {
+    if (!env.useMocks) return;
     const savedUser = sessionStorage.getItem("bravechat_user");
     if (savedUser) {
       setCurrentUser(savedUser);
@@ -181,7 +174,14 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
   }, [effectiveChannelId, currentUser, rawChannelId, rawServerId]);
 
   useEffect(() => {
-    if (env.useMocks || isMe) return;
+    if (env.useMocks) return;
+    if (isMe && rawChannelId !== "friends") {
+      http.get<{ user: { displayName: string | null; username: string } }>(`/users/${encodeURIComponent(rawChannelId)}`)
+        .then(({ user }) => setDmDisplayName(user.displayName || user.username))
+        .catch(() => setDmDisplayName("Người dùng"));
+      return;
+    }
+    if (isMe) return;
     http.get<{ channel: { type: string } }>(`/channels/${encodeURIComponent(rawChannelId)}`)
       .then(({ channel }) => setChannelType(channel.type))
       .catch(() => setChannelType(null));
@@ -195,6 +195,28 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
   }, []);
 
   useEffect(() => {
+    if (env.useMocks) {
+      connectWebSocket();
+      return () => { wsRef.current?.close(); };
+    }
+    if (isMe) {
+      if (rawChannelId === "friends") {
+        setConnectionStatus("disconnected");
+        setMessages([]);
+        return;
+      }
+      let active = true;
+      const loadDirectMessages = () => http.get<{ messages: Array<CreatedMessageResponse> }>(`/messages/dm/${encodeURIComponent(rawChannelId)}`)
+        .then(({ messages: history }) => {
+          if (!active) return;
+          setMessages(history.map((item) => ({ id: item.id, avatar: item.avatar, user: item.user, time: item.time, content: item.content, createdAt: item.createdAt })));
+          setConnectionStatus("connected");
+        })
+        .catch((error) => { if (active) { setConnectionStatus("disconnected"); setUploadError(error instanceof Error ? error.message : "Không thể tải tin nhắn riêng."); } });
+      void loadDirectMessages();
+      const timer = window.setInterval(() => void loadDirectMessages(), 3000);
+      return () => { active = false; window.clearInterval(timer); };
+    }
     connectWebSocket();
 
     return () => {
@@ -202,13 +224,13 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
         wsRef.current.close();
       }
     };
-  }, [connectWebSocket]);
+  }, [connectWebSocket, isMe, rawChannelId]);
 
   // Gửi thông báo đang gõ
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
 
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+    if (!isMe && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(
         JSON.stringify({
           type: "typing_start",
@@ -236,10 +258,23 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
   };
 
   // Gửi tin nhắn
-  const handleSendMessage = (e?: React.FormEvent) => {
+  const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const content = message.trim();
     if (!content) return;
+
+    if (!env.useMocks && isMe) {
+      if (rawChannelId === "friends") return;
+      try {
+        const { message: sent } = await http.post<{ message: CreatedMessageResponse }>(`/messages/dm/${encodeURIComponent(rawChannelId)}`, { content });
+        setMessages((previous) => previous.some((item) => item.id === sent.id) ? previous : [...previous, sent]);
+        void loadConversations(true);
+        setMessage("");
+      } catch (error) {
+        setUploadError(error instanceof Error ? error.message : "Không thể gửi tin nhắn.");
+      }
+      return;
+    }
 
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(
@@ -344,10 +379,19 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
   };
 
   // Đổi tên test nhanh
-  const handleChangeUsername = () => {
-    const newName = prompt("Nhập tên hiển thị để test:", currentUser);
+  const handleChangeUsername = async () => {
+    const newName = prompt(env.useMocks ? "Nhập tên hiển thị để test:" : "Tên hiển thị mới:", currentUser);
     if (newName && newName.trim()) {
       const trimmed = newName.trim();
+      if (!env.useMocks) {
+        try {
+          const result = await http.patch<{ user: { username: string; displayName: string | null } }>("/users/@me", { displayName: trimmed });
+          setCurrentUser(result.user.displayName || result.user.username);
+        } catch (error) {
+          setUploadError(error instanceof Error ? error.message : "Không thể cập nhật tên hiển thị.");
+        }
+        return;
+      }
       setCurrentUser(trimmed);
       sessionStorage.setItem("bravechat_user", trimmed);
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -403,14 +447,14 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
         <TypingIndicator typingUsers={typingUsers} />
 
         {/* 4. Chat Input */}
-        <ChatInput
+        {isMe && rawChannelId === "friends" ? <div className="mx-6 mb-6 rounded-lg border border-ocean-dark-border bg-ocean-dark-surface/60 p-5 text-sm text-ocean-light/70">Chọn một cuộc trò chuyện hoặc nhấn dấu + để bắt đầu nhắn tin.</div> : <ChatInput
           value={message}
           placeholder={`Nhắn tin tới #${displayChannelName} (Nhấn Enter để gửi)...`}
           onChange={handleInputChange}
           onSubmit={handleSendMessage}
           onFiles={handleFiles}
           isUploading={isUploading}
-        />
+        />}
         {uploadError ? <p role="alert" className="px-6 pb-2 text-xs text-rose-400">{uploadError}</p> : null}
       </main>
 

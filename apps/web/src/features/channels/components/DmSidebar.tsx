@@ -2,11 +2,12 @@
 
 import React from "react";
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
-import { useConversations } from "@/stores/workspace.store";
+import { useParams, usePathname, useRouter } from "next/navigation";
+import { loadConversations, useConversations } from "@/stores/workspace.store";
 import { ServerHeader } from "./ServerHeader";
 import { DirectMessageItem } from "./DirectMessageItem";
 import { cn } from "@/lib/utils";
+import { http } from "@/services/http";
 
 /**
  * LAYER 2 (nhánh @me) — Danh sách Bạn bè & Tin nhắn trực tiếp.
@@ -16,9 +17,24 @@ export function DmSidebar() {
   const params = useParams();
   const pathname = usePathname();
   const conversations = useConversations();
+  const router = useRouter();
 
   const currentDmId = (params?.dmId as string) || "";
   const isFriendsActive = pathname === "/channels/@me" || pathname === "/channels/%40me";
+
+  async function startConversation() {
+    const username = window.prompt("Nhập tên người dùng cần nhắn:")?.trim();
+    if (!username) return;
+    try {
+      const { users } = await http.get<{ users: Array<{ id: string; username: string }> }>("/users/search", { query: { username } });
+      const recipient = users.find((user) => user.username === username.toLowerCase()) ?? users[0];
+      if (!recipient) { window.alert("Không tìm thấy người dùng."); return; }
+      await loadConversations(true);
+      router.push(`/channels/@me/${encodeURIComponent(recipient.id)}`);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Không thể bắt đầu cuộc trò chuyện.");
+    }
+  }
 
   return (
     <aside
@@ -54,12 +70,12 @@ export function DmSidebar() {
         <div className="pt-2">
           <div className="flex items-center justify-between px-2 mb-1.5 text-ocean-light/50 text-[11px] font-bold uppercase tracking-wider">
             <span>Tin nhắn trực tiếp</span>
-            <span
+            <button type="button" onClick={() => void startConversation()}
               className="text-sm cursor-pointer hover:text-ocean-light"
               title="Bắt đầu cuộc trò chuyện mới"
             >
               +
-            </span>
+            </button>
           </div>
 
           {conversations.map((dm) => (

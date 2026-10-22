@@ -135,5 +135,20 @@ export async function channelRoutes(server: FastifyInstance) {
 
 export async function messageRoutes(server: FastifyInstance) {
   server.addHook('preHandler', server.authenticate)
+  server.get<{ Params: { userId: string } }>('/dm/:userId', async (request, reply) => {
+    const recipient = await prisma.user.findFirst({ where: { id: request.params.userId, isBanned: false }, select: { id: true } })
+    if (!recipient || recipient.id === request.user.id) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy người dùng.' })
+    await prisma.directMessage.updateMany({ where: { senderId: recipient.id, receiverId: request.user.id, isRead: false }, data: { isRead: true } })
+    const rows = await prisma.directMessage.findMany({ where: { OR: [{ senderId: request.user.id, receiverId: recipient.id }, { senderId: recipient.id, receiverId: request.user.id }], isDeleted: false }, orderBy: { createdAt: 'desc' }, take: 50, include: { sender: { select: { id: true, username: true, displayName: true } } } })
+    return reply.send({ statusCode: 200, data: { messages: rows.reverse().map((row) => ({ id: row.id, content: row.content ?? '', createdAt: row.createdAt, time: new Date(row.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), user: row.sender.displayName || row.sender.username, avatar: (row.sender.displayName || row.sender.username).slice(0, 2).toUpperCase() })) } })
+  })
+  server.post<{ Params: { userId: string }; Body: { content: string } }>('/dm/:userId', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const parsed = z.object({ content: z.string().trim().min(1).max(2000) }).safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ statusCode: 400, message: 'Tin nhắn cần có từ 1 đến 2.000 ký tự.' })
+    const recipient = await prisma.user.findFirst({ where: { id: request.params.userId, isBanned: false }, select: { id: true } })
+    if (!recipient || recipient.id === request.user.id) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy người dùng.' })
+    const row = await prisma.directMessage.create({ data: { senderId: request.user.id, receiverId: recipient.id, content: parsed.data.content }, include: { sender: { select: { id: true, username: true, displayName: true } } } })
+    return reply.status(201).send({ statusCode: 201, data: { message: { id: row.id, content: row.content, createdAt: row.createdAt, time: new Date(row.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), user: row.sender.displayName || row.sender.username, avatar: (row.sender.displayName || row.sender.username).slice(0, 2).toUpperCase() } } })
+  })
   server.get('/', async (_, reply) => reply.send({ statusCode: 200, data: [] }))
 }
