@@ -1,9 +1,11 @@
 import fp from 'fastify-plugin'
-import { S3Client } from '@aws-sdk/client-s3'
-import { env } from '../config/env'
+import type { FastifyInstance } from 'fastify'
+import type { S3Client } from '@aws-sdk/client-s3'
+import { createR2Client, StorageService } from '../services/storage.service'
 
 export interface R2Plugin {
   s3: S3Client
+  storage: StorageService
 }
 
 declare module 'fastify' {
@@ -12,17 +14,20 @@ declare module 'fastify' {
   }
 }
 
-import type { FastifyInstance } from 'fastify'
-
 export default fp(async (fastify: FastifyInstance) => {
-  const s3 = new S3Client({
-    region: 'auto',
-    endpoint: env.R2_ENDPOINT_URL,
-    credentials: {
-      accessKeyId: env.R2_ACCESS_KEY_ID,
-      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-    },
+  const s3 = createR2Client()
+  const storage = new StorageService(s3)
+  fastify.decorate('r2', { s3, storage })
+
+  // Kiểm kết nối lúc khởi động: không chặn boot, chỉ log rõ để biết R2 có sẵn sàng không.
+  fastify.addHook('onReady', async () => {
+    try {
+      const { bucket, latencyMs } = await storage.checkConnection()
+      fastify.log.info(`☁️  Cloudflare R2 connected: bucket "${bucket}" (${latencyMs}ms)`)
+    } catch (error) {
+      fastify.log.error(error, '☁️  Cloudflare R2 connection failed — kiểm tra R2_* trong .env')
+    }
   })
 
-  fastify.decorate('r2', { s3 })
+  fastify.addHook('onClose', async () => s3.destroy())
 }, { name: 'fastify-r2' })

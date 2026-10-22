@@ -12,6 +12,7 @@ import { messageRoutes } from './message.routes'
 import { uploadRoutes } from './upload.routes'
 import { websocketRoutes } from './websocket.routes'
 import { voiceRoutes } from './voice.routes'
+import { mediaRoutes } from './media.routes'
 
 export async function registerRoutes(server: FastifyInstance) {
   // Direct WebSocket at /ws
@@ -40,6 +41,9 @@ export async function registerRoutes(server: FastifyInstance) {
     // Uploads (R2 presigned URLs): /api/uploads/*
     await api.register(uploadRoutes, { prefix: '/uploads' })
     await api.register(voiceRoutes, { prefix: '/voice' })
+
+    // Public media (avatar, banner, server icon): /api/media/*
+    await api.register(mediaRoutes, { prefix: '/media' })
   }, { prefix: '/api' })
 }
 

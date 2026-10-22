@@ -25,11 +25,12 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
 
   // Cloudflare R2 (Object Storage)
-  R2_BUCKET_NAME: z.string(),
-  R2_ENDPOINT_URL: z.string().url(),
-  R2_ACCESS_KEY_ID: z.string(),
-  R2_SECRET_ACCESS_KEY: z.string(),
-  R2_PUBLIC_URL: z.string().url().optional(),
+  R2_BUCKET_NAME: z.string().trim().min(3),
+  R2_ENDPOINT_URL: z.string().trim().url(),
+  R2_ACCESS_KEY_ID: z.string().trim().min(16),
+  R2_SECRET_ACCESS_KEY: z.string().trim().min(32),
+  // Bỏ trống nếu bucket private (khi đó media đi qua /api/media/*)
+  R2_PUBLIC_URL: z.preprocess((value) => (value === '' || (typeof value === 'string' && value.includes('xxxx')) ? undefined : value), z.string().url().optional()),
   LIVEKIT_URL: z.string().url().optional(),
   LIVEKIT_API_KEY: z.string().optional(),
   LIVEKIT_API_SECRET: z.string().optional(),
@@ -37,6 +38,8 @@ const envSchema = z.object({
 
   // App
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+  // URL công khai của chính API — dùng để dựng link /api/media/* cho avatar, banner
+  API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),
   MAX_FILE_SIZE: z.coerce.number().default(50 * 1024 * 1024), // 50MB
 })
 

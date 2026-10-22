@@ -76,4 +76,13 @@ export async function registerPlugins(server: FastifyInstance) {
     timestamp: new Date().toISOString(),
     version: '0.1.0',
   }))
+
+  // Kiểm kết nối Cloudflare R2 khi API đang chạy
+  server.get('/health/storage', async (_request, reply) => {
+    try {
+      return { status: 'ok', provider: 'cloudflare-r2', ...(await server.r2.storage.checkConnection()) }
+    } catch (error) {
+      return reply.status(503).send({ status: 'error', provider: 'cloudflare-r2', message: error instanceof Error ? error.message : 'unknown' })
+    }
+  })
 }
