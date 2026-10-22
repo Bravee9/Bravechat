@@ -211,6 +211,8 @@ pnpm dev
 
 ## Kiểm tra Chất lượng Mã nguồn (Lint & Type-Check)
 
+Quy trình kiểm thử đầy đủ từ cài đặt, Prisma, R2, API, web đến smoke test chức năng nằm tại [docs/testing-workflow.md](./docs/testing-workflow.md). Nên chạy theo checklist này trước mỗi lần commit hoặc merge.
+
 Chạy kiểm tra toàn bộ workspace trước khi commit:
 ```bash
 # Kiểm tra TypeScript toàn bộ monorepo
