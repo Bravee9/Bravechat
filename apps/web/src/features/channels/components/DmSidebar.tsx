@@ -1,13 +1,14 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { loadConversations, useConversations } from "@/stores/workspace.store";
+import { useConversations } from "@/stores/workspace.store";
 import { ServerHeader } from "./ServerHeader";
 import { DirectMessageItem } from "./DirectMessageItem";
 import { cn } from "@/lib/utils";
 import { http } from "@/services/http";
+import { DialogFrame } from "@/components/ui/DialogFrame";
 
 /**
  * LAYER 2 (nhánh @me) — Danh sách Bạn bè & Tin nhắn trực tiếp.
@@ -18,21 +19,29 @@ export function DmSidebar() {
   const pathname = usePathname();
   const conversations = useConversations();
   const router = useRouter();
+  const [isNewDmOpen, setIsNewDmOpen] = useState(false);
+  const [username, setUsername] = useState("");
+  const [searchError, setSearchError] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   const currentDmId = (params?.dmId as string) || "";
   const isFriendsActive = pathname === "/channels/@me" || pathname === "/channels/%40me";
 
-  async function startConversation() {
-    const username = window.prompt("Nhập tên người dùng cần nhắn:")?.trim();
-    if (!username) return;
+  async function startConversation(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSearchError("");
+    setIsSearching(true);
     try {
-      const { users } = await http.get<{ users: Array<{ id: string; username: string }> }>("/users/search", { query: { username } });
-      const recipient = users.find((user) => user.username === username.toLowerCase()) ?? users[0];
-      if (!recipient) { window.alert("Không tìm thấy người dùng."); return; }
-      await loadConversations(true);
+      const { users } = await http.get<{ users: Array<{ id: string; username: string }> }>("/users/search", { query: { username, exact: "true" } });
+      const recipient = users.find((user) => user.username === username.trim().toLowerCase());
+      if (!recipient) { setSearchError("Không tìm thấy tên người dùng khớp chính xác."); return; }
       router.push(`/channels/@me/${encodeURIComponent(recipient.id)}`);
+      setIsNewDmOpen(false);
+      setUsername("");
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Không thể bắt đầu cuộc trò chuyện.");
+      setSearchError(error instanceof Error ? error.message : "Không thể tìm người dùng.");
+    } finally {
+      setIsSearching(false);
     }
   }
 
@@ -70,7 +79,7 @@ export function DmSidebar() {
         <div className="pt-2">
           <div className="flex items-center justify-between px-2 mb-1.5 text-ocean-light/50 text-[11px] font-bold uppercase tracking-wider">
             <span>Tin nhắn trực tiếp</span>
-            <button type="button" onClick={() => void startConversation()}
+            <button type="button" onClick={() => { setSearchError(""); setIsNewDmOpen(true); }}
               className="text-sm cursor-pointer hover:text-ocean-light"
               title="Bắt đầu cuộc trò chuyện mới"
             >
@@ -83,6 +92,19 @@ export function DmSidebar() {
           ))}
         </div>
       </div>
+      {isNewDmOpen ? (
+        <DialogFrame title="Tin nhắn mới" description="Tìm chính xác theo tên người dùng để mở cuộc trò chuyện." onClose={() => setIsNewDmOpen(false)}>
+          <form onSubmit={(event) => void startConversation(event)} className="space-y-4">
+            <label htmlFor="new-dm-username" className="block text-sm font-medium">Tên người dùng</label>
+            <input id="new-dm-username" autoFocus required minLength={3} maxLength={32} value={username} onChange={(event) => setUsername(event.target.value)} className="input-ocean w-full" autoComplete="off" />
+            {searchError ? <p role="alert" className="text-sm text-rose-300">{searchError}</p> : null}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setIsNewDmOpen(false)}>Hủy</button>
+              <button type="submit" disabled={isSearching} className="btn-primary disabled:opacity-60">{isSearching ? "Đang tìm…" : "Mở tin nhắn"}</button>
+            </div>
+          </form>
+        </DialogFrame>
+      ) : null}
     </aside>
   );
 }

@@ -9,6 +9,10 @@ interface ServerHeaderProps {
   isOpen: boolean;
   onToggle: () => void;
   onClose: () => void;
+  onInvite?: () => void;
+  onSettings?: () => void;
+  onCreateChannel?: () => void;
+  onLeave?: () => void;
 }
 
 export function ServerHeader({
@@ -17,6 +21,10 @@ export function ServerHeader({
   isOpen,
   onToggle,
   onClose,
+  onInvite,
+  onSettings,
+  onCreateChannel,
+  onLeave,
 }: ServerHeaderProps) {
   return (
     <div className="relative">
@@ -54,21 +62,21 @@ export function ServerHeader({
           className="absolute top-[58px] left-2 right-2 bg-[#061829] border border-ocean-dark-border rounded-lg shadow-2xl p-1.5 z-40 animate-fade-in text-xs font-semibold"
         >
           <button
-            onClick={onClose}
+            onClick={() => { onInvite?.(); onClose(); }}
             className="w-full flex items-center justify-between px-2.5 py-2 text-ocean-secondary hover:bg-ocean-primary hover:text-white rounded transition-colors"
           >
             <span>Mời mọi người</span>
             <span>+</span>
           </button>
           <button
-            onClick={onClose}
+            onClick={() => { onSettings?.(); onClose(); }}
             className="w-full flex items-center justify-between px-2.5 py-2 text-ocean-light/80 hover:bg-white/5 rounded transition-colors"
           >
             <span>Cài đặt máy chủ</span>
             <span>⚙️</span>
           </button>
           <button
-            onClick={onClose}
+            onClick={() => { onCreateChannel?.(); onClose(); }}
             className="w-full flex items-center justify-between px-2.5 py-2 text-ocean-light/80 hover:bg-white/5 rounded transition-colors"
           >
             <span>Tạo kênh</span>
@@ -76,7 +84,7 @@ export function ServerHeader({
           </button>
           <div className="h-px bg-ocean-dark-border my-1" />
           <button
-            onClick={onClose}
+            onClick={() => { onLeave?.(); onClose(); }}
             className="w-full flex items-center justify-between px-2.5 py-2 text-rose-400 hover:bg-rose-500 hover:text-white rounded transition-colors"
           >
             <span>Rời khỏi máy chủ</span>

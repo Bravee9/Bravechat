@@ -1,4 +1,4 @@
-import type { ServerDetail, ServerListItem } from "@discord-clone/shared";
+import type { ServerDetail, ServerListItem, ServerMemberSummary } from "@discord-clone/shared";
 import { API_ROUTES } from "@discord-clone/shared";
 import { env } from "@/config/env";
 import { http } from "@/services/http";
@@ -49,5 +49,10 @@ export const serverService = {
     }
 
     return http.get<ServerDetail>(API_ROUTES.servers.detail(serverId));
+  },
+
+  async getServerMembers(serverId: string): Promise<ServerMemberSummary[]> {
+    const response = await http.get<{ members: ServerMemberSummary[] }>(API_ROUTES.servers.members(serverId));
+    return response.members;
   },
 };

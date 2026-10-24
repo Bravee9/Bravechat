@@ -1,23 +1,45 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { MemberItem } from "./MemberItem";
 import type { Member } from "./MemberItem";
+import { serverService } from "@/services/server.service";
 
-const MOCK_MEMBERS: Member[] = [
-  { id: "m1", name: "Bravee9", role: "OWNER", status: "ONLINE", customStatus: "Code with passion" },
-  { id: "m2", name: "Shuji", role: "ADMIN", status: "ONLINE", customStatus: "Reviewing pull requests" },
-  { id: "m3", name: "Antigravity AI", role: "BOT", status: "ONLINE", customStatus: "Pair programming" },
-  { id: "m4", name: "Châu UI/UX", role: "MEMBER", status: "IDLE", customStatus: "Sketching wireframes" },
-  { id: "m5", name: "Hải Nam", role: "MEMBER", status: "DND" },
-  { id: "m6", name: "Thành Đạt", role: "MEMBER", status: "OFFLINE" },
-];
-
-export function MemberList({ isVisible }: { isVisible: boolean }) {
+export function MemberList({ isVisible, serverId }: { isVisible: boolean; serverId?: string }) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
-  const onlineMembers = MOCK_MEMBERS.filter((m) => m.status !== "OFFLINE");
-  const offlineMembers = MOCK_MEMBERS.filter((m) => m.status === "OFFLINE");
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loadError, setLoadError] = useState("");
+
+  // Member list is fetched independently from server READY. Refresh periodically
+  // so account status changes in another session show up without a full reload.
+  useEffect(() => {
+    if (!isVisible || !serverId) return;
+    let active = true;
+    const load = async () => {
+      try {
+        const rows = await serverService.getServerMembers(serverId);
+        if (!active) return;
+        setMembers(rows.map((row) => ({
+          id: row.id,
+          name: row.displayName || row.username,
+          role: row.role,
+          status: row.status,
+          customStatus: row.customStatus ?? undefined,
+          avatarUrl: row.avatarUrl,
+        })));
+        setLoadError("");
+      } catch (error) {
+        if (active) setLoadError(error instanceof Error ? error.message : "Không tải được thành viên.");
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => void load(), 30_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [isVisible, serverId]);
+
+  const onlineMembers = members.filter((m) => !["OFFLINE", "INVISIBLE"].includes(m.status));
+  const offlineMembers = members.filter((m) => ["OFFLINE", "INVISIBLE"].includes(m.status));
   const rows = [
     { type: "header" as const, title: "Trực tuyến", count: onlineMembers.length },
     ...onlineMembers.map((member) => ({ type: "member" as const, member })),
@@ -41,6 +63,7 @@ export function MemberList({ isVisible }: { isVisible: boolean }) {
       className="w-60 bg-[#051424] border-l border-ocean-dark-border flex flex-col h-full select-none flex-shrink-0 animate-fade-in"
       data-testid="member-list"
     >
+      {loadError ? <p role="alert" className="px-4 py-3 text-xs text-rose-300">{loadError}</p> : null}
       <div
         className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar"
         onScroll={(event) => {

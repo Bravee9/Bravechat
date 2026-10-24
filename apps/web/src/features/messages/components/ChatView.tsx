@@ -459,7 +459,7 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
       </main>
 
       {/* Cột Phải: Member List (Collapsible) */}
-      {!isMe && <MemberList isVisible={showMemberList} />}
+      {!isMe && <MemberList isVisible={showMemberList} serverId={rawServerId} />}
     </div>
   );
 }

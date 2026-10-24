@@ -10,6 +10,7 @@ interface CategorySectionProps {
   channels: Channel[];
   serverId: string;
   currentChannelId: string;
+  onCreateChannel?: () => void;
 }
 
 export function CategorySection({
@@ -17,6 +18,7 @@ export function CategorySection({
   channels,
   serverId,
   currentChannelId,
+  onCreateChannel,
 }: CategorySectionProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -46,6 +48,7 @@ export function CategorySection({
 
         <button
           type="button"
+          onClick={onCreateChannel}
           className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-white"
           title="Tạo kênh mới trong danh mục này"
         >

@@ -12,6 +12,8 @@ import { http } from "@/services/http";
 import { loadServers } from "@/stores/workspace.store";
 import type { ServerDetail } from "@discord-clone/shared";
 import { env } from "@/config/env";
+import { API_ROUTES } from "@discord-clone/shared";
+import { DialogFrame } from "@/components/ui/DialogFrame";
 
 export function ServerRail() {
   const router = useRouter();
@@ -24,20 +26,38 @@ export function ServerRail() {
 
   // Dữ liệu từ store dùng chung: tải một lần, không refetch khi đổi server.
   const servers = useServers();
+  const [dialogMode, setDialogMode] = useState<"create" | "join" | null>(null);
+  const [serverName, setServerName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCreateServer = async () => {
-    const name = window.prompt("Tên máy chủ mới:")?.trim();
-    if (!name) return;
+  const handleServerAction = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setActionError("");
     if (env.useMocks) {
-      window.alert("Tắt chế độ mock để tạo server và dùng dữ liệu thật.");
+      setActionError("Tắt chế độ mock để dùng chức năng server với dữ liệu thật.");
       return;
     }
+    setIsSubmitting(true);
     try {
-      const result = await http.post<{ server: ServerDetail }>("/servers", { name });
-      await loadServers(true);
-      router.push(`/channels/${encodeURIComponent(result.server.id)}`);
+      if (dialogMode === "create") {
+        const result = await http.post<{ server: ServerDetail }>(API_ROUTES.servers.create, { name: serverName.trim() });
+        await loadServers(true);
+        setDialogMode(null);
+        setServerName("");
+        router.push(`/channels/${encodeURIComponent(result.server.id)}`);
+      } else {
+        const result = await http.post<{ serverId: string }>(API_ROUTES.invites.join(inviteCode.trim()));
+        await loadServers(true);
+        setDialogMode(null);
+        setInviteCode("");
+        router.push(`/channels/${encodeURIComponent(result.serverId)}`);
+      }
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Không thể tạo server.");
+      setActionError(error instanceof Error ? error.message : "Không thể hoàn tất thao tác server.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
   // Chỉ dành cho Home / nút hành động. Server items tự quản hover để không re-render cả danh sách.
@@ -77,7 +97,7 @@ export function ServerRail() {
           variant="emerald"
           isHovered={hoveredItemId === "add"}
           onHover={(hovered) => setHoveredItemId(hovered ? "add" : null)}
-          onClick={() => void handleCreateServer()}
+          onClick={() => { setActionError(""); setDialogMode("create"); }}
         >
           <svg
             className="w-5 h-5 group-hover:scale-110 transition-transform duration-200"
@@ -97,6 +117,7 @@ export function ServerRail() {
           variant="ocean"
           isHovered={hoveredItemId === "explore"}
           onHover={(hovered) => setHoveredItemId(hovered ? "explore" : null)}
+          onClick={() => { setActionError(""); setDialogMode("join"); }}
         >
           <svg
             className="w-5 h-5 group-hover:rotate-45 transition-transform duration-300"
@@ -109,6 +130,32 @@ export function ServerRail() {
           </svg>
         </RailActionItem>
       </div>
+      {dialogMode ? (
+        <DialogFrame
+          title={dialogMode === "create" ? "Tạo máy chủ" : "Tham gia máy chủ"}
+          description={dialogMode === "create" ? "Máy chủ mới sẽ được tạo cùng các kênh mặc định." : "Nhập mã mời để tham gia máy chủ."}
+          onClose={() => setDialogMode(null)}
+        >
+          <form onSubmit={handleServerAction} className="space-y-4">
+            <label className="block text-sm font-medium" htmlFor="server-workflow-input">{dialogMode === "create" ? "Tên máy chủ" : "Mã mời"}</label>
+            <input
+              id="server-workflow-input"
+              autoFocus
+              required
+              minLength={dialogMode === "create" ? 2 : 1}
+              maxLength={dialogMode === "create" ? 100 : 128}
+              value={dialogMode === "create" ? serverName : inviteCode}
+              onChange={(event) => dialogMode === "create" ? setServerName(event.target.value) : setInviteCode(event.target.value)}
+              className="input-ocean w-full"
+            />
+            {actionError ? <p role="alert" className="text-sm text-rose-300">{actionError}</p> : null}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setDialogMode(null)}>Hủy</button>
+              <button type="submit" disabled={isSubmitting} className="btn-primary disabled:opacity-60">{isSubmitting ? "Đang xử lý…" : dialogMode === "create" ? "Tạo máy chủ" : "Tham gia"}</button>
+            </div>
+          </form>
+        </DialogFrame>
+      ) : null}
     </nav>
   );
 }

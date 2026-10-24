@@ -8,6 +8,7 @@ export function ProfileSettingsModal({ user, onClose, onSaved }: { user: Current
   const [username, setUsername] = useState(user.username);
   const [displayName, setDisplayName] = useState(user.displayName ?? "");
   const [bio, setBio] = useState(user.bio ?? "");
+  const [status, setStatus] = useState(user.status);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -16,7 +17,7 @@ export function ProfileSettingsModal({ user, onClose, onSaved }: { user: Current
     setBusy(true);
     setError("");
     try {
-      const result = await http.patch<{ user: CurrentUser & { bio?: string | null } }>("/users/@me", { username, displayName: displayName || null, bio: bio || null });
+      const result = await http.patch<{ user: CurrentUser & { bio?: string | null } }>("/users/@me", { username, displayName: displayName || null, bio: bio || null, status });
       onSaved(result.user);
       onClose();
     } catch (cause) {
@@ -51,6 +52,7 @@ export function ProfileSettingsModal({ user, onClose, onSaved }: { user: Current
       <label className="input-label" htmlFor="profile-display-name">Tên hiển thị</label><input id="profile-display-name" maxLength={32} value={displayName} onChange={(event) => setDisplayName(event.target.value)} className="mb-4 w-full rounded border border-ocean-dark-border bg-black/20 px-3 py-2 text-ocean-light" />
       <label className="input-label" htmlFor="profile-email">Email (không thể thay đổi)</label><input id="profile-email" readOnly value={user.email} className="mb-4 w-full cursor-not-allowed rounded border border-ocean-dark-border bg-black/10 px-3 py-2 text-ocean-light/60" />
       <label className="input-label" htmlFor="profile-bio">Giới thiệu</label><textarea id="profile-bio" maxLength={190} value={bio} onChange={(event) => setBio(event.target.value)} className="mb-4 min-h-20 w-full rounded border border-ocean-dark-border bg-black/20 px-3 py-2 text-ocean-light" placeholder="Chia sẻ đôi điều về bạn" />
+      <label className="input-label" htmlFor="profile-status">Trạng thái</label><select id="profile-status" value={status} onChange={(event) => setStatus(event.target.value as CurrentUser["status"])} className="mb-4 w-full rounded border border-ocean-dark-border bg-[#061829] px-3 py-2 text-ocean-light"><option value="ONLINE">Trực tuyến</option><option value="IDLE">Chờ</option><option value="DO_NOT_DISTURB">Không làm phiền</option><option value="INVISIBLE">Ẩn</option><option value="OFFLINE">Ngoại tuyến</option></select>
       {error ? <p role="alert" className="mb-3 text-sm text-rose-400">{error}</p> : null}
       <div className="flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded px-4 py-2 text-sm text-ocean-light/70">Hủy</button><button disabled={busy} className="rounded bg-ocean-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? "Đang lưu…" : "Lưu thay đổi"}</button></div>
     </form>

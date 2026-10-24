@@ -25,7 +25,7 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
       <button type="button" onClick={() => setSettingsOpen(true)} className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:bg-white/5 p-1 rounded transition-colors text-left">
         <div className="relative flex-shrink-0">
           {currentUser?.avatarUrl ? <img src={currentUser.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" /> : <div className="w-8 h-8 rounded-full bg-ocean-primary flex items-center justify-center text-white text-xs font-bold shadow-ocean-glow">{currentUser?.displayName?.[0] || "B"}</div>}
-          <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#051424] bg-emerald-500" />
+          <div className={cn("absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#051424]", currentUser?.status === "ONLINE" ? "bg-emerald-500" : currentUser?.status === "IDLE" ? "bg-amber-500" : currentUser?.status === "DO_NOT_DISTURB" ? "bg-rose-500" : "bg-slate-500")} />
         </div>
         <div className="min-w-0">
           <p className="text-ocean-light text-xs font-bold truncate leading-tight">
