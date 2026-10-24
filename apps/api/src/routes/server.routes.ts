@@ -101,7 +101,7 @@ export async function serverRoutes(server: FastifyInstance) {
       take: 500,
       select: { isOwner: true, roles: { select: { role: { select: { name: true } } } }, user: { select: { id: true, username: true, displayName: true, avatarKey: true, status: true, customStatus: true, isBot: true } } },
     })
-    return reply.send({ statusCode: 200, data: { members: members.map(({ isOwner, user }) => ({
+    return reply.send({ statusCode: 200, data: { members: members.map(({ isOwner, roles, user }) => ({
       id: user.id,
       username: user.username,
       displayName: user.displayName,
