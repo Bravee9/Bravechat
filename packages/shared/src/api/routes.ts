@@ -31,6 +31,9 @@ export const API_ROUTES = {
     /** Includes categories + channels (see `ServerDetail`). */
     detail: (serverId: string) => `/servers/${enc(serverId)}`,
     members: (serverId: string) => `/servers/${enc(serverId)}/members`,
+    channels: (serverId: string) => `/servers/${enc(serverId)}/channels`,
+    createInvite: (serverId: string) => `/servers/${enc(serverId)}/invites`,
+    leave: (serverId: string) => `/servers/${enc(serverId)}/members/@me`,
   },
   channels: {
     detail: (channelId: string) => `/channels/${enc(channelId)}`,

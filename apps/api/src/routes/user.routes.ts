@@ -24,6 +24,7 @@ const profileSchema = z.object({
   displayName: z.string().trim().min(1).max(32).nullable().optional(),
   bio: z.string().trim().max(190).nullable().optional(),
   customStatus: z.string().trim().max(128).nullable().optional(),
+  status: z.enum(['ONLINE', 'IDLE', 'DO_NOT_DISTURB', 'INVISIBLE', 'OFFLINE']).optional(),
 }).strict()
 
 export async function userRoutes(server: FastifyInstance) {
@@ -45,10 +46,10 @@ export async function userRoutes(server: FastifyInstance) {
     })) })
   })
 
-  server.get('/search', async (request: import('fastify').FastifyRequest<{ Querystring: { username?: string } }>, reply) => {
+  server.get('/search', async (request: import('fastify').FastifyRequest<{ Querystring: { username?: string; exact?: string } }>, reply) => {
     const username = request.query.username?.trim().toLowerCase()
     if (!username || username.length < 3) return reply.send({ statusCode: 200, data: { users: [] } })
-    const users = await prisma.user.findMany({ where: { username: { contains: username }, isBanned: false, id: { not: request.user.id } }, take: 10, select: { id: true, username: true, displayName: true, avatarKey: true, status: true } })
+    const users = await prisma.user.findMany({ where: { username: request.query.exact === 'true' ? { equals: username, mode: 'insensitive' } : { contains: username, mode: 'insensitive' }, isBanned: false, id: { not: request.user.id } }, take: request.query.exact === 'true' ? 1 : 10, select: { id: true, username: true, displayName: true, avatarKey: true, status: true } })
     return reply.send({ statusCode: 200, data: { users: users.map((user) => ({ id: user.id, username: user.username, displayName: user.displayName, avatarUrl: mediaUrl(user.avatarKey), status: user.status })) } })
   })
 
@@ -86,9 +87,10 @@ export async function userRoutes(server: FastifyInstance) {
   })
 
   server.patch('/@me/status', async (request, reply) => {
-    // TODO: UserService.updateStatus(userId, status)
-    // Also publish to Redis Pub/Sub for real-time presence update
-    return reply.send({ statusCode: 200 })
+    const parsed = z.object({ status: z.enum(['ONLINE', 'IDLE', 'DO_NOT_DISTURB', 'INVISIBLE', 'OFFLINE']) }).safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ statusCode: 400, message: 'Trạng thái không hợp lệ.' })
+    const user = await prisma.user.update({ where: { id: request.user.id }, data: { status: parsed.data.status }, select: { id: true, email: true, username: true, displayName: true, bio: true, customStatus: true, status: true, discriminator: true, avatarKey: true, bannerKey: true } })
+    return reply.send({ statusCode: 200, data: { user: { ...user, avatarUrl: mediaUrl(user.avatarKey), bannerUrl: mediaUrl(user.bannerKey) } } })
   })
 
   const uploadProfileAsset = (kind: AssetKind) => async (request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {

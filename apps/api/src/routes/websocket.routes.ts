@@ -44,7 +44,8 @@ function ensureRedis(server: FastifyInstance) {
     try {
       const envelope = JSON.parse(raw)
       if (envelope.origin !== instanceId) {
-        if (envelope.room === 'server') broadcastToServer(envelope.serverId, envelope.payload)
+        if (envelope.action === 'revoke_server_membership') revokeLocalServerMembership(envelope.serverId, envelope.userId)
+        else if (envelope.room === 'server') broadcastToServer(envelope.serverId, envelope.payload)
         else broadcastToChannel(envelope.channelId, envelope.payload)
       }
     } catch (error) {
@@ -104,6 +105,25 @@ function leaveCurrentChannel(socket: WebSocket) {
     }
   }
   session.channelId = undefined
+}
+
+function revokeLocalServerMembership(serverId: string, userId: string) {
+  for (const [socket, session] of clientSessions) {
+    if (session.serverId !== serverId || session.user?.id !== userId) continue
+    serverRooms.get(serverId)?.delete(socket)
+    if (serverRooms.get(serverId)?.size === 0) serverRooms.delete(serverId)
+    leaveCurrentChannel(socket)
+    clientSessions.delete(socket)
+    socket.close(1008, 'Server membership changed')
+  }
+}
+
+/** Close already-authorized sockets immediately after a member loses access. */
+export function revokeServerMembership(serverId: string, userId: string) {
+  revokeLocalServerMembership(serverId, userId)
+  if (redisPublisher?.status === 'ready') {
+    void redisPublisher.publish('bravechat:realtime', JSON.stringify({ origin: instanceId, action: 'revoke_server_membership', serverId, userId })).catch(() => {})
+  }
 }
 
 export async function websocketRoutes(server: FastifyInstance) {
