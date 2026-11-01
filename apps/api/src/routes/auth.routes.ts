@@ -29,6 +29,10 @@ async function issue(reply: FastifyReply, user: { id: string; email: string; use
 }
 function clear(reply: FastifyReply) { reply.clearCookie('token', options); reply.clearCookie('refreshToken', options); reply.clearCookie('refresh', options) }
 export async function authRoutes(server: FastifyInstance) {
+  server.addHook('onSend', async (_request, reply, payload) => {
+    reply.header('Cache-Control', 'no-store')
+    return payload
+  })
   server.post('/register', { config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, async (request, reply) => {
     const input = z.object({ email, password, username: z.string().trim().toLowerCase().min(3).max(32).regex(/^[a-z0-9._]+$/), displayName: z.string().trim().max(32).optional() }).parse(request.body)
     const user = await prisma.user.create({ data: { email: input.email, username: input.username, displayName: input.displayName || input.username, passwordHash: await bcrypt.hash(input.password, 12) }, select: userSelect })

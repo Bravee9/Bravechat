@@ -10,13 +10,27 @@ vi.mock('@/features/members/components/MemberList', () => ({ MemberList: () => n
 vi.mock('@/features/members/components/UserCard', () => ({ UserCard: () => null }));
 vi.mock('@/features/members/components/FriendsPanel', () => ({ FriendsPanel: () => null }));
 vi.mock('@/features/messages/components/VoiceRoom', () => ({ VoiceRoom: () => null }));
-vi.mock('@/features/messages/components/ChatHeader', () => ({ ChatHeader: () => null }));
+vi.mock('@/features/messages/components/ChatHeader', () => ({ ChatHeader: ({channelName}:{channelName:string}) => <h1>{channelName}</h1> }));
 vi.mock('@/features/messages/components/MessageList', () => ({ MessageList: React.forwardRef<HTMLDivElement,{messages:Array<{id:string;content:string}>}>(function List({messages},ref) {return <div ref={ref}>{messages.map((row)=><p data-testid="saved-message" key={row.id}>{row.content}</p>)}</div>}) }));
 class Socket { static OPEN=1; static instances: Socket[]=[]; readyState=0; onmessage?: (event:{data:string})=>void; constructor(){Socket.instances.push(this)} close(){} send(){} }
 beforeEach(()=>{vi.clearAllMocks();Socket.instances=[];vi.stubGlobal('WebSocket',Socket);HTMLElement.prototype.scrollIntoView=vi.fn();vi.mocked(http.get).mockResolvedValue({channel:{type:'TEXT',name:'general'}})});
 afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();vi.useRealTimers()});
 const saved={id:'saved1',content:'hello',user:'Alice',avatar:'AL',time:'10:00',createdAt:'2026-11-01T01:00:00Z'};
 describe('Message delivery',()=>{
+ it('never shows raw route IDs while metadata is delayed or after navigating',async()=>{
+  let finish!:(value:any)=>void;
+  vi.mocked(http.get).mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve}));
+  const view=render(<ChatView serverId="s1" channelId="private-channel-id"/>);
+  expect(screen.getByRole('heading')).toHaveTextContent('Đang tải...');
+  expect(document.body).not.toHaveTextContent('private-channel-id');
+  await act(async()=>{finish({channel:{type:'TEXT',name:'Design'}})});
+  expect(screen.getByRole('heading')).toHaveTextContent('Design');
+  vi.mocked(http.get).mockImplementationOnce(()=>new Promise(()=>{}));
+  view.rerender(<ChatView serverId="s1" channelId="another-private-id"/>);
+  expect(screen.getByRole('heading')).toHaveTextContent('Đang tải...');
+  expect(document.body).not.toHaveTextContent('another-private-id');
+  expect(document.body).not.toHaveTextContent('Design');
+ });
  it('retains draft on network failure and retries with exactly the same nonce',async()=>{
   vi.mocked(http.post).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({message:saved});
   render(<ChatView serverId="s1" channelId="c1"/>);

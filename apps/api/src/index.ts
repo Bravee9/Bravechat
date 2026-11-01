@@ -12,6 +12,7 @@ import { Prisma } from '@prisma/client'
 
 const server = Fastify({
   logger: {
+    redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
     transport: {
       target: 'pino-pretty',
       options: {

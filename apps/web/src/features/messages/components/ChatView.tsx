@@ -32,6 +32,10 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
   const params = useParams();
   const rawServerId = decodeURIComponent(serverId ?? (params?.serverId as string) ?? "@me");
   const rawChannelId = decodeURIComponent(channelId ?? (params?.channelId as string) ?? "general");
+  // Reset ngay trong render khi đổi route, tránh hiển thị tên/tin nhắn của kênh cũ.
+  return <ChannelChat key={`${rawServerId}:${rawChannelId}`} rawServerId={rawServerId} rawChannelId={rawChannelId} />;
+}
+function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawChannelId: string }) {
   const isMe = rawServerId === "@me";
   const friends = isMe && rawChannelId === "friends";
   const user = useCurrentUser();
@@ -41,7 +45,7 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
   const routeRef = useRef(key); routeRef.current = key;
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [name, setName] = useState(rawChannelId);
+  const [name, setName] = useState("Đang tải...");
   const [channelType, setChannelType] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [olderBusy, setOlderBusy] = useState(false);
@@ -66,7 +70,7 @@ export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
   const reconnect = useCallback(() => setReconnectKey((value) => value + 1), []);
 
   useEffect(() => {
-    setMessage(""); setMessages([]); setReplyTo(null); setDialog(null); setError(""); setTyping([]); setHasMore(false); setChannelType(null); setName(rawChannelId);
+    setMessage(""); setMessages([]); setReplyTo(null); setDialog(null); setError(""); setTyping([]); setHasMore(false); setChannelType(null); setName("Đang tải...");
     if (friends) return;
     let active = true; let socket: WebSocket | null = null;
     let retryTimer: ReturnType<typeof setTimeout>; let retries = 0; let version = 0;

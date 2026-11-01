@@ -20,7 +20,7 @@ class Client {
   async call(method, route, body, cookie = this.cookie) {
     const response = await fetch(base + route, { method, headers: { Cookie: cookie, Origin: origin, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15000) });
     for (const value of response.headers.getSetCookie()) { const pair = value.split(';')[0]; const at = pair.indexOf('='); if (pair.slice(at + 1)) this.cookies.set(pair.slice(0,at), pair.slice(at+1)); else this.cookies.delete(pair.slice(0,at)); }
-    return { status: response.status, body: await response.json() };
+    return { status: response.status, headers: response.headers, body: await response.json() };
   }
 }
 const ok = (result, status = 200) => { assert.equal(result.status, status, JSON.stringify(result.body)); return result.body.data; };
@@ -42,7 +42,14 @@ try {
   ok(await a.call('GET','/auth/me'),401);
   for (let index=0;index<3;index++) { const user=ok(await clients[index].call('POST','/auth/register',{email:emails[index],username:`workflow_${tag}_${index}`,password}),201).user; users.push(user);userIds.push(user.id); }
   ok(await a.call('POST','/auth/login',{email:emails[0],password:'wrong-password'}),401);
-  ok(await a.call('POST','/auth/login',{email:emails[0],password}));
+  const login = await a.call('POST','/auth/login',{email:emails[0],password});
+  ok(login);
+  assert.equal(login.headers.get('cache-control'), 'no-store');
+  assert.deepEqual(Object.keys(login.body.data), ['user']);
+  for (const name of ['token', 'refreshToken']) {
+    const cookie = login.headers.getSetCookie().find(value => value.startsWith(name + '='));
+    assert.ok(cookie && /; HttpOnly/i.test(cookie) && /; SameSite=Lax/i.test(cookie), 'Session cookies must remain HttpOnly and SameSite');
+  }
   ok(await a.call('PATCH','/users/@me',{displayName:'Workflow A',customStatus:'testing'}));
   assert.equal(ok(await a.call('GET','/auth/me')).user.displayName,'Workflow A');
   const aSocket = await connect(a); const bSocket = await connect(b); const cSocket = await connect(c);
