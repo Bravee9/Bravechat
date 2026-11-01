@@ -24,7 +24,7 @@ export function DmSidebar() {
   const [searchError, setSearchError] = useState("");
   const [isSearching, setIsSearching] = useState(false);
 
-  const currentDmId = (params?.dmId as string) || "";
+  const currentDmId = (params?.dmId as string) || (params?.channelId as string) || "";
   const isFriendsActive = pathname === "/channels/@me" || pathname === "/channels/%40me";
 
   async function startConversation(event: React.FormEvent<HTMLFormElement>) {

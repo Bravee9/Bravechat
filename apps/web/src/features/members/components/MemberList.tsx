@@ -4,8 +4,10 @@ import React, { useEffect, useState } from "react";
 import { MemberItem } from "./MemberItem";
 import type { Member } from "./MemberItem";
 import { serverService } from "@/services/server.service";
+import { UserCard } from "./UserCard";
 
 export function MemberList({ isVisible, serverId }: { isVisible: boolean; serverId?: string }) {
+  const [inspected, setInspected] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
   const [members, setMembers] = useState<Member[]>([]);
@@ -78,11 +80,12 @@ export function MemberList({ isVisible, serverId }: { isVisible: boolean; server
                 <h3 className="px-2 mb-1.5 text-ocean-light/50 text-[11px] font-extrabold uppercase tracking-wider select-none" data-testid={`member-group-${row.title}`}>
                   {row.title} — {row.count}
                 </h3>
-              ) : <MemberItem member={row.member} />}
+              ) : <MemberItem member={row.member} onInspect={setInspected} />}
             </div>
           ))}
         </div>
       </div>
+      {inspected && <UserCard userId={inspected} onClose={() => setInspected(null)} />}
     </aside>
   );
 }

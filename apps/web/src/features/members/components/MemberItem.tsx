@@ -14,14 +14,19 @@ export interface Member {
 
 interface MemberItemProps {
   member: Member;
+  onInspect?: (id: string) => void;
 }
 
-export function MemberItem({ member }: MemberItemProps) {
+export function MemberItem({ member, onInspect }: MemberItemProps) {
   const isOffline = member.status === "OFFLINE" || member.status === "INVISIBLE";
   const presence = member.status === "DO_NOT_DISTURB" ? "DND" : member.status;
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onInspect?.(member.id)}
+      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onInspect?.(member.id); } }}
       data-testid={`member-item-${member.id}`}
       className={cn(
         "flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-white/5 transition-colors cursor-pointer group",

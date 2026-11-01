@@ -47,6 +47,8 @@ async function request<T>(method: string, path: string, options: RequestOptions 
     ...init,
     method,
     credentials: "include",
+    cache: "no-store",
+    signal: init.signal ?? AbortSignal.timeout(15000),
     headers: {
       Accept: "application/json",
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
@@ -57,8 +59,8 @@ async function request<T>(method: string, path: string, options: RequestOptions 
 
   const json: unknown = await response.json().catch(() => null);
 
-  if (response.status === 401 && retryAuth && !path.startsWith("/auth/")) {
-    refreshInFlight ??= fetch(buildUrl("/auth/refresh"), { method: "POST", credentials: "include", headers: { Accept: "application/json" } })
+  if (response.status === 401 && retryAuth && (!path.startsWith("/auth/") || path === "/auth/me")) {
+    refreshInFlight ??= fetch(buildUrl("/auth/refresh"), { method: "POST", credentials: "include", signal: AbortSignal.timeout(15000), headers: { Accept: "application/json" } })
       .then((refresh) => refresh.ok)
       .catch(() => false)
       .finally(() => { refreshInFlight = null; });
@@ -77,5 +79,7 @@ export const http = {
     request<T>("POST", path, { ...options, body }),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     request<T>("PATCH", path, { ...options, body }),
+  put: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>("PUT", path, { ...options, body }),
   delete: <T>(path: string, options?: RequestOptions) => request<T>("DELETE", path, options),
 };

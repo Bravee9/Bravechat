@@ -7,6 +7,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { env } from "@/config/env";
 
 interface FormState {
   email: string;
@@ -50,11 +51,12 @@ export function LoginForm() {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/login`,
+        `${env.apiUrl}/auth/login`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
+          signal: AbortSignal.timeout(15000),
           body: JSON.stringify({
             email: form.email.trim().toLowerCase(),
             password: form.password,

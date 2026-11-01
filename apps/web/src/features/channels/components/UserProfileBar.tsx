@@ -7,15 +7,20 @@ import { cn } from "@/lib/utils";
 import { ProfileSettingsModal } from "./ProfileSettingsModal";
 import { workspaceStore } from "@/stores/workspace.store";
 import { http } from "@/services/http";
+import { audioStore } from "@/stores/audio.store";
+import { useStore } from "@/lib/store";
 
 interface UserProfileBarProps {
   currentUser: CurrentUser | null;
 }
 
 export function UserProfileBar({ currentUser }: UserProfileBarProps) {
-  const [isMicMuted, setIsMicMuted] = useState(false);
-  const [isDeafened, setIsDeafened] = useState(false);
+  const isMicMuted = useStore(audioStore, (state) => state.muted);
+  const isDeafened = useStore(audioStore, (state) => state.deafened);
+  const effectivelyMuted = isMicMuted || isDeafened;
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
 
   return (
     <footer
@@ -39,10 +44,10 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
 
       {/* Quick action buttons: Mute Mic, Deafen, Settings */}
       <div className="flex items-center gap-0.5 text-ocean-light/60">
-        <Tooltip content={isMicMuted ? "Bật Mic" : "Tắt Mic"} side="top">
+        <Tooltip content={effectivelyMuted ? "Bật Mic" : "Tắt Mic"} side="top">
           <button
             type="button"
-            onClick={() => setIsMicMuted((prev) => !prev)}
+            onClick={() => audioStore.set(effectivelyMuted ? { muted: false, deafened: false } : { muted: true })}
             data-testid="mute-mic-btn"
             className={cn(
               "p-1.5 rounded hover:bg-white/10 hover:text-ocean-light transition-colors cursor-pointer",
@@ -59,7 +64,7 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
         <Tooltip content={isDeafened ? "Bật Âm Thanh" : "Tắt Âm Thanh"} side="top">
           <button
             type="button"
-            onClick={() => setIsDeafened((prev) => !prev)}
+            onClick={() => audioStore.set({ deafened: !isDeafened })}
             data-testid="deafen-audio-btn"
             className={cn(
               "p-1.5 rounded hover:bg-white/10 hover:text-ocean-light transition-colors cursor-pointer",
@@ -87,8 +92,9 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
             </svg>
           </button>
         </Tooltip>
-        {currentUser ? <button type="button" title="Đăng xuất" aria-label="Đăng xuất" onClick={async () => { await http.post("/auth/logout").catch(() => undefined); window.location.href = "/login"; }} className="rounded p-1.5 text-ocean-light/60 hover:bg-white/10 hover:text-rose-300">⏻</button> : null}
+        {currentUser ? <button type="button" title="Đăng xuất" aria-label="Đăng xuất" disabled={loggingOut} onClick={async () => { setLoggingOut(true); setLogoutError(""); try { await http.post("/auth/logout"); window.location.href = "/login"; } catch { setLogoutError("Không thể đăng xuất. Vui lòng thử lại."); } finally { setLoggingOut(false); } }} className="rounded p-1.5 text-ocean-light/60 hover:bg-white/10 hover:text-rose-300">⏻</button> : null}
       </div>
+      {logoutError && <p role="alert" className="absolute bottom-14 left-2 rounded bg-rose-950 p-2 text-xs text-rose-200">{logoutError}</p>}
       {settingsOpen && currentUser ? <ProfileSettingsModal user={currentUser} onClose={() => setSettingsOpen(false)} onSaved={(user) => workspaceStore.set({ currentUser: user })} /> : null}
     </footer>
   );

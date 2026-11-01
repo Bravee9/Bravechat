@@ -22,6 +22,7 @@ export function ServerChannelSidebar({ serverId }: { serverId: string }) {
   const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"invite" | "channel" | "leave" | "settings" | null>(null);
   const [channelName, setChannelName] = useState("");
+  const [categoryId, setCategoryId] = useState<string | undefined>();
   const [serverName, setServerName] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
   const [actionError, setActionError] = useState("");
@@ -65,7 +66,7 @@ export function ServerChannelSidebar({ serverId }: { serverId: string }) {
     setActionError("");
     setBusy(true);
     try {
-      const { channel } = await http.post<{ channel: { id: string } }>(API_ROUTES.servers.channels(serverId), { name: channelName.trim(), type: "TEXT" });
+      const { channel } = await http.post<{ channel: { id: string } }>(API_ROUTES.servers.channels(serverId), { name: channelName.trim(), type: "TEXT", categoryId });
       await loadServerDetail(serverId, true);
       setDialogMode(null);
       setChannelName("");
@@ -118,7 +119,7 @@ export function ServerChannelSidebar({ serverId }: { serverId: string }) {
         onClose={() => setIsServerMenuOpen(false)}
         onInvite={() => void createInvite()}
         onSettings={() => { setServerName(serverDetail?.name ?? ""); setDialogMode("settings"); setActionError(""); }}
-        onCreateChannel={() => { setDialogMode("channel"); setActionError(""); }}
+        onCreateChannel={() => { setCategoryId(undefined); setDialogMode("channel"); setActionError(""); }}
         onLeave={() => { setDialogMode("leave"); setActionError(""); }}
       />
 
@@ -130,7 +131,7 @@ export function ServerChannelSidebar({ serverId }: { serverId: string }) {
             channels={channelsByCategory.get(category.id) ?? []}
             serverId={serverId}
             currentChannelId={currentChannelId}
-            onCreateChannel={() => { setDialogMode("channel"); setActionError(""); }}
+            onCreateChannel={() => { setCategoryId(category.id); setDialogMode("channel"); setActionError(""); }}
           />
         ))}
       </div>
@@ -156,7 +157,7 @@ export function ServerChannelSidebar({ serverId }: { serverId: string }) {
         </DialogFrame>
       ) : null}
       {dialogMode === "channel" ? (
-        <DialogFrame title="Tạo kênh" description="Kênh mới sẽ nằm trong danh mục đầu tiên của server." onClose={() => setDialogMode(null)}>
+        <DialogFrame title="Tạo kênh" description={categoryId ? "Kênh mới sẽ nằm trong danh mục bạn đã chọn." : "Kênh mới sẽ nằm trong danh mục đầu tiên của server."} onClose={() => setDialogMode(null)}>
           <form onSubmit={(event) => void createChannel(event)} className="space-y-4">
             <label htmlFor="new-channel-name" className="block text-sm font-medium">Tên kênh</label>
             <input id="new-channel-name" autoFocus required minLength={1} maxLength={100} pattern="[a-zA-Z0-9_-]+" value={channelName} onChange={(event) => setChannelName(event.target.value)} className="input-ocean w-full" />

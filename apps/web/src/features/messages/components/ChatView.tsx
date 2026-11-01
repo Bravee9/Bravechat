@@ -1,467 +1,226 @@
 "use client";
-
 import { useParams } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { env } from "@/config/env";
+import { ApiError, http } from "@/services/http";
+import { useCurrentUser, loadConversations } from "@/stores/workspace.store";
 import { MemberList } from "@/features/members/components/MemberList";
+import { UserCard } from "@/features/members/components/UserCard";
+import { FriendsPanel } from "@/features/members/components/FriendsPanel";
+import { DialogFrame } from "@/components/ui/DialogFrame";
 import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
 import { TypingIndicator } from "./TypingIndicator";
 import { ChatInput } from "./ChatInput";
-import type { ChatMessage } from "./MessageItem";
-import { http } from "@/services/http";
 import { VoiceRoom } from "./VoiceRoom";
-import { loadConversations } from "@/stores/workspace.store";
+import type { ChatMessage } from "./MessageItem";
 
-const DEFAULT_MESSAGES: ChatMessage[] = [
-  {
-    id: "init_1",
-    avatar: "B9",
-    user: "Bravee9",
-    time: "Hôm nay lúc 09:41",
-    content: "Xin chào! Kênh chat thời gian thực qua WebSocket đã sẵn sàng hoạt động.",
-    isHighlighted: true,
-  },
-  {
-    id: "init_2",
-    avatar: "SJ",
-    user: "Shuji",
-    time: "Hôm nay lúc 09:43",
-    content: "Bạn có thể mở một tab ẩn danh (Incognito) hoặc cửa sổ khác để test chat 2 chiều ngay lập tức!",
-    isHighlighted: false,
-  },
-];
-
-interface ChatViewProps {
-  /** Truyền từ route page. Nếu bỏ trống sẽ đọc từ URL params. */
-  serverId?: string;
-  channelId?: string;
+type StoredMessage = ChatMessage & { id: string; createdAt: string };
+type Page = { messages: StoredMessage[]; hasMore: boolean };
+interface ChatViewProps { serverId?: string; channelId?: string }
+export const mergeMessages = (existing: ChatMessage[], incoming: ChatMessage[]) => {
+  const byId = new Map(existing.map((item) => [item.id, item]));
+  incoming.forEach((item) => byId.set(item.id, item));
+  return Array.from(byId.values()).sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime() || String(a.id).localeCompare(String(b.id)));
+};
+function applyEvent(previous: ChatMessage[], data: any): ChatMessage[] {
+  if (data.type === "message_delete" || data.type === "dm_delete") return previous.filter((item) => item.id !== data.messageId).map((item) => item.replyTo && item.replyTo.id === data.messageId ? { ...item, replyTo: { ...item.replyTo, content: "Tin nhắn đã xóa" } } : item);
+  if (data.message && typeof data.message.id === "string") return mergeMessages(previous, [data.message]).map((item) => item.replyTo && item.replyTo.id === data.message.id ? { ...item, replyTo: { ...item.replyTo, content: data.message.content } } : item);
+  return previous;
 }
-
-interface CreatedMessageResponse {
-  id: string;
-  avatar: string;
-  user: string;
-  time: string;
-  content: string;
-  createdAt: string;
-  attachments: NonNullable<ChatMessage["attachments"]>;
-}
-
 export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
   const params = useParams();
   const rawServerId = decodeURIComponent(serverId ?? (params?.serverId as string) ?? "@me");
   const rawChannelId = decodeURIComponent(channelId ?? (params?.channelId as string) ?? "general");
-
   const isMe = rawServerId === "@me";
-
+  const friends = isMe && rawChannelId === "friends";
+  const user = useCurrentUser();
+  const currentUser = user?.displayName || user?.username || "";
+  const key = (isMe ? "dm:" : "channel:") + rawChannelId;
+  // Request của kênh cũ có thể hoàn thành sau khi đổi route; không ghi vào draft/kênh mới.
+  const routeRef = useRef(key); routeRef.current = key;
   const [message, setMessage] = useState("");
-  const [dmDisplayName, setDmDisplayName] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>(() => env.useMocks ? DEFAULT_MESSAGES : []);
-  const [hasOlderMessages, setHasOlderMessages] = useState(false);
-  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "disconnected">("connecting");
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [currentUser, setCurrentUser] = useState<string>("Bravee9");
-  const [showMemberList, setShowMemberList] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [name, setName] = useState(rawChannelId);
   const [channelType, setChannelType] = useState<string | null>(null);
-
-  const displayChannelName = isMe ? (rawChannelId === "friends" ? "Trang chủ" : (dmDisplayName || rawChannelId)) : rawChannelId;
-  const isChannelTopic = !isMe;
-
+  const [hasMore, setHasMore] = useState(false);
+  const [olderBusy, setOlderBusy] = useState(false);
+  const [status, setStatus] = useState<"connected" | "connecting" | "disconnected">("connecting");
+  const [typing, setTyping] = useState<string[]>([]);
+  const [showMembers, setShowMembers] = useState(true);
+  const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [dialog, setDialog] = useState<{ type: "edit" | "delete"; message: ChatMessage } | null>(null);
+  const [edited, setEdited] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
+  const [inspected, setInspected] = useState<string | null>(null);
+  const [reconnectKey, setReconnectKey] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Khởi tạo danh tính người dùng (để test dễ dàng giữa 2 tab)
-  useEffect(() => {
-    if (!env.useMocks) return;
-    const savedUser = sessionStorage.getItem("bravechat_user");
-    if (savedUser) {
-      setCurrentUser(savedUser);
-    } else {
-      const randomId = Math.floor(100 + Math.random() * 900);
-      const generated = `User_${randomId}`;
-      sessionStorage.setItem("bravechat_user", generated);
-      setCurrentUser(generated);
-    }
-  }, []);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sendingRef = useRef(false);
+  const attemptRef = useRef<{ key: string; content: string; replyToId?: string; nonce: string } | null>(null);
+  const historyPath = isMe ? "/messages/dm/" + encodeURIComponent(rawChannelId) : "/channels/" + encodeURIComponent(rawChannelId) + "/messages";
+  const reconnect = useCallback(() => setReconnectKey((value) => value + 1), []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, typingUsers]);
-
-  // Kết nối WebSocket theo channelId
-  const effectiveChannelId = env.useMocks ? `${rawServerId}_${rawChannelId}` : rawChannelId;
-
-  const connectWebSocket = useCallback(() => {
-    const wsUrl = env.wsUrl;
-    setConnectionStatus("connecting");
-
-    try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setConnectionStatus("connected");
-        ws.send(
-          JSON.stringify({
-            type: "join_channel",
-            channelId: effectiveChannelId,
-            serverId: rawServerId,
-            channelKey: rawChannelId,
-            user: {
-              username: currentUser,
-              avatar: currentUser.slice(0, 2).toUpperCase(),
-            },
-          })
-        );
-      };
-
-      ws.onmessage = (event) => {
+    setMessage(""); setMessages([]); setReplyTo(null); setDialog(null); setError(""); setTyping([]); setHasMore(false); setChannelType(null); setName(rawChannelId);
+    if (friends) return;
+    let active = true; let socket: WebSocket | null = null;
+    let retryTimer: ReturnType<typeof setTimeout>; let retries = 0; let version = 0;
+    let readTimer: ReturnType<typeof setTimeout>;
+    let fetching = false; let buffered: any[] = [];
+    const abort = new AbortController();
+    const markRead = () => {
+      // Coalesce ACK trong 500ms và không đánh dấu đã đọc cho tab đang ẩn.
+      if (isMe || document.visibilityState !== "visible") return;
+      clearTimeout(readTimer);
+      readTimer = setTimeout(() => { void http.post("/channels/" + encodeURIComponent(rawChannelId) + "/read").catch(() => undefined); }, 500);
+    };
+    const receive = (event: any) => { if (fetching) buffered.push(event); setMessages((previous) => applyEvent(previous, event)); if (!isMe && event.type === "message_create") markRead(); };
+    const load = async () => {
+      const current = ++version; fetching = true; buffered = [];
+      try {
+        const page = await http.get<Page>(historyPath, { signal: abort.signal, query: isMe ? { read: document.visibilityState === "visible" ? "true" : "false" } : undefined });
+        if (!active || current !== version) return;
+        const changes = buffered.slice(); fetching = false;
+        // REST là lịch sử gốc; phát lại các sự kiện tới trong lúc chờ để không mất tin mới.
+        setMessages((previous) => {
+          const first = page.messages[0];
+          const older = first && page.hasMore ? previous.filter((item) => new Date(item.createdAt ?? 0).getTime() < new Date(first.createdAt).getTime()) : [];
+          return changes.reduce(applyEvent, mergeMessages(older, page.messages));
+        });
+        setHasMore(page.hasMore); setStatus("connected");
+        markRead();
+      } catch (reason) { if (active && current === version) { fetching = false; setError(reason instanceof Error ? reason.message : "Không thể tải lịch sử."); } }
+    };
+    void http.get<any>(isMe ? "/users/" + encodeURIComponent(rawChannelId) : "/channels/" + encodeURIComponent(rawChannelId), { signal: abort.signal })
+      .then((result) => { if (active) { setName(isMe ? result.user.displayName || result.user.username : result.channel.name); if (!isMe) setChannelType(result.channel.type); } })
+      .catch((reason) => { if (active) setError(reason.message); });
+    const userEvent = (event: Event) => {
+      const data = (event as CustomEvent).detail;
+      if (data.type === "ready" && isMe) void load();
+      if (isMe && data.type === "connection") setStatus(data.status);
+      if (isMe && data.type?.startsWith("dm_") && (data.senderId === rawChannelId || data.receiverId === rawChannelId)) { receive(data); if (data.type === "dm_create" && document.visibilityState === "visible") void http.get(historyPath, { query: { limit: 1 } }).catch(() => undefined); }
+    };
+    window.addEventListener("bravechat:realtime", userEvent);
+    const visible = () => { if (document.visibilityState === "visible") { if (isMe) void load(); else markRead(); } };
+    document.addEventListener("visibilitychange", visible);
+    const connect = () => {
+      if (!active) return;
+      setStatus("connecting"); socket = new WebSocket(env.wsUrl); wsRef.current = socket;
+      const currentSocket = socket;
+      currentSocket.onopen = () => currentSocket.send(JSON.stringify({ type: "join_channel", channelId: rawChannelId }));
+      currentSocket.onmessage = (event) => {
+        if (!active) return;
         try {
           const data = JSON.parse(event.data);
-
-          if (data.type === "channel_joined") {
-            if (env.useMocks) {
-              setMessages(data.messages ?? []);
-              setHasOlderMessages((data.messages?.length ?? 0) >= 50);
-            } else {
-              void http.get<{ messages: CreatedMessageResponse[]; hasMore: boolean }>(`/channels/${encodeURIComponent(rawChannelId)}/messages`, { query: { limit: 50 } })
-                .then((history) => {
-                  setMessages(history.messages.map((item) => ({ ...item, createdAt: item.createdAt })));
-                  setHasOlderMessages(history.hasMore);
-                })
-                .catch((error) => setUploadError(error instanceof Error ? error.message : "Không thể tải lịch sử tin nhắn."));
-            }
-          } else if (data.type === "older_messages") {
-            setMessages((previous) => [...data.messages, ...previous]);
-            setHasOlderMessages(data.messages.length >= 50);
-            setIsLoadingOlder(false);
-          } else if (data.type === "message_create") {
-            setMessages((prev) => prev.some((item) => item.id === data.message.id) ? prev : [...prev, data.message]);
-          } else if (data.type === "typing_start") {
-            if (data.username && data.username !== currentUser) {
-              setTypingUsers((prev) => Array.from(new Set([...prev, data.username])));
-            }
-          } else if (data.type === "typing_stop") {
-            setTypingUsers((prev) => prev.filter((u) => u !== data.username));
-          }
-        } catch (e) {
-          console.error("Lỗi parse WS payload:", e);
-        }
+          if (data.type === "channel_joined") { retries = 0; void load(); }
+          else if (data.channelId === rawChannelId && ["message_create", "message_update", "message_delete"].includes(data.type)) receive(data);
+          else if (data.type === "typing_start" && data.username !== user?.username) setTyping((previous) => Array.from(new Set([...previous, data.username])));
+          else if (data.type === "typing_stop") setTyping((previous) => previous.filter((value) => value !== data.username));
+          else if (data.type === "error") setError(data.message);
+        } catch { setError("Không đọc được cập nhật từ máy chủ."); }
       };
-
-      ws.onclose = () => {
-        setIsLoadingOlder(false);
-        setConnectionStatus("disconnected");
+      currentSocket.onclose = (event) => {
+        if (!active) return;
+        setStatus("disconnected"); setTyping([]);
+        if (event.code === 1008 && event.reason !== "Session expired") { setError("Bạn không còn quyền truy cập kênh này."); return; }
+        retryTimer = setTimeout(() => {
+          void http.get("/auth/me").then(() => { if (active) connect(); }).catch((reason) => {
+            if (!active) return;
+            if (reason instanceof ApiError && reason.status === 401) window.location.replace("/login");
+            else retryTimer = setTimeout(connect, 5000);
+          });
+        }, Math.min(1000 * 2 ** retries++, 15000));
       };
-
-      ws.onerror = (err) => {
-        console.error("Lỗi WebSocket:", err);
-        setConnectionStatus("disconnected");
-      };
-    } catch (err) {
-      console.error("Không thể khởi tạo WebSocket:", err);
-      setConnectionStatus("disconnected");
-    }
-  }, [effectiveChannelId, currentUser, rawChannelId, rawServerId]);
-
-  useEffect(() => {
-    if (env.useMocks) return;
-    if (isMe && rawChannelId !== "friends") {
-      http.get<{ user: { displayName: string | null; username: string } }>(`/users/${encodeURIComponent(rawChannelId)}`)
-        .then(({ user }) => setDmDisplayName(user.displayName || user.username))
-        .catch(() => setDmDisplayName("Người dùng"));
-      return;
-    }
-    if (isMe) return;
-    http.get<{ channel: { type: string } }>(`/channels/${encodeURIComponent(rawChannelId)}`)
-      .then(({ channel }) => setChannelType(channel.type))
-      .catch(() => setChannelType(null));
-  }, [rawChannelId, isMe]);
-
-  useEffect(() => {
-    if (env.useMocks) return;
-    http.get<{ user: { username: string; displayName?: string | null } }>("/auth/me")
-      .then(({ user }) => setCurrentUser(user.displayName || user.username))
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    if (env.useMocks) {
-      connectWebSocket();
-      return () => { wsRef.current?.close(); };
-    }
-    if (isMe) {
-      if (rawChannelId === "friends") {
-        setConnectionStatus("disconnected");
-        setMessages([]);
-        return;
-      }
-      let active = true;
-      const loadDirectMessages = () => http.get<{ messages: Array<CreatedMessageResponse> }>(`/messages/dm/${encodeURIComponent(rawChannelId)}`)
-        .then(({ messages: history }) => {
-          if (!active) return;
-          setMessages(history.map((item) => ({ id: item.id, avatar: item.avatar, user: item.user, time: item.time, content: item.content, createdAt: item.createdAt })));
-          setConnectionStatus("connected");
-        })
-        .catch((error) => { if (active) { setConnectionStatus("disconnected"); setUploadError(error instanceof Error ? error.message : "Không thể tải tin nhắn riêng."); } });
-      void loadDirectMessages();
-      const timer = window.setInterval(() => void loadDirectMessages(), 3000);
-      return () => { active = false; window.clearInterval(timer); };
-    }
-    connectWebSocket();
-
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
+      currentSocket.onerror = () => { if (active) setStatus("disconnected"); };
     };
-  }, [connectWebSocket, isMe, rawChannelId]);
+    if (isMe) void load(); else connect();
+    return () => { active = false; abort.abort(); clearTimeout(retryTimer); clearTimeout(readTimer); if (typingTimer.current) clearTimeout(typingTimer.current); socket?.close(); wsRef.current = null; window.removeEventListener("bravechat:realtime", userEvent); document.removeEventListener("visibilitychange", visible); };
+  }, [key, historyPath, friends, isMe, rawChannelId, reconnectKey, user?.username]);
 
-  // Gửi thông báo đang gõ
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setMessage(e.target.value);
-
-    if (!isMe && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: "typing_start",
-          channelId: effectiveChannelId,
-          username: currentUser,
-        })
-      );
-
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-
-      typingTimeoutRef.current = setTimeout(() => {
-        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(
-            JSON.stringify({
-              type: "typing_stop",
-              channelId: effectiveChannelId,
-              username: currentUser,
-            })
-          );
-        }
-      }, 1500);
-    }
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
+  const sendTyping = (type: string) => { if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(JSON.stringify({ type, channelId: rawChannelId })); };
+  const handleSend = async (event?: React.FormEvent) => {
+    event?.preventDefault(); const content = message.trim();
+    if (!content || friends || sendingRef.current) return;
+    const replyToId = replyTo ? String(replyTo.id) : undefined;
+    // Giữ nonce khi thử lại cùng draft; chỉ xóa draft sau xác nhận đã lưu từ backend.
+    if (!attemptRef.current || attemptRef.current.key !== key || attemptRef.current.content !== content || attemptRef.current.replyToId !== replyToId) attemptRef.current = { key, content, replyToId, nonce: crypto.randomUUID() };
+    const attempt = attemptRef.current; sendingRef.current = true; setSending(true); setError("");
+    try {
+      const result = await http.post<{ message: StoredMessage }>(historyPath, { content, replyToId, nonce: attempt.nonce });
+      if (routeRef.current === attempt.key) { setMessages((previous) => mergeMessages(previous, [result.message])); setMessage(""); setReplyTo(null); sendTyping("typing_stop"); }
+      attemptRef.current = null; if (isMe) void loadConversations(true);
+    } catch (reason) { if (routeRef.current === attempt.key) setError("Chưa xác nhận gửi thành công. Nội dung được giữ lại; nhấn Gửi để thử lại. " + (reason instanceof Error ? reason.message : "")); }
+    finally { sendingRef.current = false; setSending(false); }
   };
-
-  // Gửi tin nhắn
-  const handleSendMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const content = message.trim();
-    if (!content) return;
-
-    if (!env.useMocks && isMe) {
-      if (rawChannelId === "friends") return;
-      try {
-        const { message: sent } = await http.post<{ message: CreatedMessageResponse }>(`/messages/dm/${encodeURIComponent(rawChannelId)}`, { content });
-        setMessages((previous) => previous.some((item) => item.id === sent.id) ? previous : [...previous, sent]);
-        void loadConversations(true);
-        setMessage("");
-      } catch (error) {
-        setUploadError(error instanceof Error ? error.message : "Không thể gửi tin nhắn.");
-      }
-      return;
-    }
-
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(
-        JSON.stringify({
-          type: "send_message",
-          channelId: effectiveChannelId,
-          serverId: rawServerId,
-          channelKey: rawChannelId,
-          content,
-          user: {
-            username: currentUser,
-            avatar: currentUser.slice(0, 2).toUpperCase(),
-          },
-        })
-      );
-
-      wsRef.current.send(
-        JSON.stringify({
-          type: "typing_stop",
-          channelId: effectiveChannelId,
-          username: currentUser,
-        })
-      );
-    } else {
-      const localMsg: ChatMessage = {
-        id: `local_${Date.now()}`,
-        avatar: currentUser.slice(0, 2).toUpperCase(),
-        user: currentUser,
-        time: "Vừa xong",
-        content,
-      };
-      setMessages((prev) => [...prev, localMsg]);
-    }
-
-    setMessage("");
-  };
-
   const handleFiles = async (files: File[]) => {
-    if (env.useMocks || isMe) {
-      setUploadError("Đăng nhập và mở channel server để tải file lên.");
-      return;
-    }
-    setIsUploading(true);
-    setUploadError("");
-    const uploaded: Array<{ filename: string; contentType: string; key: string }> = [];
+    if (isMe || sendingRef.current) return;
+    sendingRef.current = true; setUploading(true); setError("");
+    const savedKey = key; const uploaded: Array<{ filename: string; contentType: string; key: string }> = [];
     try {
       for (const file of files.slice(0, 10)) {
-        const form = new FormData();
-        form.append("purpose", "attachment");
-        form.append("channelId", rawChannelId);
-        form.append("file", file, file.name);
-        const response = await fetch(`${env.apiUrl.replace(/\/$/, "")}/uploads`, { method: "POST", credentials: "include", body: form });
-        if (!response.ok) throw new Error(`Upload ${file.name} thất bại.`);
-        const result = await response.json();
-        const item = result.data as { key: string; filename: string; contentType: string };
-        uploaded.push({ filename: item.filename, contentType: item.contentType, key: item.key });
+        const form = new FormData(); form.append("purpose", "attachment"); form.append("channelId", rawChannelId); form.append("file", file, file.name);
+        const response = await fetch(env.apiUrl.replace(/\/$/, "") + "/uploads", { method: "POST", credentials: "include", body: form });
+        const result = await response.json(); if (!response.ok) throw new Error(result.message || "Không thể tải tệp.");
+        uploaded.push(result.data);
       }
-      const result = await http.post<{ message: CreatedMessageResponse }>(`/channels/${encodeURIComponent(rawChannelId)}/messages`, {
-        content: message.trim(),
-        attachments: uploaded,
-      });
-      setMessages((previous) => previous.some((item) => item.id === result.message.id) ? previous : [...previous, {
-        id: result.message.id,
-        avatar: result.message.avatar,
-        user: result.message.user,
-        time: result.message.time,
-        content: result.message.content,
-        createdAt: result.message.createdAt,
-        attachments: result.message.attachments,
-      }]);
-      setMessage("");
-    } catch (error) {
-      await Promise.all(uploaded.map(({ key }) => http.delete("/uploads/pending", { body: { key } }).catch(() => undefined)));
-      setUploadError(error instanceof Error ? error.message : "Không thể tải tệp lên.");
-    } finally {
-      setIsUploading(false);
-    }
+      const result = await http.post<{ message: StoredMessage }>(historyPath, { content: message.trim(), attachments: uploaded, replyToId: replyTo ? String(replyTo.id) : undefined });
+      if (routeRef.current === savedKey) { setMessages((previous) => mergeMessages(previous, [result.message])); setMessage(""); setReplyTo(null); }
+    } catch (reason) { await Promise.all(uploaded.map(({ key: pending }) => http.delete("/uploads/pending", { body: { key: pending } }).catch(() => undefined))); if (routeRef.current === savedKey) setError(reason instanceof Error ? reason.message : "Không thể tải tệp."); }
+    finally { sendingRef.current = false; setUploading(false); }
   };
-
-  const loadOlderMessages = () => {
-    const oldestMessage = messages[0];
-    if (!oldestMessage?.createdAt || isLoadingOlder) return;
-    if (!env.useMocks) {
-      setIsLoadingOlder(true);
-      void http.get<{ messages: Array<CreatedMessageResponse & { id: string }>; hasMore: boolean }>(`/channels/${encodeURIComponent(rawChannelId)}/messages`, {
-        query: { before: String(oldestMessage.id), limit: 50 },
-      }).then(({ messages: olderMessages, hasMore }) => {
-        setMessages((previous) => [...olderMessages.map((item) => ({ ...item, createdAt: item.createdAt })), ...previous]);
-        setHasOlderMessages(hasMore);
-      }).catch((error) => setUploadError(error instanceof Error ? error.message : "Không thể tải tin nhắn cũ hơn."))
-        .finally(() => setIsLoadingOlder(false));
-      return;
-    }
-    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
-    setIsLoadingOlder(true);
-    wsRef.current.send(JSON.stringify({
-      type: "load_older_messages",
-      channelId: effectiveChannelId,
-      channelKey: rawChannelId,
-      before: oldestMessage.createdAt,
-    }));
+  const loadOlder = async () => {
+    if (!messages[0] || olderBusy) return;
+    const savedKey = key; setOlderBusy(true);
+    try { const page = await http.get<Page>(historyPath, { query: { before: String(messages[0].id), limit: 50 } }); if (routeRef.current === savedKey) { setMessages((previous) => mergeMessages(previous, page.messages)); setHasMore(page.hasMore); } }
+    catch (reason) { if (routeRef.current === savedKey) setError(reason instanceof Error ? reason.message : "Không thể tải tin nhắn cũ."); }
+    finally { setOlderBusy(false); }
   };
-
-  // Đổi tên test nhanh
-  const handleChangeUsername = async () => {
-    const newName = prompt(env.useMocks ? "Nhập tên hiển thị để test:" : "Tên hiển thị mới:", currentUser);
-    if (newName && newName.trim()) {
-      const trimmed = newName.trim();
-      if (!env.useMocks) {
-        try {
-          const result = await http.patch<{ user: { username: string; displayName: string | null } }>("/users/@me", { displayName: trimmed });
-          setCurrentUser(result.user.displayName || result.user.username);
-        } catch (error) {
-          setUploadError(error instanceof Error ? error.message : "Không thể cập nhật tên hiển thị.");
-        }
-        return;
+  const actionPath = (item: ChatMessage) => isMe ? "/messages/dm/" + encodeURIComponent(rawChannelId) + "/" + encodeURIComponent(String(item.id)) : "/messages/" + encodeURIComponent(String(item.id));
+  const reaction = async (item: ChatMessage, emoji: string, remove: boolean) => {
+    const savedKey = key; setError("");
+    try {
+      const path = actionPath(item) + "/reactions";
+      const result = remove ? await http.delete<{ message: StoredMessage }>(path + "/" + encodeURIComponent(emoji)) : await http.post<{ message: StoredMessage }>(path, { emoji });
+      if (routeRef.current === savedKey) setMessages((previous) => applyEvent(previous, { message: result.message }));
+    } catch (reason) { if (routeRef.current === savedKey) setError(reason instanceof Error ? reason.message : "Không thể cập nhật emoji."); }
+  };
+  const submitAction = async (event: React.FormEvent) => {
+    event.preventDefault(); if (!dialog || actionBusy) return;
+    const savedKey = key; setActionBusy(true); setError("");
+    try {
+      if (dialog.type === "edit") {
+        const result = await http.patch<{ message: StoredMessage }>(actionPath(dialog.message), { content: edited });
+        if (routeRef.current === savedKey) setMessages((previous) => applyEvent(previous, { message: result.message }));
+      } else {
+        await http.delete(actionPath(dialog.message));
+        if (routeRef.current === savedKey) setMessages((previous) => applyEvent(previous, { type: "message_delete", messageId: dialog.message.id }));
       }
-      setCurrentUser(trimmed);
-      sessionStorage.setItem("bravechat_user", trimmed);
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(
-          JSON.stringify({
-            type: "join_channel",
-            channelId: effectiveChannelId,
-            user: {
-              username: trimmed,
-              avatar: trimmed.slice(0, 2).toUpperCase(),
-            },
-          })
-        );
-      }
-    }
+      if (routeRef.current === savedKey) setDialog(null);
+    } catch (reason) { if (routeRef.current === savedKey) setError(reason instanceof Error ? reason.message : "Không thể cập nhật tin nhắn."); }
+    finally { setActionBusy(false); }
   };
-
-  return (
-    <div className="flex-1 flex min-w-0 h-full overflow-hidden bg-ocean-dark-bg" data-testid="chat-view">
-      {/* Cột Giữa: Chat Area */}
-      <main className="flex-1 flex flex-col min-w-0 h-full relative">
-        <div className="absolute inset-0 pointer-events-none opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-ocean-primary/20 via-ocean-dark-bg to-ocean-dark-bg" />
-
-        {/* 1. Chat Header */}
-        <ChatHeader
-          channelName={displayChannelName}
-          isMe={isMe}
-          isChannelTopic={isChannelTopic}
-          currentUser={currentUser}
-          connectionStatus={connectionStatus}
-          showMemberList={showMemberList}
-          onChangeUsername={handleChangeUsername}
-          onReconnectWs={connectWebSocket}
-          onToggleMemberList={() => setShowMemberList((prev) => !prev)}
-        />
-
-        {channelType === "VOICE" || channelType === "VIDEO" ? (
-          <VoiceRoom channelId={rawChannelId} channelType={channelType} />
-        ) : null}
-
-        {/* 2. Message List */}
-        <MessageList
-          ref={messagesEndRef}
-          channelName={displayChannelName}
-          messages={messages}
-          currentUser={currentUser}
-          hasOlder={hasOlderMessages}
-          isLoadingOlder={isLoadingOlder}
-          onLoadOlder={loadOlderMessages}
-        />
-
-        {/* 3. Typing Indicator */}
-        <TypingIndicator typingUsers={typingUsers} />
-
-        {/* 4. Chat Input */}
-        {isMe && rawChannelId === "friends" ? <div className="mx-6 mb-6 rounded-lg border border-ocean-dark-border bg-ocean-dark-surface/60 p-5 text-sm text-ocean-light/70">Chọn một cuộc trò chuyện hoặc nhấn dấu + để bắt đầu nhắn tin.</div> : <ChatInput
-          value={message}
-          placeholder={`Nhắn tin tới #${displayChannelName} (Nhấn Enter để gửi)...`}
-          onChange={handleInputChange}
-          onSubmit={handleSendMessage}
-          onFiles={handleFiles}
-          isUploading={isUploading}
-        />}
-        {uploadError ? <p role="alert" className="px-6 pb-2 text-xs text-rose-400">{uploadError}</p> : null}
-      </main>
-
-      {/* Cột Phải: Member List (Collapsible) */}
-      {!isMe && <MemberList isVisible={showMemberList} serverId={rawServerId} />}
-    </div>
-  );
+  if (friends) return <FriendsPanel />;
+  return <div className="flex-1 flex min-w-0 h-full overflow-hidden bg-ocean-dark-bg" data-testid="chat-view">
+    <main className="flex-1 flex flex-col min-w-0 h-full relative">
+      <ChatHeader channelName={name} isMe={isMe} isChannelTopic={!isMe} currentUser={currentUser} connectionStatus={status} showMemberList={showMembers} onChangeUsername={() => { if (user) setInspected(user.id); }} onReconnectWs={reconnect} onToggleMemberList={() => setShowMembers((value) => !value)} />
+      {(channelType === "VOICE" || channelType === "VIDEO") && <VoiceRoom channelId={rawChannelId} channelType={channelType} />}
+      <MessageList ref={bottomRef} channelName={name} messages={messages} currentUser={currentUser} currentUserId={user?.id} hasOlder={hasMore} isLoadingOlder={olderBusy} onLoadOlder={loadOlder}
+        onReply={setReplyTo} onReaction={(item, emoji, remove) => void reaction(item, emoji, remove)} onEdit={(item) => { setEdited(item.content); setDialog({ type: "edit", message: item }); }} onDelete={(item) => setDialog({ type: "delete", message: item })} onInspect={setInspected} />
+      <TypingIndicator typingUsers={typing} />
+      {replyTo && <div className="mx-6 mb-2 flex justify-between gap-3 rounded border border-ocean-dark-border px-3 py-2 text-xs text-ocean-light/70"><span className="truncate">Trả lời {replyTo.user}: {replyTo.content}</span><button aria-label="Hủy trả lời" onClick={() => setReplyTo(null)}>✕</button></div>}
+      <ChatInput value={message} placeholder={isMe ? "Nhắn tin tới " + name : "Nhắn tin tới #" + name} onChange={(event) => { setMessage(event.target.value); sendTyping("typing_start"); if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = setTimeout(() => sendTyping("typing_stop"), 1500); }} onSubmit={handleSend} onFiles={isMe ? undefined : handleFiles} isUploading={uploading} isSending={sending} />
+      {sending && <p role="status" className="px-6 pb-2 text-xs text-ocean-light/60">Đang gửi...</p>}
+      {error && <p role="alert" className="px-6 pb-2 text-xs text-rose-300">{error}</p>}
+    </main>
+    {!isMe && <MemberList isVisible={showMembers} serverId={rawServerId} />}
+    {inspected && <UserCard userId={inspected} onClose={() => setInspected(null)} />}
+    {dialog && <DialogFrame title={dialog.type === "edit" ? "Sửa tin nhắn" : "Xóa tin nhắn"} onClose={() => { if (!actionBusy) setDialog(null); }}><form onSubmit={submitAction} className="space-y-4">{dialog.type === "edit" ? <label className="block text-sm">Nội dung<textarea autoFocus className="input-ocean mt-2 w-full" value={edited} required maxLength={2000} onChange={(event) => setEdited(event.target.value)} /></label> : <p>Bạn muốn xóa tin nhắn này?</p>}<div className="flex justify-end gap-2"><button type="button" disabled={actionBusy} className="btn-secondary" onClick={() => setDialog(null)}>Hủy</button><button className="btn-primary" disabled={actionBusy || dialog.type === "edit" && !edited.trim()}>{actionBusy ? "Đang lưu..." : "Xác nhận"}</button></div></form></DialogFrame>}
+  </div>;
 }
-
 export const ChatArea = ChatView;

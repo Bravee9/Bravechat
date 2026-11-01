@@ -1,9 +1,9 @@
 "use client";
 
 import React, { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MessageItem, type ChatMessage } from "./MessageItem";
+import { MessageItem, type ChatMessage, type MessageActions } from "./MessageItem";
 
-interface MessageListProps {
+interface MessageListProps extends MessageActions {
   channelName: string;
   messages: ChatMessage[];
   currentUser: string;
@@ -13,7 +13,7 @@ interface MessageListProps {
 }
 
 export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
-  ({ channelName, messages, currentUser, onLoadOlder, hasOlder, isLoadingOlder }, ref) => {
+  ({ channelName, messages, currentUser, onLoadOlder, hasOlder, isLoadingOlder, ...actions }, ref) => {
     const listRef = useRef<HTMLDivElement>(null);
     const rowObservers = useRef(new Map<string | number, ResizeObserver>());
     const [scrollTop, setScrollTop] = useState(0);
@@ -107,7 +107,7 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
                 style={{ top: row.top }}
                 ref={(element) => setRowElement(msg.id, element)}
               >
-                <MessageItem message={msg} isCurrentUser={msg.user === currentUser} />
+                <MessageItem {...actions} message={msg} isCurrentUser={actions.currentUserId ? msg.author?.id === actions.currentUserId : msg.user === currentUser} />
               </div>
             );
           })}
