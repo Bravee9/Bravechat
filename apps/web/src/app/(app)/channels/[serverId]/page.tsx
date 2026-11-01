@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { loadServerDetail, workspaceStore } from "@/stores/workspace.store";
+import { ChatView } from "@/features/messages/components/ChatView";
 
 export default function ServerIndexPage() {
   const params = useParams();
@@ -10,6 +11,7 @@ export default function ServerIndexPage() {
   const serverId = decodeURIComponent(params.serverId as string);
 
   useEffect(() => {
+    if (serverId === "@me") return;
     let active = true;
     void loadServerDetail(serverId, true).then(() => {
       if (!active) return;
@@ -20,5 +22,6 @@ export default function ServerIndexPage() {
     return () => { active = false; };
   }, [router, serverId]);
 
+  if (serverId === "@me") return <ChatView serverId="@me" channelId="friends" />;
   return <div className="flex h-full flex-1 items-center justify-center text-sm text-ocean-light/60">Đang mở máy chủ...</div>;
 }

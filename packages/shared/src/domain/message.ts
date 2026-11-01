@@ -16,6 +16,8 @@ export interface Message {
   replyToId: string | null;
   /** Client-generated id for optimistic UI de-duplication. */
   nonce: string | null;
+  replyTo?: { id: string; content: string; user: string } | null;
+  reactions?: { emoji: string; count: number; userIds: string[] }[];
 }
 
 /** Cursor pagination for message history: `?before=<messageId>&limit=50`. */

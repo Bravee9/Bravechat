@@ -12,11 +12,7 @@ export const userService = {
     if (env.useMocks) {
       return MOCK_CURRENT_USER;
     }
-    try {
-      const response = await http.get<{ user: CurrentUser }>(API_ROUTES.auth.me);
-      return response.user;
-    } catch {
-      return MOCK_CURRENT_USER;
-    }
+    const response = await http.get<{ user: CurrentUser }>(API_ROUTES.auth.me);
+    return response.user;
   },
 };

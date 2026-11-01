@@ -23,3 +23,14 @@ export interface ServerDetail {
   categories: ChannelCategory[];
   channels: Channel[];
 }
+
+/** Public member row returned by GET /servers/:serverId/members. */
+export interface ServerMemberSummary {
+  id: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  status: import("./user").UserStatus;
+  customStatus: string | null;
+  role: "OWNER" | "ADMIN" | "MEMBER" | "BOT";
+}

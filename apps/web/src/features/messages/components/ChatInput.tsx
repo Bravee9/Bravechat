@@ -10,6 +10,7 @@ interface ChatInputProps {
   onSubmit: (e?: React.FormEvent) => void;
   onFiles?: (files: File[]) => void;
   isUploading?: boolean;
+  isSending?: boolean;
 }
 
 export function ChatInput({
@@ -19,6 +20,7 @@ export function ChatInput({
   onSubmit,
   onFiles,
   isUploading = false,
+  isSending = false,
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   return (
@@ -42,7 +44,7 @@ export function ChatInput({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
+          disabled={isUploading || isSending}
           className="pl-4 pr-3 py-3 text-ocean-light/50 hover:text-ocean-light transition-colors"
           title={isUploading ? "Đang tải tệp..." : "Đính kèm tệp"}
           data-testid="attach-file-btn"
@@ -54,6 +56,8 @@ export function ChatInput({
 
         <input
           type="text"
+          maxLength={2000}
+          disabled={isUploading || isSending}
           value={value}
           onChange={onChange}
           placeholder={placeholder}
@@ -64,7 +68,7 @@ export function ChatInput({
         <div className="pr-3 pl-2 py-3 flex items-center gap-2 text-ocean-light/50">
           <button
             type="submit"
-          disabled={!value.trim() || isUploading}
+          disabled={!value.trim() || isUploading || isSending}
             data-testid="send-message-btn"
             className={cn(
               "p-1.5 rounded-md transition-all",

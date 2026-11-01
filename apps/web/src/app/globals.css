@@ -10,11 +10,21 @@
 @tailwind components;
 @tailwind utilities;
 
+.en-only { display: none; }
+.legal-page[lang="en"] .en-only { display: inline; }
+.legal-page[lang="en"] .vi-only { display: none; }
+.legal-english .en-only { display: inline; }
+.legal-english .vi-only { display: none; }
+.legal-english section > :not(.legal-heading):not(.legal-english-content) { display: none; }
+.legal-english-content { display: none; }
+.legal-english .legal-english-content { display: block; }
+.legal-english .legal-english-content { color: rgb(203 213 225); line-height: 1.8; }
+
 /* ─── CSS CUSTOM PROPERTIES ──────────────────────────────── */
 :root {
   /* Ocean palette as CSS variables for non-Tailwind usage */
   --ocean-primary:        #1A659E;
-  --ocean-secondary:      #5B92C2;
+  --ocean-secondary:      #86B8DE;
   --ocean-light:          #EAF2F8;
   --ocean-dark-bg:        #071A2C;
   --ocean-dark-surface:   #0A233A;
@@ -64,7 +74,7 @@
   }
 
   /* Swiss Minimalist: sharp corners everywhere */
-  * {
+  *:where(:not(.discord-app, .discord-app *)) {
     border-radius: 0 !important;
   }
 
@@ -117,6 +127,86 @@
   input, textarea, select {
     @apply bg-transparent font-sans;
   }
+}
+
+/* Workspace palette is scoped so the landing page keeps its own design. */
+.discord-app {
+  --theme-primary: 88 101 242;
+  --theme-primary-hover: 71 82 196;
+  --theme-secondary: 181 186 193;
+  --theme-text: 219 222 225;
+  --theme-bg: 49 51 56;
+  --theme-surface: 43 45 49;
+  --theme-border: 35 36 40;
+  --theme-hover: 64 66 73;
+  --ocean-primary: #5865f2;
+  --ocean-secondary: #b5bac1;
+  --ocean-dark-bg: #313338;
+  --ocean-dark-surface: #2b2d31;
+  --ocean-dark-border: #232428;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #1e1f22;
+  --scrollbar-thumb-hover: #111214;
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.375;
+  color-scheme: dark;
+}
+.discord-app ::selection { background: #5865f270; }
+.discord-app ::-webkit-scrollbar { width: 8px; }
+.discord-app ::-webkit-scrollbar-thumb { border-radius: 4px; }
+.discord-app :is(button, input, textarea, h1, h2, h3, h4) { font-family: inherit; }
+.discord-app :is(.btn-primary, .btn-secondary) {
+  border-radius: 4px;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+  padding: 10px 16px;
+}
+.discord-app :is(.shadow-ocean-glow, .hover\:shadow-ocean-glow:hover) { box-shadow: none; }
+.discord-app [data-testid="server-rail"] { background: #1e1f22; border: 0; }
+.discord-app [data-testid="channel-sidebar"] { border: 0; }
+.discord-app [data-testid="member-list"] { background: #2b2d31; border: 0; }
+.discord-app [data-testid="chat-header"],
+.discord-app [data-testid="server-header-btn"] {
+  height: 48px;
+  box-shadow: 0 1px 0 #0003, 0 1.5px 0 #0001, 0 2px 0 #0001;
+}
+.discord-app [data-testid="chat-header"] { background: #313338; padding-inline: 16px; backdrop-filter: none; }
+.discord-app [data-testid="chat-header"] h1 { color: #f2f3f5; font-weight: 600; }
+.discord-app [data-testid="change-username-btn"] { border: 0; background: none; }
+.discord-app [data-testid="workflow-dialog"] { background: #313338; border-radius: 8px; }
+.discord-app [data-testid="ws-connection-badge"] { border: 0; background: none; }
+.discord-app [data-testid="friends-tab-btn"] { border: 0; }
+.discord-app [data-testid="friends-tab-btn"][aria-current="page"] { background: #404249; }
+.discord-app [data-testid="chat-input-container"] { padding: 0 16px 24px; }
+.discord-app [data-testid="chat-input-container"] form { background: #383a40; border: 0; border-radius: 8px; box-shadow: none; }
+.discord-app [data-testid="chat-input-field"] { font-size: 15px; min-width: 0; padding-block: 13px; }
+.discord-app [data-testid="chat-input-field"]::placeholder { color: #949ba4; }
+.discord-app [data-testid="message-list"] { padding-inline: 0; }
+.discord-app .chat-welcome { padding: 0 16px 12px; margin-top: 16px; border: 0; }
+.discord-app .chat-welcome h2 { font-size: 30px; color: #f2f3f5; }
+.discord-app .chat-welcome-icon { background: #41434a; color: #dbdee1; border: 0; }
+.discord-app .message-row { padding: 3px 48px 3px 16px; border-radius: 0; }
+.discord-app .message-row:hover { background: #2e3035; }
+.discord-app .message-avatar { background: #5865f2; color: white; border: 0; }
+.discord-app .message-content { color: #dbdee1; font-size: 15px; line-height: 1.375; }
+.discord-app .message-author { color: #f2f3f5; font-size: 15px; font-weight: 500; }
+.discord-app .profile-dock { left: 72px; width: 240px; background: #232428; border: 0; }
+.discord-app [data-testid="user-profile-bar"] { background: #232428; border: 0; padding-inline: 8px; }
+.discord-app [data-testid="user-profile-bar"] [class*="border-[#051424]"] { border-color: #232428; }
+.discord-app [role="tooltip"] { background: #111214; border-color: #111214; color: #f2f3f5; }
+.discord-app [role="tooltip"] > div { border-color: transparent; }
+.discord-app .input-ocean { border-radius: 4px; background: #1e1f22; }
+@media (max-width: 1000px) {
+  .discord-app [data-testid="member-list"] { display: none; }
+  .discord-app [data-testid="change-username-btn"] { display: none; }
+}
+@media (max-width: 640px) {
+  .discord-app [data-testid="server-rail"] { width: 60px; }
+  .discord-app [data-testid="channel-sidebar"] { width: 180px; }
+  .discord-app .profile-dock { left: 60px; width: 180px; }
+  .discord-app [data-testid="chat-header"] { padding-inline: 12px; gap: 8px; }
+  .discord-app [data-testid="chat-header"] > div:last-child { gap: 4px; }
 }
 
 /* ─── COMPONENT LAYER ────────────────────────────────────── */

@@ -10,7 +10,9 @@
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
     "type-check": "tsc --noEmit",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "r2:test": "tsx scripts/r2-smoke-test.ts",
+    "r2:cors": "tsx scripts/r2-cors.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",

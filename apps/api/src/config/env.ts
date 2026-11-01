@@ -5,8 +5,14 @@
 
 import { z } from 'zod'
 import dotenv from 'dotenv'
+import { resolve } from 'node:path'
 
 dotenv.config()
+dotenv.config({ path: resolve(__dirname, '../../../../.env') })
+const optionalCredential = (schema: z.ZodString) => z.preprocess(
+  (value) => typeof value === 'string' && /^(your_|CHANGE_ME|unconfigured)/i.test(value) ? undefined : value,
+  schema.optional(),
+)
 
 const envSchema = z.object({
   // Server
@@ -19,17 +25,21 @@ const envSchema = z.object({
 
   // Redis
   REDIS_URL: z.string().default('redis://localhost:6379'),
+  REDIS_ENABLED: z.enum(['true', 'false']).default('false'),
 
   // Auth
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default('7d'),
+  RESEND_API_KEY: z.string().optional(),
+  RESET_EMAIL_FROM: z.string().optional(),
 
   // Cloudflare R2 (Object Storage)
-  R2_BUCKET_NAME: z.string(),
-  R2_ENDPOINT_URL: z.string().url(),
-  R2_ACCESS_KEY_ID: z.string(),
-  R2_SECRET_ACCESS_KEY: z.string(),
-  R2_PUBLIC_URL: z.string().url().optional(),
+  R2_BUCKET_NAME: z.string().trim().min(3).optional(),
+  R2_ENDPOINT_URL: z.string().trim().url().optional(),
+  R2_ACCESS_KEY_ID: optionalCredential(z.string().trim().min(16)),
+  R2_SECRET_ACCESS_KEY: optionalCredential(z.string().trim().min(32)),
+  // Bỏ trống nếu bucket private (khi đó media đi qua /api/media/*)
+  R2_PUBLIC_URL: z.preprocess((value) => (value === '' || (typeof value === 'string' && value.includes('xxxx')) ? undefined : value), z.string().url().optional()),
   LIVEKIT_URL: z.string().url().optional(),
   LIVEKIT_API_KEY: z.string().optional(),
   LIVEKIT_API_SECRET: z.string().optional(),
@@ -37,6 +47,8 @@ const envSchema = z.object({
 
   // App
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+  // URL công khai của chính API — dùng để dựng link /api/media/* cho avatar, banner
+  API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),
   MAX_FILE_SIZE: z.coerce.number().default(50 * 1024 * 1024), // 50MB
 })
 
@@ -48,5 +60,12 @@ if (!parsed.success) {
   process.exit(1)
 }
 
-export const env = parsed.data
+export const env = {
+  ...parsed.data,
+  STORAGE_ENABLED: Boolean(parsed.data.R2_BUCKET_NAME && parsed.data.R2_ENDPOINT_URL && parsed.data.R2_ACCESS_KEY_ID && parsed.data.R2_SECRET_ACCESS_KEY),
+  R2_BUCKET_NAME: parsed.data.R2_BUCKET_NAME ?? 'unconfigured',
+  R2_ENDPOINT_URL: parsed.data.R2_ENDPOINT_URL ?? 'http://127.0.0.1:9000',
+  R2_ACCESS_KEY_ID: parsed.data.R2_ACCESS_KEY_ID ?? '',
+  R2_SECRET_ACCESS_KEY: parsed.data.R2_SECRET_ACCESS_KEY ?? '',
+}
 export type Env = typeof env

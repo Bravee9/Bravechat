@@ -10,6 +10,7 @@ const getPresenceRedis = () => presenceRedis ??= new Redis(env.REDIS_URL, { lazy
 
 export async function voiceRoutes(server: FastifyInstance) {
   server.post<{ Params: { channelId: string } }>('/channels/:channelId/token', { preHandler: [server.authenticate] }, async (request, reply) => {
+    reply.header('Cache-Control', 'no-store')
     if (!env.LIVEKIT_URL || !env.LIVEKIT_API_KEY || !env.LIVEKIT_API_SECRET) {
       return reply.status(503).send({ statusCode: 503, message: 'Voice/video chưa được cấu hình trên máy chủ.' })
     }
@@ -50,10 +51,10 @@ export async function voiceRoutes(server: FastifyInstance) {
       canSubscribe: true,
       canPublishData: true,
     })
-    return reply.send({ statusCode: 200, data: { serverUrl: env.LIVEKIT_URL, token: await token.toJwt(), roomName, channelType: channel.type } })
+    return reply.send({ statusCode: 200, data: { serverUrl: env.LIVEKIT_URL, token: await token.toJwt(), channelType: channel.type } })
   })
 
-  server.post('/webhook', { config: { rateLimit: { max: 600, timeWindow: '1 minute' } } }, async (request, reply) => {
+  server.post('/webhook', { config: { rateLimit: { max: 6000, timeWindow: '1 minute' } } }, async (request, reply) => {
     if (!env.LIVEKIT_API_KEY || !env.LIVEKIT_API_SECRET) return reply.status(503).send({ statusCode: 503 })
     const authorization = request.headers.authorization
     if (typeof request.body !== 'string' || !authorization) return reply.status(400).send({ statusCode: 400, message: 'Webhook payload không hợp lệ.' })

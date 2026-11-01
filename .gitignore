@@ -67,3 +67,4 @@ skills-lock.json
 replace.js
 *.ai.txt
 *.prompt
+.local/

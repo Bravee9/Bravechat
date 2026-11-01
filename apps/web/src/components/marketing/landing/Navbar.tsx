@@ -15,7 +15,7 @@ const NAV_LINKS = [
   { label: "Tài liệu", href: "/docs" },
 ];
 
-export function Navbar() {
+export function Navbar({ language = "vi" }: { language?: "vi" | "en" }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -51,7 +51,7 @@ export function Navbar() {
               href={link.href}
               className="text-ocean-secondary text-sm font-medium uppercase tracking-wider hover:text-ocean-light transition-colors duration-200 relative group"
             >
-              {link.label}
+              {language === "en" ? ({ "Tính năng": "Features", "Cộng đồng": "Community", "Lộ trình": "Roadmap", "Tài liệu": "Documentation" }[link.label] ?? link.label) : link.label}
               {/* Underline indicator */}
               <span className="absolute -bottom-1 left-0 w-0 h-px bg-ocean-primary group-hover:w-full transition-all duration-300" />
             </Link>
@@ -64,13 +64,13 @@ export function Navbar() {
             href="/login"
             className="text-ocean-secondary text-sm font-bold uppercase tracking-wider hover:text-ocean-light transition-colors px-4 py-2"
           >
-            Đăng nhập
+            {language === "en" ? "Log in" : "Đăng nhập"}
           </Link>
           <Link
             href="/register"
             className="btn-primary text-xs py-2.5 px-5"
           >
-            Bắt đầu ngay
+            {language === "en" ? "Get started" : "Bắt đầu ngay"}
           </Link>
         </div>
 
@@ -79,7 +79,7 @@ export function Navbar() {
           id="mobile-menu-toggle"
           onClick={() => setIsMobileOpen(!isMobileOpen)}
           className="md:hidden text-ocean-secondary hover:text-ocean-light transition-colors p-2"
-          aria-label="Mở/đóng menu"
+          aria-label={language === "en" ? "Open/close menu" : "Mở/đóng menu"}
           aria-expanded={isMobileOpen}
           aria-controls="mobile-menu"
         >
@@ -119,15 +119,15 @@ export function Navbar() {
                 onClick={() => setIsMobileOpen(false)}
                 className="text-ocean-secondary font-medium uppercase tracking-wider hover:text-ocean-light transition-colors"
               >
-                {link.label}
+                {language === "en" ? ({ "Tính năng": "Features", "Cộng đồng": "Community", "Lộ trình": "Roadmap", "Tài liệu": "Documentation" }[link.label] ?? link.label) : link.label}
               </Link>
             ))}
             <div className="divider-ocean" />
             <Link href="/login" className="btn-secondary text-center text-xs">
-              Đăng nhập
+              {language === "en" ? "Log in" : "Đăng nhập"}
             </Link>
             <Link href="/register" className="btn-primary text-center text-xs">
-              Bắt đầu ngay
+              {language === "en" ? "Get started" : "Bắt đầu ngay"}
             </Link>
           </div>
         </div>

@@ -11,6 +11,7 @@ import { createStore, useStore } from "@/lib/store";
 import { serverService } from "@/services/server.service";
 import { channelService } from "@/services/channel.service";
 import { userService } from "@/services/user.service";
+import { ApiError } from "@/services/http";
 
 /**
  * Workspace store: nguồn dữ liệu duy nhất cho các Layer cố định (Rail, Sidebar, Profile).
@@ -22,6 +23,7 @@ interface WorkspaceState {
   conversations: DirectConversation[] | null;
   currentUser: CurrentUser | null;
   serverDetails: Record<string, ServerDetail>;
+  error: string | null;
 }
 
 const DETAIL_STALE_MS = 60_000;
@@ -31,6 +33,7 @@ export const workspaceStore = createStore<WorkspaceState>({
   conversations: null,
   currentUser: null,
   serverDetails: {},
+  error: null,
 });
 
 // Chống gọi trùng (dedupe in-flight) và theo dõi độ tươi của cache.
@@ -40,7 +43,10 @@ const detailFetchedAt = new Map<string, number>();
 function once(key: string, task: () => Promise<void>): Promise<void> {
   const existing = inflight.get(key);
   if (existing) return existing;
-  const promise = task().finally(() => inflight.delete(key));
+  const promise = task().catch((reason) => {
+    workspaceStore.set({ error: reason instanceof Error ? reason.message : "Không thể tải dữ liệu." });
+    if (reason instanceof ApiError && reason.status === 401) window.location.replace("/login");
+  }).finally(() => inflight.delete(key));
   inflight.set(key, promise);
   return promise;
 }

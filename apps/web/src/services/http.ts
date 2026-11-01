@@ -36,15 +36,21 @@ function buildUrl(path: string, query?: Query): string {
   return url.toString();
 }
 
-async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+let refreshInFlight: Promise<boolean> | null = null;
+let sessionVersion = 0;
+
+async function request<T>(method: string, path: string, options: RequestOptions = {}, retryAuth = true): Promise<T> {
   const { query, body, headers, ...init } = options;
 
-  // TODO(auth): on the server, forward the refresh cookie / access token
-  // (next/headers → cookies()) once the auth flow is wired.
+  // Request mới chờ cookie được xoay vòng, không gửi bằng phiên vừa hết hạn.
+  if (refreshInFlight && !path.startsWith("/auth/")) await refreshInFlight;
+  const sentVersion = sessionVersion;
   const response = await fetch(buildUrl(path, query), {
     ...init,
     method,
     credentials: "include",
+    cache: "no-store",
+    signal: init.signal ?? AbortSignal.timeout(15000),
     headers: {
       Accept: "application/json",
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
@@ -54,6 +60,16 @@ async function request<T>(method: string, path: string, options: RequestOptions 
   });
 
   const json: unknown = await response.json().catch(() => null);
+
+  if (response.status === 401 && retryAuth && (!path.startsWith("/auth/") || path === "/auth/me")) {
+    // 401 cũ có thể về sau khi refresh đã xong; không consume refresh token lần nữa.
+    if (sentVersion !== sessionVersion) return request<T>(method, path, options, false);
+    refreshInFlight ??= fetch(buildUrl("/auth/refresh"), { method: "POST", credentials: "include", signal: AbortSignal.timeout(15000), headers: { Accept: "application/json" } })
+      .then((refresh) => { if (refresh.ok) sessionVersion++; return refresh.ok; })
+      .catch(() => false)
+      .finally(() => { refreshInFlight = null; });
+    if (await refreshInFlight) return request<T>(method, path, options, false);
+  }
 
   if (!response.ok) {
     throw new ApiError(response.status, json as ApiErrorBody | null);
@@ -67,5 +83,7 @@ export const http = {
     request<T>("POST", path, { ...options, body }),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>
     request<T>("PATCH", path, { ...options, body }),
+  put: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>("PUT", path, { ...options, body }),
   delete: <T>(path: string, options?: RequestOptions) => request<T>("DELETE", path, options),
 };

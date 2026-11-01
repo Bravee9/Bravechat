@@ -18,23 +18,24 @@ const config: Config = {
   theme: {
     extend: {
       // ─── OCEAN COLOR PALETTE (Xanh dương hàn lâm, chống mỏi mắt) ───
-      // Gốc LaTeX: OceanBluePrimary 1A659E · OceanBlueSecondary 5B92C2
+      // Màu phụ sáng hơn để chữ/icon tách rõ khỏi nền navy.
       //            OceanBlueLightBg EAF2F8 · OceanBlueDark 0E3D60 · OceanBlueLightText 0A233A
       // Nền tối là navy (không đen tuyền) để giảm chói; chữ là EAF2F8 thay vì trắng.
       colors: {
         ocean: {
-          primary:       "#1A659E",  // OceanBluePrimary — nút chính, nhấn
-          secondary:     "#5B92C2",  // OceanBlueSecondary — viền, icon, text phụ
-          light:         "#EAF2F8",  // OceanBlueLightBg — chữ trên nền tối
-          "dark-bg":     "#071A2C",  // Navy thẫm (dẫn xuất từ 0A233A) — nền body tối
-          "dark-surface":"#0A233A",  // OceanBlueLightText — nền card/sidebar tối
-          "dark-border": "#173B5C",  // Viền tối
+          // CSS variables let the workspace use Discord colors without changing public pages.
+          primary:       "rgb(var(--theme-primary, 26 101 158) / <alpha-value>)",
+          secondary:     "rgb(var(--theme-secondary, 134 184 222) / <alpha-value>)",
+          light:         "rgb(var(--theme-text, 234 242 248) / <alpha-value>)",
+          "dark-bg":     "rgb(var(--theme-bg, 7 26 44) / <alpha-value>)",
+          "dark-surface":"rgb(var(--theme-surface, 10 35 58) / <alpha-value>)",
+          "dark-border": "rgb(var(--theme-border, 23 59 92) / <alpha-value>)",
           "light-bg":    "#EAF2F8",  // OceanBlueLightBg — nền body sáng
           "light-surface":"#FFFFFF", // Card sáng
           "light-border":"#C5D9EA",  // Viền sáng
           "light-text":  "#0A233A",  // OceanBlueLightText — chữ chính nền sáng
-          hover:         "#15568A",  // Hover của primary
-          "dark-hover":  "#0F2D4A",  // Hover trên nền tối
+          hover:         "rgb(var(--theme-primary-hover, 21 86 138) / <alpha-value>)",
+          "dark-hover":  "rgb(var(--theme-hover, 15 45 74) / <alpha-value>)",
           deep:          "#0E3D60",  // OceanBlueDark — mảng tối, gradient
         },
       },

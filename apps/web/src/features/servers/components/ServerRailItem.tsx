@@ -84,7 +84,7 @@ function ServerRailItemBase({
           {server.mentionCount > 0 && (
             <div
               data-testid={`server-badge-${server.id}`}
-              className="absolute -bottom-1 -right-1 bg-rose-500 text-white text-[10px] font-black min-w-5 h-5 px-1 flex items-center justify-center rounded-full border-2 border-[#030a0d] shadow-md animate-fade-in pointer-events-none"
+              className="absolute -bottom-1 -right-1 bg-rose-500 text-white text-[10px] font-black min-w-5 h-5 px-1 flex items-center justify-center rounded-full border-2 border-[#1e1f22] shadow-md animate-fade-in pointer-events-none"
             >
               {server.mentionCount > 99 ? "99+" : server.mentionCount}
             </div>

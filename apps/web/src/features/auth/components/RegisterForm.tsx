@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { env } from "@/config/env";
 
 interface FormState {
   email: string;
@@ -109,13 +110,13 @@ export function RegisterForm() {
     setIsLoading(true);
 
     try {
-      // TODO: Call API POST /api/auth/register
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/register`,
+        `${env.apiUrl}/auth/register`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
+          signal: AbortSignal.timeout(15000),
           body: JSON.stringify({
             email: form.email.trim().toLowerCase(),
             username: form.username.trim().toLowerCase(),
@@ -132,7 +133,7 @@ export function RegisterForm() {
       }
 
       // Redirect to thank-you page
-      window.location.href = "/thank-you";
+      window.location.href = "/channels/@me";
     } catch {
       setErrors({ general: "Không thể kết nối đến máy chủ. Vui lòng thử lại." });
     } finally {

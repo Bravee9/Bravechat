@@ -4,6 +4,8 @@
 
 # Bravechat
 
+Các luồng mới không phụ thuộc R2 (bạn bè, chặn, reply/reaction, DM realtime, khôi phục mật khẩu) và hướng dẫn kiểm thử nằm tại [docs/non-r2-workflows.md](docs/non-r2-workflows.md).
+
 Bravechat là nền tảng giao tiếp thời gian thực (Real-time Communication Platform) hiệu năng cao dành cho cộng đồng, nhóm làm việc và bạn bè. Dự án được xây dựng theo kiến trúc **Monorepo (Turborepo)** chuẩn doanh nghiệp, áp dụng mô hình **Phân tầng (Layered Architecture)** chặt chẽ và ngôn ngữ thiết kế **Ocean Swiss Minimalist** dịu mắt, tối giản và hiện đại.
 
 **Tác giả**: [Bravee9](https://github.com/Bravee9) & [Shuji7245](https://github.com/Shuji7245)
@@ -210,6 +212,10 @@ pnpm dev
 ---
 
 ## Kiểm tra Chất lượng Mã nguồn (Lint & Type-Check)
+
+Quy trình kiểm thử đầy đủ từ cài đặt, Prisma, R2, API, web đến smoke test chức năng nằm tại [docs/testing-workflow.md](./docs/testing-workflow.md). Nên chạy theo checklist này trước mỗi lần commit hoặc merge.
+
+Luồng workspace frontend/API (server, thành viên, invite, kênh và DM) được mô tả tại [docs/frontend-workflows.md](./docs/frontend-workflows.md).
 
 Chạy kiểm tra toàn bộ workspace trước khi commit:
 ```bash

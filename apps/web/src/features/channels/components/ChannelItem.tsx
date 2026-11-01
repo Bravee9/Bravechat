@@ -12,16 +12,17 @@ interface ChannelItemProps {
 }
 
 export function ChannelItem({ channel, serverId, isActive }: ChannelItemProps) {
-  const isVoice = channel.type === "VOICE";
+  const isVoice = channel.type === "VOICE" || channel.type === "VIDEO";
 
   return (
     <Link
       href={`/channels/${serverId}/${channel.id}`}
       data-testid={`channel-item-${channel.id}`}
+      aria-current={isActive ? "page" : undefined}
       className={cn(
         "flex items-center gap-2.5 px-2.5 py-1.5 rounded transition-colors group cursor-pointer text-sm font-medium",
         isActive
-          ? "bg-ocean-primary/25 text-white font-semibold border-l-2 border-ocean-secondary"
+          ? "bg-ocean-dark-hover text-white font-semibold"
           : "text-ocean-light/70 hover:bg-white/5 hover:text-ocean-light"
       )}
     >
@@ -31,7 +32,7 @@ export function ChannelItem({ channel, serverId, isActive }: ChannelItemProps) {
           fill="currentColor"
           viewBox="0 0 24 24"
         >
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+          <path d="M3 9v6h4l5 4V5L7 9H3zm12-2v2a4 4 0 010 6v2a6 6 0 000-10zm3-3v2a8 8 0 010 12v2a10 10 0 000-16z" />
         </svg>
       ) : (
         <span className="text-ocean-light/50 font-mono text-base leading-none flex-shrink-0">#</span>

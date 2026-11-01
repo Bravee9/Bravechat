@@ -7,19 +7,26 @@ export interface Member {
   id: string;
   name: string;
   role: "OWNER" | "ADMIN" | "MEMBER" | "BOT";
-  status: "ONLINE" | "IDLE" | "DND" | "OFFLINE";
+  status: "ONLINE" | "IDLE" | "DND" | "DO_NOT_DISTURB" | "INVISIBLE" | "OFFLINE";
   customStatus?: string;
+  avatarUrl?: string | null;
 }
 
 interface MemberItemProps {
   member: Member;
+  onInspect?: (id: string) => void;
 }
 
-export function MemberItem({ member }: MemberItemProps) {
-  const isOffline = member.status === "OFFLINE";
+export function MemberItem({ member, onInspect }: MemberItemProps) {
+  const isOffline = member.status === "OFFLINE" || member.status === "INVISIBLE";
+  const presence = member.status === "DO_NOT_DISTURB" ? "DND" : member.status;
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onInspect?.(member.id)}
+      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onInspect?.(member.id); } }}
       data-testid={`member-item-${member.id}`}
       className={cn(
         "flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-white/5 transition-colors cursor-pointer group",
@@ -35,16 +42,16 @@ export function MemberItem({ member }: MemberItemProps) {
               : "bg-ocean-primary text-white"
           )}
         >
-          {member.name[0]}
+          {member.avatarUrl ? <img src={member.avatarUrl} alt="" className="h-full w-full rounded-full object-cover" /> : member.name[0]}
         </div>
         <span
           data-testid={`member-presence-${member.status}`}
           className={cn(
-            "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#051424]",
-            member.status === "ONLINE" && "bg-emerald-500",
-            member.status === "IDLE" && "bg-amber-500",
-            member.status === "DND" && "bg-rose-500",
-            member.status === "OFFLINE" && "bg-slate-500"
+            "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-ocean-dark-surface",
+            presence === "ONLINE" && "bg-emerald-500",
+            presence === "IDLE" && "bg-amber-500",
+            presence === "DND" && "bg-rose-500",
+            (presence === "OFFLINE" || presence === "INVISIBLE") && "bg-slate-500"
           )}
         />
       </div>
@@ -53,7 +60,7 @@ export function MemberItem({ member }: MemberItemProps) {
         <div className="flex items-center gap-1.5">
           <span
             className={cn(
-              "text-xs font-bold truncate",
+              "text-sm font-medium truncate",
               member.role === "OWNER" && "text-amber-400",
               member.role === "ADMIN" && "text-ocean-secondary",
               member.role === "BOT" && "text-indigo-400",

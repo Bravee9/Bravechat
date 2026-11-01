@@ -165,15 +165,25 @@ Tạo server mới.
 Lấy thông tin server (channels, members summary).
 
 ### PATCH /servers/:serverId
+Đổi tên hoặc mô tả server. Chỉ owner được cập nhật; ID server không đổi.
+
+### PATCH /servers/:serverId
 Cập nhật server (owner only).
 
 ### GET /servers/:serverId/members
-Danh sách thành viên với pagination.
+Lấy tối đa 500 thành viên đang hoạt động cùng profile công khai và trạng thái đã lưu. Chỉ thành viên server đọc được.
 
-Query: `?limit=50&after=<cursor>`
+### POST /servers/:serverId/channels
+Tạo kênh văn bản trong danh mục đầu tiên. Chỉ owner được phép.
+
+### POST /servers/:serverId/invites
+Tạo mã mời ngẫu nhiên có hiệu lực trong 7 ngày. Thành viên server được phép tạo.
+
+### DELETE /servers/:serverId/members/@me
+Rời server. Owner cần chuyển quyền sở hữu trước.
 
 ### POST /invites/:code
-Tham gia server bằng mã mời.
+Tham gia server bằng mã mời; kiểm tra hết hạn, số lượt sử dụng và trạng thái bị cấm. Membership và lượt dùng được cập nhật trong transaction.
 
 ---
 
