@@ -123,7 +123,7 @@ export async function userRoutes(server: FastifyInstance) {
     await request.server.r2.storage.deleteQuietly(kind === 'avatar' ? current.avatarKey : current.bannerKey)
     return reply.send({ statusCode: 200, data: { user: { ...user, avatarUrl: mediaUrl(user.avatarKey), bannerUrl: mediaUrl(user.bannerKey) } } })
   }
-  server.post('/@me/avatar', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, uploadProfileAsset('avatar'))
-  server.post('/@me/banner', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, uploadProfileAsset('banner'))
+  server.post('/@me/avatar', { config: { rateLimit: { max: 100, timeWindow: '1 minute' } } }, uploadProfileAsset('avatar'))
+  server.post('/@me/banner', { config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, uploadProfileAsset('banner'))
 
 }

@@ -138,7 +138,7 @@ export async function serverRoutes(server: FastifyInstance) {
     return reply.status(201).send({ statusCode: 201, data: { channel } })
   })
 
-  server.post<{ Params: { serverId: string } }>('/:serverId/invites', { config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (request, reply) => {
+  server.post<{ Params: { serverId: string } }>('/:serverId/invites', { config: { rateLimit: { max: 100, timeWindow: '1 hour' } } }, async (request, reply) => {
     const membership = await prisma.serverMember.findFirst({ where: { serverId: request.params.serverId, userId: request.user.id, isBanned: false }, select: { id: true } })
     if (!membership) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy server hoặc bạn không có quyền truy cập.' })
     const { randomBytes } = await import('node:crypto')

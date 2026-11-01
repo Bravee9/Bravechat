@@ -11,7 +11,7 @@ import type { FastifyInstance } from 'fastify'
 import { isPublicMediaKey } from '../services/storage.service'
 
 export async function mediaRoutes(server: FastifyInstance) {
-  server.get<{ Params: { '*': string } }>('/*', { config: { rateLimit: { max: 600, timeWindow: '1 minute' } } }, async (request, reply) => {
+  server.get<{ Params: { '*': string } }>('/*', { config: { rateLimit: { max: 6000, timeWindow: '1 minute' } } }, async (request, reply) => {
     const key = decodeURIComponent(request.params['*'] ?? '')
     if (!isPublicMediaKey(key)) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy tài nguyên.' })
     try {

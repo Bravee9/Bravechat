@@ -78,7 +78,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
    * POST /api/uploads (multipart/form-data)
    * Trường text (`purpose`, `channelId`, `serverId`) phải đứng TRƯỚC trường `file`.
    */
-  fastify.post('/', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+  fastify.post('/', { config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request, reply) => {
     const data = await request.file().catch(() => undefined)
     if (!data) return reply.status(400).send({ statusCode: 400, message: 'Không nhận được tệp.' })
 

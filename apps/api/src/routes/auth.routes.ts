@@ -29,13 +29,13 @@ async function issue(reply: FastifyReply, user: { id: string; email: string; use
 }
 function clear(reply: FastifyReply) { reply.clearCookie('token', options); reply.clearCookie('refreshToken', options); reply.clearCookie('refresh', options) }
 export async function authRoutes(server: FastifyInstance) {
-  server.post('/register', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
+  server.post('/register', { config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, async (request, reply) => {
     const input = z.object({ email, password, username: z.string().trim().toLowerCase().min(3).max(32).regex(/^[a-z0-9._]+$/), displayName: z.string().trim().max(32).optional() }).parse(request.body)
     const user = await prisma.user.create({ data: { email: input.email, username: input.username, displayName: input.displayName || input.username, passwordHash: await bcrypt.hash(input.password, 12) }, select: userSelect })
     await issue(reply, user, request)
     return reply.code(201).send({ statusCode: 201, data: { user: present(user) } })
   })
-  server.post('/login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
+  server.post('/login', { config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, async (request, reply) => {
     const input = z.object({ email, password: z.string().min(1).max(128) }).parse(request.body)
     const account = await prisma.user.findUnique({ where: { email: input.email } })
     if (!account || account.isBanned || !await bcrypt.compare(input.password, account.passwordHash)) throw fail(401, 'Email hoặc mật khẩu không chính xác.')
@@ -68,7 +68,7 @@ export async function authRoutes(server: FastifyInstance) {
     reply.header('Cache-Control', 'no-store')
     return { statusCode: 200, data: { user: present(await prisma.user.findUniqueOrThrow({ where: { id: request.user.id }, select: userSelect })) } }
   })
-  server.post('/forgot-password', { config: { rateLimit: { max: 3, timeWindow: '15 minutes' } } }, async (request) => {
+  server.post('/forgot-password', { config: { rateLimit: { max: 30, timeWindow: '15 minutes' } } }, async (request) => {
     const input = z.object({ email }).parse(request.body)
     if (!developmentMailbox() && (!env.RESEND_API_KEY || !env.RESET_EMAIL_FROM)) throw fail(503, 'Dịch vụ gửi email chưa được cấu hình.')
     const user = await prisma.user.findFirst({ where: { email: input.email, isBanned: false }, select: { id: true, email: true } })
@@ -83,7 +83,7 @@ export async function authRoutes(server: FastifyInstance) {
     }
     return { statusCode: 200, data: { delivery: developmentMailbox() ? 'development' : 'email' }, message: 'Nếu email tồn tại, hướng dẫn khôi phục đã được tạo.' }
   })
-  server.post('/reset-password', { config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (request) => {
+  server.post('/reset-password', { config: { rateLimit: { max: 100, timeWindow: '15 minutes' } } }, async (request) => {
     const input = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/), password }).parse(request.body)
     const hash = await bcrypt.hash(input.password, 12)
     // Chỉ request dùng token đầu tiên được đổi mật khẩu; các phiên cũ bị thu hồi cùng transaction.

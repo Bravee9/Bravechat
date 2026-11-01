@@ -53,7 +53,7 @@ export async function voiceRoutes(server: FastifyInstance) {
     return reply.send({ statusCode: 200, data: { serverUrl: env.LIVEKIT_URL, token: await token.toJwt(), roomName, channelType: channel.type } })
   })
 
-  server.post('/webhook', { config: { rateLimit: { max: 600, timeWindow: '1 minute' } } }, async (request, reply) => {
+  server.post('/webhook', { config: { rateLimit: { max: 6000, timeWindow: '1 minute' } } }, async (request, reply) => {
     if (!env.LIVEKIT_API_KEY || !env.LIVEKIT_API_SECRET) return reply.status(503).send({ statusCode: 503 })
     const authorization = request.headers.authorization
     if (typeof request.body !== 'string' || !authorization) return reply.status(400).send({ statusCode: 400, message: 'Webhook payload không hợp lệ.' })

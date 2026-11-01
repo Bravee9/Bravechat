@@ -24,7 +24,7 @@ export async function friendRoutes(server: FastifyInstance) {
     }
     return { statusCode: 200, data: groups }
   })
-  server.post('/', { config: { rateLimit: { max: 15, timeWindow: '1 minute' } } }, async (request, reply) => {
+  server.post('/', { config: { rateLimit: { max: 150, timeWindow: '1 minute' } } }, async (request, reply) => {
     const input = z.object({ username: z.string().trim().toLowerCase().min(3).max(32) }).parse(request.body)
     const target = await prisma.user.findUnique({ where: { username: input.username }, select: { id: true, isBanned: true } })
     if (!target || target.isBanned) throw fail(404, 'Không tìm thấy người dùng.')

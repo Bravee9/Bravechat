@@ -164,7 +164,7 @@ export async function messageRoutes(server: FastifyInstance) {
     const page = rows.slice(0, query.limit).reverse()
     return { statusCode: 200, data: { messages: await Promise.all(page.map((row) => serializeMessage(server, row))), hasMore, nextCursor: page[0]?.id ?? null } }
   })
-  server.post<{ Params: { userId: string } }>('/dm/:userId', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request, reply) => {
+  server.post<{ Params: { userId: string } }>('/dm/:userId', { config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request, reply) => {
     const input = z.object({ content: z.string().trim().min(1).max(2000), nonce: z.string().uuid().optional(), replyToId: z.string().optional() }).parse(request.body)
     const otherId = request.params.userId
     if (otherId === request.user.id || !await prisma.user.findFirst({ where: { id: otherId, isBanned: false }, select: { id: true } })) throw fail(404, 'Không tìm thấy người dùng.')
