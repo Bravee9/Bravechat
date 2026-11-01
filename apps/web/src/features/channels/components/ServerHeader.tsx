@@ -59,7 +59,7 @@ export function ServerHeader({
       {isOpen && !isMe && (
         <div
           data-testid="server-dropdown-menu"
-          className="absolute top-[58px] left-2 right-2 bg-[#061829] border border-ocean-dark-border rounded-lg shadow-2xl p-1.5 z-40 animate-fade-in text-xs font-semibold"
+          className="absolute top-[50px] left-2 right-2 bg-ocean-dark-surface border border-ocean-dark-border rounded-lg shadow-2xl p-1.5 z-40 animate-fade-in text-xs font-semibold"
         >
           <button
             onClick={() => { onInvite?.(); onClose(); }}

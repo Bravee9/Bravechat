@@ -47,7 +47,7 @@ export function MemberItem({ member, onInspect }: MemberItemProps) {
         <span
           data-testid={`member-presence-${member.status}`}
           className={cn(
-            "absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#051424]",
+            "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-ocean-dark-surface",
             presence === "ONLINE" && "bg-emerald-500",
             presence === "IDLE" && "bg-amber-500",
             presence === "DND" && "bg-rose-500",
@@ -60,7 +60,7 @@ export function MemberItem({ member, onInspect }: MemberItemProps) {
         <div className="flex items-center gap-1.5">
           <span
             className={cn(
-              "text-xs font-bold truncate",
+              "text-sm font-medium truncate",
               member.role === "OWNER" && "text-amber-400",
               member.role === "ADMIN" && "text-ocean-secondary",
               member.role === "BOT" && "text-indigo-400",

@@ -63,10 +63,11 @@ export function DmSidebar() {
         <Link
           href="/channels/@me"
           data-testid="friends-tab-btn"
+          aria-current={isFriendsActive ? "page" : undefined}
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded transition-colors cursor-pointer group text-sm font-semibold",
             isFriendsActive
-              ? "bg-ocean-primary/20 text-ocean-light border border-ocean-primary/30"
+              ? "bg-ocean-dark-hover text-ocean-light"
               : "text-ocean-light/70 hover:bg-white/5 hover:text-ocean-light"
           )}
         >

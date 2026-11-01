@@ -25,7 +25,7 @@ export function DialogFrame({ title, description, onClose, children }: {
       aria-describedby={description ? `${titleId}-description` : undefined}
       onCancel={(event) => { event.preventDefault(); onClose(); }}
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
-      className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md border border-ocean-dark-border bg-[#061829] p-0 text-ocean-light shadow-2xl backdrop:bg-black/70"
+      className="fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-ocean-dark-border bg-ocean-dark-surface p-0 text-ocean-light shadow-2xl backdrop:bg-black/70"
       data-testid="workflow-dialog"
     >
       <div className="p-6">

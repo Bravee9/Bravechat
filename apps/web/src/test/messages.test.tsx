@@ -55,7 +55,8 @@ describe("Message Components", () => {
       render(<MessageItem message={mockMessage} isCurrentUser={true} />);
 
       expect(screen.getByText("Bravee9")).toBeInTheDocument();
-      expect(screen.getByText("Bạn")).toBeInTheDocument();
+      // Like Discord, authors use the same layout for incoming and own messages.
+      expect(screen.queryByText("Bạn")).not.toBeInTheDocument();
       expect(screen.getByText("Xin chào thế giới!")).toBeInTheDocument();
       expect(screen.getByText("10:30")).toBeInTheDocument();
 

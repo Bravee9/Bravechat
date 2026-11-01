@@ -24,12 +24,12 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
       let offset = 0;
       return messages.map((message) => {
         const row = { top: offset, height: rowHeights.get(message.id) ?? estimatedRowHeight };
-        offset += row.height + 16;
+        offset += row.height + 8;
         return row;
       });
     }, [messages, estimatedRowHeight, rowHeights]);
     const lastRow = rowOffsets[rowOffsets.length - 1];
-    const totalHeight = lastRow ? lastRow.top + lastRow.height + 16 : 0;
+    const totalHeight = lastRow ? lastRow.top + lastRow.height + 8 : 0;
     const headerHeight = 180 + (hasOlder ? 40 : 0);
     const visibleStart = Math.max(0, scrollTop - headerHeight - 500);
     const visibleEnd = scrollTop + viewportHeight + 500;
@@ -73,8 +73,8 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
         className="flex-1 overflow-y-auto px-6 py-6 z-10 custom-scrollbar"
       >
         {/* Welcome Message Header */}
-        <div className="my-4 pb-4 border-b border-ocean-dark-border/40 select-none">
-          <div className="w-16 h-16 rounded-full bg-ocean-primary/20 border border-ocean-primary/40 flex items-center justify-center text-3xl font-extrabold text-ocean-secondary mb-3">
+        <div className="chat-welcome my-4 pb-4 border-b border-ocean-dark-border/40 select-none">
+          <div className="chat-welcome-icon w-16 h-16 rounded-full bg-ocean-primary/20 border border-ocean-primary/40 flex items-center justify-center text-3xl font-extrabold text-ocean-secondary mb-3">
             #
           </div>
           <h2 className="text-2xl font-bold text-ocean-light mb-1">

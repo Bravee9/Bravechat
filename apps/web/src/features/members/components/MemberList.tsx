@@ -52,9 +52,9 @@ export function MemberList({ isVisible, serverId }: { isVisible: boolean; server
   let totalHeight = 0;
   for (const row of rows) {
     offsets.push(totalHeight);
-    totalHeight += row.type === "header" ? 26 : 56;
+    totalHeight += row.type === "header" ? 26 : 44;
   }
-  const firstVisible = Math.max(0, offsets.findIndex((offset, index) => offset + (rows[index].type === "header" ? 26 : 56) >= scrollTop - 300));
+  const firstVisible = Math.max(0, offsets.findIndex((offset, index) => offset + (rows[index].type === "header" ? 26 : 44) >= scrollTop - 300));
   const visibleEnd = scrollTop + viewportHeight + 300;
   const visibleRows = rows.map((row, index) => ({ row, index })).filter(({ index }) => offsets[index] <= visibleEnd && index >= firstVisible);
   if (!isVisible) return null;
@@ -75,7 +75,7 @@ export function MemberList({ isVisible, serverId }: { isVisible: boolean; server
       >
         <div className="relative" style={{ height: totalHeight }}>
           {visibleRows.map(({ row, index }) => (
-            <div key={row.type === "header" ? row.title : row.member.id} className="absolute left-0 right-0" style={{ top: offsets[index], height: row.type === "header" ? 26 : 56 }}>
+            <div key={row.type === "header" ? row.title : row.member.id} className="absolute left-0 right-0" style={{ top: offsets[index], height: row.type === "header" ? 26 : 44 }}>
               {row.type === "header" ? (
                 <h3 className="px-2 mb-1.5 text-ocean-light/50 text-[11px] font-extrabold uppercase tracking-wider select-none" data-testid={`member-group-${row.title}`}>
                   {row.title} — {row.count}

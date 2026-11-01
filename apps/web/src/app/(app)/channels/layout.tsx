@@ -13,7 +13,7 @@ import { AuthGate } from "@/features/auth/components/AuthGate";
  */
 export default function ChannelsLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthGate><div className="relative h-screen w-screen overflow-hidden bg-ocean-dark-bg text-ocean-light font-sans flex select-none">
+    <AuthGate><div className="discord-app relative h-screen w-screen overflow-hidden bg-ocean-dark-bg text-ocean-light font-sans flex">
       <WorkspaceBootstrap />
       <WorkspaceRealtime />
       <ServerRail />
