@@ -2,6 +2,7 @@ import fp from 'fastify-plugin'
 import type { FastifyInstance } from 'fastify'
 import type { S3Client } from '@aws-sdk/client-s3'
 import { createR2Client, StorageService } from '../services/storage.service'
+import { env } from '../config/env'
 
 export interface R2Plugin {
   s3: S3Client
@@ -21,6 +22,10 @@ export default fp(async (fastify: FastifyInstance) => {
 
   // Kiểm kết nối lúc khởi động: không chặn boot, chỉ log rõ để biết R2 có sẵn sàng không.
   fastify.addHook('onReady', async () => {
+    if (!env.STORAGE_ENABLED) {
+      fastify.log.warn('Cloudflare R2 is not configured; media uploads are unavailable.')
+      return
+    }
     try {
       const { bucket, latencyMs } = await storage.checkConnection()
       fastify.log.info(`☁️  Cloudflare R2 connected: bucket "${bucket}" (${latencyMs}ms)`)

@@ -5,17 +5,20 @@
   "description": "A real-time communication platform clone built by Bravee9",
   "author": "Bravee9",
   "license": "MIT",
-  "packageManager": "pnpm@12.5.1",
+  "packageManager": "pnpm@11.27.1",
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "node scripts/dev.mjs",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "db:prepare": "node scripts/db.mjs",
+    "db:local": "powershell -NoProfile -File scripts/local-db.ps1",
+    "test:integration": "node scripts/test-workflows.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -27,17 +30,6 @@
     "apps/*",
     "packages/*"
   ],
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "esbuild",
-      "msgpackr-extract",
-      "prisma",
-      "unrs-resolver",
-      "@next/swc-win32-x64-msvc"
-    ]
-  },
   "dependencies": {
     "@prisma/client": "^5.22.0"
   }

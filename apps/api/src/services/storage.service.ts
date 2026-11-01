@@ -83,18 +83,24 @@ export function mediaUrl(key: string | null | undefined): string | null {
 
 export class StorageService {
   constructor(private readonly s3: S3Client, private readonly bucket = env.R2_BUCKET_NAME) {}
+  private ensureConfigured() {
+    if (!env.STORAGE_ENABLED) throw Object.assign(new Error('Cloudflare R2 chưa được cấu hình.'), { statusCode: 503 })
+  }
 
   async checkConnection() {
+    this.ensureConfigured()
     const started = Date.now()
     await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }))
     return { bucket: this.bucket, latencyMs: Date.now() - started }
   }
 
   putObject(key: string, body: Buffer | Uint8Array | string, contentType: string) {
+    this.ensureConfigured()
     return this.s3.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }))
   }
 
   async headObject(key: string) {
+    this.ensureConfigured()
     try {
       const result = await this.s3.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }))
       return { size: result.ContentLength ?? 0, contentType: result.ContentType ?? 'application/octet-stream' }
@@ -104,10 +110,12 @@ export class StorageService {
   }
 
   presignPut(key: string, contentType: string, size: number, expiresIn = 600) {
+    this.ensureConfigured()
     return getSignedUrl(this.s3, new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType, ContentLength: size }), { expiresIn })
   }
 
   presignGet(key: string, options: { expiresIn?: number; filename?: string; contentType?: string } = {}) {
+    this.ensureConfigured()
     return getSignedUrl(this.s3, new GetObjectCommand({
       Bucket: this.bucket,
       Key: key,
@@ -117,6 +125,7 @@ export class StorageService {
   }
 
   copyObject(sourceKey: string, targetKey: string) {
+    this.ensureConfigured()
     return this.s3.send(new CopyObjectCommand({
       Bucket: this.bucket,
       Key: targetKey,
@@ -125,6 +134,7 @@ export class StorageService {
   }
 
   deleteObject(key: string) {
+    this.ensureConfigured()
     return this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }))
   }
 
