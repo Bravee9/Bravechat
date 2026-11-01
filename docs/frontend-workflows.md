@@ -50,4 +50,4 @@ Checklist end-to-end tổng thể nằm trong [testing-workflow.md](./testing-wo
 
 ## Việc cần dịch vụ ngoài để hoàn tất
 
-Quên mật khẩu hiện chưa thể chạy end-to-end: API chưa có model/token reset và môi trường chưa khai báo nhà cung cấp email. Không được hiển thị trạng thái “email đã gửi” giả. Cần chọn/cấu hình dịch vụ gửi email trước khi bật luồng reset an toàn.
+Quên/đặt lại mật khẩu đã có token hash, hết hạn 15 phút, dùng một lần và thu hồi phiên cũ. Local ghi thư trong .local/mail; production hỗ trợ Resend với sender được xác minh. Các luồng bạn bè, chặn, reply/reaction, sửa/xóa, DM realtime và phân trang được mô tả tại [non-r2-workflows.md](./non-r2-workflows.md).

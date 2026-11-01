@@ -4,6 +4,8 @@
 
 # Bravechat
 
+Các luồng mới không phụ thuộc R2 (bạn bè, chặn, reply/reaction, DM realtime, khôi phục mật khẩu) và hướng dẫn kiểm thử nằm tại [docs/non-r2-workflows.md](docs/non-r2-workflows.md).
+
 Bravechat là nền tảng giao tiếp thời gian thực (Real-time Communication Platform) hiệu năng cao dành cho cộng đồng, nhóm làm việc và bạn bè. Dự án được xây dựng theo kiến trúc **Monorepo (Turborepo)** chuẩn doanh nghiệp, áp dụng mô hình **Phân tầng (Layered Architecture)** chặt chẽ và ngôn ngữ thiết kế **Ocean Swiss Minimalist** dịu mắt, tối giản và hiện đại.
 
 **Tác giả**: [Bravee9](https://github.com/Bravee9) & [Shuji7245](https://github.com/Shuji7245)
