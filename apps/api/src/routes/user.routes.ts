@@ -18,6 +18,8 @@ import { z } from 'zod'
 import { prisma } from '../config/prisma'
 import { ASSET_RULES, mediaUrl, type AssetKind } from '../services/storage.service'
 import { sniffImageType } from './upload.routes'
+import { publishUserEvent } from './websocket.routes'
+import { unreadActivity, serverActivity } from '../services/read-state'
 
 const profileSchema = z.object({
   username: z.string().trim().min(3).max(32).regex(/^[a-z0-9._]+$/).optional(),
@@ -32,6 +34,7 @@ export async function userRoutes(server: FastifyInstance) {
   server.addHook('preHandler', server.authenticate)
 
   server.get('/@me/servers', async (request, reply) => {
+    const activity = await unreadActivity(request.user.id)
     const memberships = await prisma.serverMember.findMany({
       where: { userId: request.user.id, isBanned: false },
       include: { server: { select: { id: true, name: true, iconKey: true } } },
@@ -41,8 +44,7 @@ export async function userRoutes(server: FastifyInstance) {
       id: item.id,
       name: item.name,
       iconUrl: mediaUrl(item.iconKey),
-      hasUnread: false,
-      mentionCount: 0,
+      ...serverActivity(activity, item.id),
     })) })
   })
 
@@ -55,16 +57,25 @@ export async function userRoutes(server: FastifyInstance) {
 
   server.get('/@me/conversations', async (request, reply) => {
     const userId = request.user.id
+    // Chuẩn hóa cặp hai chiều để A->B và B->A chỉ tạo một mục conversation.
+    const latest = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM (
+        SELECT DISTINCT ON (LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id)) id, created_at
+        FROM direct_messages WHERE (sender_id = ${userId} OR receiver_id = ${userId}) AND is_deleted = false
+        ORDER BY LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id), created_at DESC, id DESC
+      ) recent ORDER BY created_at DESC, id DESC LIMIT 100
+    `
+    const unread = await prisma.directMessage.groupBy({ by: ['senderId'], where: { receiverId: userId, isRead: false, isDeleted: false }, _count: true })
+    // Tin cuối có thể là tin gửi đi, nên unread phải xét mọi tin nhận chưa đọc.
+    const unreadUsers = new Set(unread.map((row) => row.senderId))
     const rows = await prisma.directMessage.findMany({
-      where: { OR: [{ senderId: userId }, { receiverId: userId }], isDeleted: false },
-      orderBy: { createdAt: 'desc' },
-      distinct: ['senderId', 'receiverId'],
-      take: 100,
+      where: { id: { in: latest.map((row) => row.id) } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       include: { sender: { select: { id: true, username: true, displayName: true, avatarKey: true, status: true } }, receiver: { select: { id: true, username: true, displayName: true, avatarKey: true, status: true } } },
     })
     const conversations = rows.map((row) => {
       const other = row.senderId === userId ? row.receiver : row.sender
-      return { id: other.id, recipient: { id: other.id, username: other.username, displayName: other.displayName, avatarUrl: mediaUrl(other.avatarKey), status: other.status }, lastMessageAt: row.createdAt.toISOString(), hasUnread: row.receiverId === userId && !row.isRead }
+      return { id: other.id, recipient: { id: other.id, username: other.username, displayName: other.displayName, avatarUrl: mediaUrl(other.avatarKey), status: other.status }, lastMessageAt: row.createdAt.toISOString(), hasUnread: unreadUsers.has(other.id) }
     })
     return reply.send({ statusCode: 200, data: conversations })
   })
@@ -83,6 +94,7 @@ export async function userRoutes(server: FastifyInstance) {
       if (existing) return reply.status(409).send({ statusCode: 409, message: 'Tên người dùng đã được sử dụng.' })
     }
     const user = await prisma.user.update({ where: { id: request.user.id }, data: parsed.data, select: { id: true, email: true, username: true, displayName: true, bio: true, customStatus: true, status: true, discriminator: true, avatarKey: true, bannerKey: true } })
+    publishUserEvent(request.user.id, { type: 'user_update' })
     return reply.send({ statusCode: 200, data: { user: { ...user, avatarUrl: mediaUrl(user.avatarKey), bannerUrl: mediaUrl(user.bannerKey) } } })
   })
 
@@ -114,23 +126,4 @@ export async function userRoutes(server: FastifyInstance) {
   server.post('/@me/avatar', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, uploadProfileAsset('avatar'))
   server.post('/@me/banner', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, uploadProfileAsset('banner'))
 
-  server.get('/@me/friends', async (request, reply) => {
-    // TODO: UserService.getFriends(userId)
-    return reply.send({ statusCode: 200, data: { friends: [] } })
-  })
-
-  server.post('/@me/friends', async (request, reply) => {
-    // TODO: UserService.sendFriendRequest(fromId, toUsername)
-    return reply.status(201).send({ statusCode: 201 })
-  })
-
-  server.put('/@me/friends/:friendshipId', async (request, reply) => {
-    // TODO: UserService.respondToFriendRequest(friendshipId, action)
-    return reply.send({ statusCode: 200 })
-  })
-
-  server.delete('/@me/friends/:friendshipId', async (request, reply) => {
-    // TODO: UserService.removeFriend(userId, friendshipId)
-    return reply.send({ statusCode: 200 })
-  })
 }

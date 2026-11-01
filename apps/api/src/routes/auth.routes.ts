@@ -1,230 +1,104 @@
-/**
- * apps/api/src/routes/auth.routes.ts
- * Authentication routes: register, login, logout, refresh
- * ─────────────────────────────────────────────────────────
- * POST /api/auth/register   — Tạo tài khoản mới
- * POST /api/auth/login      — Đăng nhập, trả về JWT
- * POST /api/auth/logout     — Thu hồi refresh token
- * POST /api/auth/refresh    — Lấy access token mới
- * GET  /api/auth/me         — Lấy thông tin user hiện tại
- */
-
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { createHash, randomBytes } from 'node:crypto'
 import { prisma } from '../config/prisma'
+import { env } from '../config/env'
 import { mediaUrl } from '../services/storage.service'
+import { fail } from '../services/conversation'
+import { developmentMailbox, sendResetMail } from '../services/reset-mail'
+import { revokeSessions } from './websocket.routes'
 
-// ─── Validation Schemas ──────────────────────────────────
-const RegisterSchema = z.object({
-  email: z.string().email('Email không hợp lệ'),
-  username: z
-    .string()
-    .min(3, 'Tên người dùng phải có ít nhất 3 ký tự')
-    .max(32, 'Tên người dùng tối đa 32 ký tự')
-    .regex(/^[a-z0-9._]+$/, 'Chỉ dùng chữ thường, số, dấu chấm và gạch dưới'),
-  displayName: z.string().max(32).optional(),
-  password: z
-    .string()
-    .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
-    .max(128),
-})
-
-const LoginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
-})
-
-// ─── Route Handler Types ──────────────────────────────────
-type RegisterBody = z.infer<typeof RegisterSchema>
-type LoginBody = z.infer<typeof LoginSchema>
-
-const REFRESH_COOKIE = 'refreshToken'
-const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000
-const ACCESS_TTL_SECONDS = 15 * 60
-const secureCookie = process.env.NODE_ENV === 'production'
-const cookieOptions = { httpOnly: true, secure: secureCookie, sameSite: 'lax' as const, path: '/' }
-const digestToken = (token: string) => createHash('sha256').update(token).digest('hex')
-
-async function issueSession(reply: FastifyReply, user: { id: string; email: string; username: string }, request: FastifyRequest) {
+const digest = (value: string) => createHash('sha256').update(value).digest('hex')
+const email = z.string().trim().toLowerCase().email('Email không hợp lệ.')
+const password = z.string().min(8, 'Mật khẩu cần ít nhất 8 ký tự.').max(128).refine((value) => Buffer.byteLength(value, 'utf8') <= 72, 'Mật khẩu tối đa 72 byte UTF-8.')
+const userSelect = { id: true, email: true, username: true, displayName: true, discriminator: true, status: true, customStatus: true, bio: true, avatarKey: true, bannerKey: true } as const
+const present = (user: any) => ({ ...user, avatarUrl: mediaUrl(user.avatarKey), bannerUrl: mediaUrl(user.bannerKey) })
+const options = { httpOnly: true, secure: env.FRONTEND_URL.startsWith('https:'), sameSite: 'lax' as const, path: '/' }
+const refreshData = (userId: string, value: string, request: FastifyRequest) => ({ userId, token: digest(value), expiresAt: new Date(Date.now() + 30 * 86400000), userAgent: request.headers['user-agent']?.slice(0, 500), ipAddress: request.ip })
+async function setSession(reply: FastifyReply, user: { id: string; email: string; username: string }, sid: string, refresh: string) {
+  // JWT trỏ tới phiên trong DB: logout/reset có thể thu hồi ngay cả JWT còn hạn.
+  const access = await reply.jwtSign({ id: user.id, email: user.email, username: user.username, sid }, { expiresIn: 900 })
+  reply.setCookie('token', access, { ...options, maxAge: 900 })
+  reply.setCookie('refreshToken', refresh, { ...options, maxAge: 30 * 86400 })
+}
+async function issue(reply: FastifyReply, user: { id: string; email: string; username: string }, request: FastifyRequest) {
   const refresh = randomBytes(48).toString('base64url')
-  await prisma.refreshToken.create({ data: {
-    userId: user.id,
-    token: digestToken(refresh),
-    expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
-    userAgent: request.headers['user-agent']?.slice(0, 500),
-    ipAddress: request.ip,
-  } })
-  const access = await reply.jwtSign(user, { expiresIn: ACCESS_TTL_SECONDS })
-  reply.setCookie('token', access, { ...cookieOptions, maxAge: ACCESS_TTL_SECONDS })
-  reply.setCookie(REFRESH_COOKIE, refresh, { ...cookieOptions, maxAge: REFRESH_TTL_MS / 1000 })
+  const session = await prisma.refreshToken.create({ data: refreshData(user.id, refresh, request) })
+  await setSession(reply, user, session.id, refresh)
 }
-
-// ─── Routes ──────────────────────────────────────────────
+function clear(reply: FastifyReply) { reply.clearCookie('token', options); reply.clearCookie('refreshToken', options); reply.clearCookie('refresh', options) }
 export async function authRoutes(server: FastifyInstance) {
-  /**
-   * POST /api/auth/register
-   * Tạo tài khoản mới
-   */
-  server.post<{ Body: RegisterBody }>(
-    '/register',
-    {
-      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
-    },
-    async (request: FastifyRequest<{ Body: RegisterBody }>, reply: FastifyReply) => {
-      // Validate input
-      const parseResult = RegisterSchema.safeParse(request.body)
-      if (!parseResult.success) {
-        return reply.status(400).send({
-          statusCode: 400,
-          error: 'Validation Error',
-          message: parseResult.error.errors[0]?.message ?? 'Dữ liệu không hợp lệ',
-          details: parseResult.error.flatten().fieldErrors,
-        })
-      }
-
-      const { username, password, displayName } = parseResult.data
-      const email = parseResult.data.email.toLowerCase()
-      const existingUser = await prisma.user.findFirst({ where: { OR: [{ email }, { username }] } })
-      if (existingUser) return reply.status(409).send({ statusCode: 409, message: 'Email hoặc tên người dùng đã tồn tại.' })
-      const user = await prisma.user.create({
-        data: { email, username, displayName, passwordHash: await bcrypt.hash(password, 12) },
-        select: { id: true, email: true, username: true, displayName: true },
+  server.post('/register', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const input = z.object({ email, password, username: z.string().trim().toLowerCase().min(3).max(32).regex(/^[a-z0-9._]+$/), displayName: z.string().trim().max(32).optional() }).parse(request.body)
+    const user = await prisma.user.create({ data: { email: input.email, username: input.username, displayName: input.displayName || input.username, passwordHash: await bcrypt.hash(input.password, 12) }, select: userSelect })
+    await issue(reply, user, request)
+    return reply.code(201).send({ statusCode: 201, data: { user: present(user) } })
+  })
+  server.post('/login', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const input = z.object({ email, password: z.string().min(1).max(128) }).parse(request.body)
+    const account = await prisma.user.findUnique({ where: { email: input.email } })
+    if (!account || account.isBanned || !await bcrypt.compare(input.password, account.passwordHash)) throw fail(401, 'Email hoặc mật khẩu không chính xác.')
+    const user = await prisma.user.update({ where: { id: account.id }, data: { lastSeenAt: new Date() }, select: userSelect })
+    await issue(reply, user, request)
+    return { statusCode: 200, data: { user: present(user) } }
+  })
+  server.post('/logout', async (request, reply) => {
+    let session = request.cookies.refreshToken ? await prisma.refreshToken.findUnique({ where: { token: digest(request.cookies.refreshToken) } }) : null
+    if (!session) { try { await request.jwtVerify(); session = await prisma.refreshToken.findUnique({ where: { id: request.user.sid } }) } catch { /* expired cookies are still cleared */ } }
+    if (session) { await prisma.refreshToken.update({ where: { id: session.id }, data: { isRevoked: true } }); revokeSessions(session.userId, session.id) }
+    clear(reply)
+    return { statusCode: 200, data: null }
+  })
+  server.post('/refresh', async (request, reply) => {
+    const stored = request.cookies.refreshToken ? await prisma.refreshToken.findUnique({ where: { token: digest(request.cookies.refreshToken) }, include: { user: true } }) : null
+    if (!stored || stored.isRevoked || stored.expiresAt <= new Date() || stored.user.isBanned) { clear(reply); throw fail(401, 'Phiên đăng nhập đã hết hạn.') }
+    const nextValue = randomBytes(48).toString('base64url')
+    // Consume có điều kiện trong transaction: hai request refresh không tạo hai phiên mới.
+    const next = await prisma.$transaction(async (tx) => {
+      const consumed = await tx.refreshToken.updateMany({ where: { id: stored.id, isRevoked: false }, data: { isRevoked: true } })
+      if (consumed.count !== 1) throw fail(401, 'Phiên đăng nhập đã được làm mới.')
+      return tx.refreshToken.create({ data: refreshData(stored.userId, nextValue, request) })
+    })
+    await setSession(reply, stored.user, next.id, nextValue)
+    revokeSessions(stored.userId, stored.id)
+    return { statusCode: 200, data: null }
+  })
+  server.get('/me', { preHandler: [server.authenticate] }, async (request, reply) => {
+    reply.header('Cache-Control', 'no-store')
+    return { statusCode: 200, data: { user: present(await prisma.user.findUniqueOrThrow({ where: { id: request.user.id }, select: userSelect })) } }
+  })
+  server.post('/forgot-password', { config: { rateLimit: { max: 3, timeWindow: '15 minutes' } } }, async (request) => {
+    const input = z.object({ email }).parse(request.body)
+    if (!developmentMailbox() && (!env.RESEND_API_KEY || !env.RESET_EMAIL_FROM)) throw fail(503, 'Dịch vụ gửi email chưa được cấu hình.')
+    const user = await prisma.user.findFirst({ where: { email: input.email, isBanned: false }, select: { id: true, email: true } })
+    if (user) {
+      const value = randomBytes(32).toString('hex')
+      // DB chỉ giữ hash. Token thô chỉ được chuyển tới hộp thư của người nhận.
+      const token = await prisma.$transaction(async (tx) => {
+        await tx.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } })
+        return tx.passwordResetToken.create({ data: { userId: user.id, tokenHash: digest(value), expiresAt: new Date(Date.now() + 15 * 60000) } })
       })
-      await issueSession(reply, user, request)
-
-      return reply.status(201).send({
-        statusCode: 201,
-        message: 'Tài khoản đã được tạo thành công.',
-        data: {
-          user,
-        },
-      })
+      try { await sendResetMail(user.email, value) } catch (error) { await prisma.passwordResetToken.update({ where: { id: token.id }, data: { usedAt: new Date() } }); throw error }
     }
-  )
-
-  /**
-   * POST /api/auth/login
-   * Đăng nhập và nhận JWT
-   */
-  server.post<{ Body: LoginBody }>(
-    '/login',
-    {
-      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
-    },
-    async (request: FastifyRequest<{ Body: LoginBody }>, reply: FastifyReply) => {
-      const parseResult = LoginSchema.safeParse(request.body)
-      if (!parseResult.success) {
-        return reply.status(400).send({
-          statusCode: 400,
-          error: 'Validation Error',
-          message: parseResult.error.errors[0]?.message,
-        })
-      }
-
-      const user = await prisma.user.findUnique({ where: { email: request.body.email.toLowerCase() } })
-      if (!user || !(await bcrypt.compare(request.body.password, user.passwordHash)) || user.isBanned) {
-        return reply.status(401).send({ statusCode: 401, message: 'Email hoặc mật khẩu không chính xác.' })
-      }
-      await issueSession(reply, user, request)
-
-      return reply.status(200).send({
-        statusCode: 200,
-        message: 'Đăng nhập thành công.',
-        data: {
-          user: {
-            id: user.id,
-            email: user.email,
-            username: user.username,
-            displayName: user.displayName,
-          },
-        },
-      })
-    }
-  )
-
-  /**
-   * POST /api/auth/logout
-   * Thu hồi refresh token
-   */
-  server.post(
-    '/logout',
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const refresh = request.cookies?.[REFRESH_COOKIE]
-      if (refresh) await prisma.refreshToken.updateMany({ where: { token: digestToken(refresh), isRevoked: false }, data: { isRevoked: true } })
-      reply.clearCookie('token', { path: '/' })
-      reply.clearCookie(REFRESH_COOKIE, { path: '/' })
-      return reply.send({ statusCode: 200, message: 'Đã đăng xuất.' })
-    }
-  )
-
-  /**
-   * POST /api/auth/refresh
-   * Đổi refresh token lấy access token mới
-   */
-  server.post(
-    '/refresh',
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const refresh = request.cookies?.[REFRESH_COOKIE]
-      if (!refresh) return reply.status(401).send({ statusCode: 401, message: 'Phiên đăng nhập đã hết hạn.' })
-      const tokenHash = digestToken(refresh)
-      const stored = await prisma.refreshToken.findUnique({ where: { token: tokenHash }, include: { user: true } })
-      if (!stored || stored.isRevoked || stored.expiresAt <= new Date() || stored.user.isBanned) {
-        reply.clearCookie('token', { path: '/' })
-        reply.clearCookie(REFRESH_COOKIE, { path: '/' })
-        return reply.status(401).send({ statusCode: 401, message: 'Phiên đăng nhập đã hết hạn.' })
-      }
-      const nextRefresh = randomBytes(48).toString('base64url')
-      const nextHash = digestToken(nextRefresh)
-      await prisma.$transaction([
-        prisma.refreshToken.update({ where: { id: stored.id }, data: { isRevoked: true } }),
-        prisma.refreshToken.create({ data: { userId: stored.userId, token: nextHash, expiresAt: new Date(Date.now() + REFRESH_TTL_MS), userAgent: request.headers['user-agent']?.slice(0, 500), ipAddress: request.ip } }),
-      ])
-      const access = await reply.jwtSign({ id: stored.user.id, email: stored.user.email, username: stored.user.username }, { expiresIn: ACCESS_TTL_SECONDS })
-      reply.setCookie('token', access, { ...cookieOptions, maxAge: ACCESS_TTL_SECONDS })
-      reply.setCookie(REFRESH_COOKIE, nextRefresh, { ...cookieOptions, maxAge: REFRESH_TTL_MS / 1000 })
-      return reply.send({ statusCode: 200, message: 'Phiên đăng nhập đã được gia hạn.' })
-    }
-  )
-
-  /**
-   * GET /api/auth/me
-   * Lấy thông tin người dùng hiện tại
-   */
-  server.get(
-    '/me',
-    { preHandler: [server.authenticate] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const user = await prisma.user.findUnique({ where: { id: request.user.id }, select: { id: true, username: true, displayName: true, email: true, avatarKey: true, status: true, customStatus: true, discriminator: true, bio: true } })
-      if (!user) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy người dùng.' })
-      return reply.send({
-        statusCode: 200,
-        data: { user: { ...user, avatarUrl: mediaUrl(user.avatarKey) } },
-      })
-    }
-  )
+    return { statusCode: 200, data: { delivery: developmentMailbox() ? 'development' : 'email' }, message: 'Nếu email tồn tại, hướng dẫn khôi phục đã được tạo.' }
+  })
+  server.post('/reset-password', { config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (request) => {
+    const input = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/), password }).parse(request.body)
+    const hash = await bcrypt.hash(input.password, 12)
+    // Chỉ request dùng token đầu tiên được đổi mật khẩu; các phiên cũ bị thu hồi cùng transaction.
+    const userId = await prisma.$transaction(async (tx) => {
+      const token = await tx.passwordResetToken.findUnique({ where: { tokenHash: digest(input.token) }, include: { user: { select: { isBanned: true } } } })
+      if (!token || token.usedAt || token.expiresAt <= new Date() || token.user.isBanned) throw fail(400, 'Liên kết đã hết hạn hoặc đã sử dụng.')
+      const consumed = await tx.passwordResetToken.updateMany({ where: { id: token.id, usedAt: null, expiresAt: { gt: new Date() } }, data: { usedAt: new Date() } })
+      if (consumed.count !== 1) throw fail(400, 'Liên kết đã hết hạn hoặc đã sử dụng.')
+      await tx.user.update({ where: { id: token.userId }, data: { passwordHash: hash } })
+      await tx.refreshToken.updateMany({ where: { userId: token.userId, isRevoked: false }, data: { isRevoked: true } })
+      return token.userId
+    })
+    revokeSessions(userId)
+    return { statusCode: 200, data: null, message: 'Mật khẩu đã được cập nhật. Hãy đăng nhập lại.' }
+  })
 }
-
-// Extend FastifyInstance với custom authenticate và JWT types
-declare module 'fastify' {
-  interface FastifyInstance {
-    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>
-  }
-}
-
-declare module '@fastify/jwt' {
-  interface FastifyJWT {
-    payload: {
-      id: string
-      email: string
-      username: string
-    }
-    user: {
-      id: string
-      email: string
-      username: string
-    }
-  }
-}
-
+declare module 'fastify' { interface FastifyInstance { authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void | FastifyReply> } }
+declare module '@fastify/jwt' { interface FastifyJWT { payload: { id: string; email: string; username: string; sid: string }; user: { id: string; email: string; username: string; sid: string } } }
