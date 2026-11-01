@@ -4,12 +4,13 @@ import { z } from 'zod'
 import { prisma } from '../config/prisma'
 import { mediaUrl } from '../services/storage.service'
 import { revokeServerMembership } from './websocket.routes'
+import { unreadActivity, serverActivity, type ChannelActivity } from '../services/read-state'
 
 const createSchema = z.object({ name: z.string().trim().min(2).max(100) })
 
 type ServerDetailRecord = Prisma.ServerGetPayload<{ include: { categories: true; channels: true } }>
 
-function toServerDetail(server: ServerDetailRecord) {
+function toServerDetail(server: ServerDetailRecord, activity: ChannelActivity[] = []) {
   return {
     id: server.id,
     name: server.name,
@@ -26,8 +27,8 @@ function toServerDetail(server: ServerDetailRecord) {
       type: channel.type,
       topic: channel.topic,
       position: channel.position,
-      hasUnread: false,
-      mentionCount: 0,
+      hasUnread: activity.some((row) => row.channelId === channel.id && row.unreadCount > 0),
+      mentionCount: activity.find((row) => row.channelId === channel.id)?.mentionCount ?? 0,
     })),
   }
 }
@@ -36,12 +37,13 @@ export async function serverRoutes(server: FastifyInstance) {
   server.addHook('preHandler', server.authenticate)
 
   server.get('/', async (request, reply) => {
+    const activity = await unreadActivity(request.user.id)
     const memberships = await prisma.serverMember.findMany({
       where: { userId: request.user.id, isBanned: false },
       include: { server: { select: { id: true, name: true, iconKey: true } } },
       orderBy: { joinedAt: 'asc' },
     })
-    return reply.send({ statusCode: 200, data: memberships.map(({ server: item }) => ({ id: item.id, name: item.name, iconUrl: mediaUrl(item.iconKey), hasUnread: false, mentionCount: 0 })) })
+    return reply.send({ statusCode: 200, data: memberships.map(({ server: item }) => ({ id: item.id, name: item.name, iconUrl: mediaUrl(item.iconKey), ...serverActivity(activity, item.id) })) })
   })
 
   server.post<{ Body: z.infer<typeof createSchema> }>('/', async (request, reply) => {
@@ -71,7 +73,7 @@ export async function serverRoutes(server: FastifyInstance) {
       include: { categories: { orderBy: { position: 'asc' } }, channels: { orderBy: { position: 'asc' } } },
     })
     if (!serverRecord) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy server hoặc bạn không có quyền truy cập.' })
-    return reply.send({ statusCode: 200, data: toServerDetail(serverRecord) })
+    return reply.send({ statusCode: 200, data: toServerDetail(serverRecord, await unreadActivity(request.user.id, serverRecord.id)) })
   })
 
   server.patch<{ Params: { serverId: string } }>('/:serverId', async (request, reply) => {
@@ -84,7 +86,7 @@ export async function serverRoutes(server: FastifyInstance) {
       await transaction.server.update({ where: { id: serverId }, data: parsed.data })
       return transaction.server.findUniqueOrThrow({ where: { id: serverId }, include: { categories: { orderBy: { position: 'asc' } }, channels: { orderBy: { position: 'asc' } } } })
     })
-    return reply.send({ statusCode: 200, data: { server: toServerDetail(updated) } })
+    return reply.send({ statusCode: 200, data: { server: toServerDetail(updated, await unreadActivity(request.user.id, serverId)) } })
   })
 
   // The server detail endpoint is deliberately small. The member panel loads this
