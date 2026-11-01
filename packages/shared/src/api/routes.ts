@@ -17,6 +17,8 @@ export const API_ROUTES = {
     logout: "/auth/logout",
     refresh: "/auth/refresh",
     me: "/auth/me",
+    forgotPassword: "/auth/forgot-password",
+    resetPassword: "/auth/reset-password",
   },
   users: {
     byId: (userId: string) => `/users/${enc(userId)}`,
@@ -25,6 +27,9 @@ export const API_ROUTES = {
     myServers: "/users/@me/servers",
     /** PROPOSED — 1-1 conversations for the "@me" sidebar. */
     myConversations: "/users/@me/conversations",
+    friends: "/users/@me/friends",
+    friend: (id: string) => `/users/@me/friends/${enc(id)}`,
+    block: "/users/@me/friends/block",
   },
   servers: {
     create: "/servers",
@@ -40,6 +45,7 @@ export const API_ROUTES = {
     /** `?before=<messageId>&limit=50` → `CursorPage<Message>` */
     messages: (channelId: string) => `/channels/${enc(channelId)}/messages`,
     typing: (channelId: string) => `/channels/${enc(channelId)}/typing`,
+    read: (channelId: string) => `/channels/${enc(channelId)}/read`,
   },
   invites: {
     join: (code: string) => `/invites/${enc(code)}`,
@@ -47,5 +53,11 @@ export const API_ROUTES = {
   uploads: {
     presign: "/uploads/presign",
     confirm: "/uploads/confirm",
+  },
+  messages: {
+    detail: (id: string) => `/messages/${enc(id)}`,
+    reactions: (id: string) => `/messages/${enc(id)}/reactions`,
+    dm: (userId: string) => `/messages/dm/${enc(userId)}`,
+    dmMessage: (userId: string, id: string) => `/messages/dm/${enc(userId)}/${enc(id)}`,
   },
 } as const;

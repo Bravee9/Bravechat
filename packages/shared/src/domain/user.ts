@@ -23,3 +23,6 @@ export interface CurrentUser extends UserSummary {
   customStatus: string | null;
   bio?: string | null;
 }
+
+export interface FriendshipEntry { id: string; user: UserSummary; status: "PENDING" | "ACCEPTED" | "BLOCKED" }
+export interface FriendLists { friends: FriendshipEntry[]; incoming: FriendshipEntry[]; outgoing: FriendshipEntry[]; blocked: FriendshipEntry[] }

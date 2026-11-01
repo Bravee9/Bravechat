@@ -18,7 +18,13 @@ export interface WsUserRef {
 /** Message shape the API currently broadcasts (pre-`Message` DTO). */
 export interface WsChatMessage {
   id: string;
-  channelId: string;
+  channelId?: string;
+  senderId?: string;
+  receiverId?: string;
+  author?: { id: string; username: string; displayName?: string | null };
+  replyTo?: { id: string; content: string; user: string } | null;
+  reactions?: { emoji: string; count: number; userIds: string[] }[];
+  isEdited?: boolean;
   content: string;
   /** Pre-formatted label from the server — prefer `createdAt`. */
   time: string;
@@ -33,6 +39,7 @@ export interface WsChatMessage {
 // ─── Client → Server ──────────────────────────────────────────
 
 export type ClientEvent =
+  | { type: "join_server"; serverId: string }
   | { type: "join_channel"; channelId: string; user?: WsUserRef }
   | { type: "leave_channel"; channelId: string }
   | { type: "send_message"; channelId: string; content: string; nonce?: string; user?: WsUserRef }
@@ -42,9 +49,20 @@ export type ClientEvent =
 // ─── Server → Client ──────────────────────────────────────────
 
 export type ServerEvent =
-  | { type: "connected"; message: string; timestamp: string }
+  | { type: "connected"; message?: string; timestamp?: string; userId?: string }
   | { type: "channel_joined"; channelId: string; messages: WsChatMessage[] }
   | { type: "message_create"; channelId: string; message: WsChatMessage; echoBack?: boolean }
+  | { type: "message_update"; channelId: string; message: WsChatMessage }
+  | { type: "message_delete"; channelId: string; messageId: string }
+  | { type: "dm_create"; senderId: string; receiverId: string; message: WsChatMessage }
+  | { type: "dm_update"; senderId: string; receiverId: string; message: WsChatMessage }
+  | { type: "dm_delete"; senderId: string; receiverId: string; messageId: string }
+  | { type: "friends_update" }
+  | { type: "conversations_update" }
+  | { type: "channel_read"; channelId: string; serverId: string }
+  | { type: "user_update" }
+  | { type: "server_unavailable"; serverId: string }
+  | { type: "error"; message: string }
   | { type: "typing_start"; channelId: string; username: string }
   | { type: "typing_stop"; channelId: string; username: string };
 
@@ -55,6 +73,8 @@ const SERVER_EVENT_TYPES: ReadonlySet<string> = new Set<ServerEventType>([
   "connected",
   "channel_joined",
   "message_create",
+  "message_update", "message_delete", "dm_create", "dm_update", "dm_delete",
+  "friends_update", "conversations_update", "channel_read", "user_update", "server_unavailable", "error",
   "typing_start",
   "typing_stop",
 ]);
