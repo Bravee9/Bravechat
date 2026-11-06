@@ -11,7 +11,7 @@ function fixture() {
   const rooms = new Map([['channel:c:0', []]]);
   class RoomServiceClient {
     async removeParticipant(room, identity) { removed.push({ room, identity }); }
-    async deleteRoom(room) { if (failDeletion) throw new Error('SFU temporarily unavailable'); deleted.push(room); rooms.delete(room); }
+    async deleteRoom(room) { if (failDeletion) throw new Error('SFU failed: access_token=PRIVATE-ADMIN-JWT'); deleted.push(room); rooms.delete(room); }
     async updateParticipant(room, identity, options) { updated.push({ room, identity, options }); if (options.permission) afterGrant(); }
     async listRooms() { return [...rooms.keys()].map((name) => ({ name })); }
     async listParticipants(room) { return rooms.get(room) || []; }
@@ -75,7 +75,12 @@ test('a reset during the permission update removes the participant again', async
 test('reconciliation retries obsolete room cleanup after a LiveKit outage', async () => {
   const f = fixture(); await f.service.registerVoiceToken('c', 's', 'u');
   f.setFailDeletion(true);
-  await assert.rejects(() => f.service.revokeVoiceSessions('u', 's'));
+  await assert.rejects(() => f.service.revokeVoiceSessions('u', 's'), (error) => {
+    assert.equal(error.statusCode, 503);
+    assert.equal(String(error.stack).includes('PRIVATE-ADMIN-JWT'), false);
+    assert.equal(error.cause, undefined);
+    return true;
+  });
   assert.equal(f.channel.voiceEpoch, 1);
   f.setFailDeletion(false);
   await f.service.reconcileVoiceRooms();
