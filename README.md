@@ -28,7 +28,7 @@ Bravechat phân tách trách nhiệm rõ ràng theo các tầng độc lập đ�
 │       TẦNG FRONTEND (WEB)     │         │       TẦNG BACKEND (API)      │
 │          apps/web             │         │          apps/api             │
 ├───────────────────────────────┤         ├───────────────────────────────┤
-│ Presentation (Next.js 14)     │         │ Routes & Controllers          │
+│ Presentation (Next.js 15)     │         │ Routes & Controllers          │
 │ Features & UI Components      │         │ Business Services             │
 │ State & Typed Services        │         │ Prisma Repositories           │
 │ HTTP Client & WS Realtime     │         │ Plugins (JWT, R2, WS, Redis)  │
@@ -47,7 +47,7 @@ Bravechat phân tách trách nhiệm rõ ràng theo các tầng độc lập đ�
 - **Realtime Contracts**: Định nghĩa kiểu dữ liệu sự kiện 2 chiều WebSocket (`ClientEvent` và `ServerEvent`).
 
 ### 2. Tầng Ứng dụng Web (`apps/web`)
-Áp dụng **Next.js 14 App Router** với Route Groups phân lập và cấu trúc Discord Multi-layered Layout:
+Áp dụng **Next.js 15 App Router** với Route Groups phân lập và cấu trúc Discord Multi-layered Layout:
 
 - **Route Groups**:
   - `(marketing)`: Landing page, tài liệu (`/docs`), điều khoản (`/terms`, `/privacy`), roadmap (`/roadmap`), trạng thái (`/status`).
@@ -98,7 +98,7 @@ Dự án tuân thủ mô hình phân nhánh chuẩn để đảm bảo mã ngu�
 ```text
 Bravechat/
 ├── apps/
-│   ├── web/                          # Ứng dụng Next.js 14 Frontend Client (Port 3000)
+│   ├── web/                          # Ứng dụng Next.js 15 Frontend Client (Port 3000)
 │   │   ├── src/
 │   │   │   ├── app/
 │   │   │   │   ├── (marketing)/      # Landing page, docs, changelog, legal
@@ -159,7 +159,7 @@ Bravechat/
 ## Hướng dẫn Cài đặt & Chạy Dự án
 
 ### Yêu cầu Tiên quyết
-- **Node.js**: Phiên bản 18.x hoặc 20.x LTS
+- **Node.js**: Phiên bản 22.x hoặc 24.x LTS
 - **pnpm**: Phiên bản 8.x hoặc cao hơn (`npm i -g pnpm`)
 - **Docker & Docker Compose**: Dùng cho PostgreSQL 16 và Redis 7
 

@@ -1,5 +1,17 @@
 # Security hardening
 
+## Runtime and dependencies
+
+Use Node.js 22 or later (Docker images use Node 22). The security upgrade moves
+to Next.js 15.5.29, React 19, Fastify 5.12.8 with compatible Fastify plugins,
+and Zod 4.6.7. Async Next route props and Zod error handling are migrated.
+Workspace overrides keep PostCSS and fast-uri on patched versions when a
+parent dependency pins an older release. Commit and install the lockfile with
+`pnpm install --frozen-lockfile`; do not remove the overrides independently.
+
+On 2026-11-06, `pnpm audit --prod` reported zero vulnerabilities after this
+upgrade. Re-run the audit regularly as advisory data changes.
+
 ## Deployment
 
 Apply migrations before starting the patched API:

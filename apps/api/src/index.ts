@@ -27,11 +27,12 @@ const server = Fastify({
 async function bootstrap() {
   try {
     server.setErrorHandler((error, request, reply) => {
-      if (error instanceof ZodError) return reply.code(400).send({ statusCode: 400, message: error.errors[0]?.message ?? 'Dữ liệu không hợp lệ.' })
+      if (error instanceof ZodError) return reply.code(400).send({ statusCode: 400, message: error.issues[0]?.message ?? 'Dữ liệu không hợp lệ.' })
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return reply.code(409).send({ statusCode: 409, message: 'Dữ liệu đã tồn tại.' })
-      const status = error.statusCode ?? 500
+      const status = typeof error === 'object' && error !== null && 'statusCode' in error && typeof error.statusCode === 'number' && error.statusCode >= 400 && error.statusCode <= 599 ? error.statusCode : 500
       if (status >= 500) request.log.error(error)
-      return reply.code(status).send({ statusCode: status, message: status >= 500 ? 'Máy chủ tạm thời không thể xử lý yêu cầu.' : error.message })
+      const message = error instanceof Error ? error.message : 'Dữ liệu không hợp lệ.'
+      return reply.code(status).send({ statusCode: status, message: status >= 500 ? 'Máy chủ tạm thời không thể xử lý yêu cầu.' : message })
     })
     // Register all plugins (cors, jwt, multipart, etc.)
     await registerPlugins(server)
