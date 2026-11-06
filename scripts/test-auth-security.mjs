@@ -53,6 +53,7 @@ async function fixture() {
     '../config/prisma': { prisma }, '../config/env': { env },
     '../services/storage.service': { mediaUrl: () => null }, '../services/conversation': { fail },
     '../services/reset-mail': { developmentMailbox: () => true }, './websocket.routes': { revokeSessions() {} },
+    '../services/voice-security': { revokeVoiceSessions: async () => {}, rotateVoiceSession: async () => {} },
   };
   await app.register(loadModule('routes/auth.routes.ts', dependencies).authRoutes, { prefix: '/auth' });
   const login = () => app.inject({ method: 'POST', url: '/auth/login', payload: { email: user.email, password: 'OldPassword1' } });

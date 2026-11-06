@@ -67,13 +67,14 @@ test('voice capacity counts users across tabs and admits an existing user to a f
     async toJwt() { return 'test-token'; }
   }
   const { voiceRoutes } = loadRoute('voice.routes.ts', {
+    '../services/voice-security': { startVoiceSecurity() {}, admitVoiceParticipant: async () => true, registerVoiceToken: async (id) => `channel:${id}:0` },
     ioredis: Redis,
     'livekit-server-sdk': { AccessToken, TrackSource: { MICROPHONE: 1, CAMERA: 2 } },
     '../config/env': { env: { LIVEKIT_URL: 'ws://test', LIVEKIT_API_KEY: 'key', LIVEKIT_API_SECRET: 'secret' } },
     '../config/prisma': { prisma: { channel: { findFirst: async () => ({ id: 'c', type: 'VOICE', userLimit: limit, server: { members: [] } }) } } },
   });
   let handler;
-  await voiceRoutes({ authenticate() {}, post: (path, _options, callback) => { if (path.endsWith('/token')) handler = callback; } });
+  await voiceRoutes({ authenticate() {}, addHook() {}, post: (path, _options, callback) => { if (path.endsWith('/token')) handler = callback; } });
   const join = async (id) => {
     let status = 200;
     await handler({ params: { channelId: 'c' }, user: { id, username: id }, log: { error() {} } }, {

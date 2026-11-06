@@ -4,11 +4,14 @@ import Redis from 'ioredis'
 import { randomUUID } from 'node:crypto'
 import { prisma } from '../config/prisma'
 import { env } from '../config/env'
+import { admitVoiceParticipant, registerVoiceToken, startVoiceSecurity } from '../services/voice-security'
 
 let presenceRedis: Redis | undefined
 const getPresenceRedis = () => presenceRedis ??= new Redis(env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 })
 
 export async function voiceRoutes(server: FastifyInstance) {
+  startVoiceSecurity(server)
+  server.addHook('onClose', async () => { presenceRedis?.disconnect(); presenceRedis = undefined })
   server.post<{ Params: { channelId: string } }>('/channels/:channelId/token', { preHandler: [server.authenticate] }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store')
     if (!env.LIVEKIT_URL || !env.LIVEKIT_API_KEY || !env.LIVEKIT_API_SECRET) {
@@ -23,7 +26,7 @@ export async function voiceRoutes(server: FastifyInstance) {
       select: { id: true, type: true, userLimit: true, server: { select: { members: { where: { userId: request.user.id }, select: { user: { select: { username: true, displayName: true } } } } } } },
     })
     if (!channel) return reply.status(404).send({ statusCode: 404, message: 'Voice/video channel không tồn tại hoặc bạn không có quyền tham gia.' })
-    const roomName = `channel:${channel.id}`
+    const roomName = await registerVoiceToken(channel.id, request.user.sid, request.user.id)
     if (channel.userLimit && channel.userLimit > 0) {
       try {
         const redis = getPresenceRedis()
@@ -44,14 +47,16 @@ export async function voiceRoutes(server: FastifyInstance) {
       identity: `${request.user.id}:${randomUUID()}`,
       name: channel.server.members[0]?.user.displayName || channel.server.members[0]?.user.username || request.user.username,
       ttl: `${env.LIVEKIT_TOKEN_TTL_SECONDS}s`,
-      metadata: JSON.stringify({ channelId: channel.id, channelType: channel.type }),
+      metadata: JSON.stringify({ sid: request.user.sid, channelId: channel.id, channelType: channel.type }),
     })
     token.addGrant({
       roomJoin: true,
       room: roomName,
       canPublishSources: channel.type === 'VIDEO' ? [TrackSource.MICROPHONE, TrackSource.CAMERA] : [TrackSource.MICROPHONE],
-      canSubscribe: true,
-      canPublishData: true,
+      canPublish: false,
+      canSubscribe: false,
+      canPublishData: false,
+      canUpdateOwnMetadata: false,
     })
     return reply.send({ statusCode: 200, data: { serverUrl: env.LIVEKIT_URL, token: await token.toJwt(), channelType: channel.type } })
   })
@@ -70,6 +75,7 @@ export async function voiceRoutes(server: FastifyInstance) {
       const key = `bravechat:voice:${roomName}`
       const participantIdentity = event.participant?.identity
       if (event.event === 'participant_joined' && participantIdentity) {
+        if (!await admitVoiceParticipant(roomName, event.participant!)) return reply.send({ statusCode: 200 })
         await redis.sadd(key, participantIdentity)
         await redis.expire(key, 3600)
       } else if (event.event === 'participant_left' && participantIdentity) {

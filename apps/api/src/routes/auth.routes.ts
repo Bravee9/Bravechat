@@ -8,6 +8,7 @@ import { mediaUrl } from '../services/storage.service'
 import { fail } from '../services/conversation'
 import { developmentMailbox, sendResetMail } from '../services/reset-mail'
 import { revokeSessions } from './websocket.routes'
+import { revokeVoiceSessions, rotateVoiceSession } from '../services/voice-security'
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex')
 const email = z.string().trim().toLowerCase().email('Email không hợp lệ.')
@@ -61,6 +62,7 @@ export async function authRoutes(server: FastifyInstance) {
     if (!session) { try { await request.jwtVerify(); session = await prisma.refreshToken.findUnique({ where: { id: request.user.sid } }) } catch { /* expired cookies are still cleared */ } }
     if (session) { await prisma.refreshToken.update({ where: { id: session.id }, data: { isRevoked: true } }); revokeSessions(session.userId, session.id) }
     clear(reply)
+    if (session) await revokeVoiceSessions(session.userId, session.id)
     return { statusCode: 200, data: null }
   })
   server.post('/refresh', async (request, reply) => {
@@ -77,8 +79,9 @@ export async function authRoutes(server: FastifyInstance) {
       if (consumed.count !== 1) throw fail(401, 'Phiên đăng nhập đã được làm mới.')
       return tx.refreshToken.create({ data: refreshData(stored.userId, nextValue, request) })
     })
-    await setSession(reply, stored.user, next.id, nextValue)
     revokeSessions(stored.userId, stored.id)
+    await rotateVoiceSession(stored.userId, stored.id, next.id)
+    await setSession(reply, stored.user, next.id, nextValue)
     return { statusCode: 200, data: null }
   })
   server.get('/me', { preHandler: [server.authenticate] }, async (request, reply) => {
@@ -118,6 +121,7 @@ export async function authRoutes(server: FastifyInstance) {
       return token.userId
     })
     revokeSessions(userId)
+    await revokeVoiceSessions(userId)
     return { statusCode: 200, data: null, message: 'Mật khẩu đã được cập nhật. Hãy đăng nhập lại.' }
   })
 }

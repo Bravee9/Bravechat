@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import vm from 'node:vm';
+import { loadModule } from './security-test-support.mjs';
 
 const require = createRequire(import.meta.url);
 const apiRequire = createRequire(new URL('../apps/api/package.json', import.meta.url));
@@ -19,7 +20,7 @@ const redisUrl = process.env.TEST_REDIS_URL || 'redis://127.0.0.1:16379';
 const tag = randomUUID();
 const userId = `redis-test-${tag}`;
 const channelId = `redis-test-${tag}`;
-const presenceKey = `bravechat:voice:channel:${channelId}`;
+const presenceKey = `bravechat:voice:channel:${channelId}:0`;
 const connections = [];
 
 class TestRedis extends Redis {
@@ -79,9 +80,18 @@ test('real Redis: cross-instance realtime and signed voice webhooks', { timeout:
   const prisma = {
     refreshToken: { findFirst: async () => ({ id: 'test-session' }) },
     serverMember: { findFirst: async () => ({ id: 'test-member' }) },
-    channel: { findFirst: async () => ({ id: channelId, type: 'VOICE', userLimit, server: { members: [] } }) },
+    channel: { findFirst: async () => ({ id: channelId, type: 'VOICE', voiceEpoch: 0, userLimit, server: { members: [] } }), update: async () => ({ voiceEpoch: 0 }) },
+    voiceSession: { upsert: async () => {}, findUnique: async () => ({ epoch: 0 }) },
   };
+  prisma.$transaction = async (work) => work(prisma);
   const dependencies = { ioredis: TestRedis, '../config/env': { env }, '../config/prisma': { prisma }, 'livekit-server-sdk': livekit };
+  // Redis, WebSockets, and webhook signatures are real; the SFU control API
+  // remains isolated so this suite does not require microphone/media support.
+  class RoomServiceClient { async listRooms() { return []; } async updateParticipant() {} async removeParticipant() {} }
+  dependencies['../services/voice-security'] = loadModule('services/voice-security.ts', {
+    ...dependencies, 'livekit-server-sdk': { ...livekit, RoomServiceClient },
+    './conversation': { fail: (statusCode, message) => Object.assign(new Error(message), { statusCode }) },
+  });
   const modules = [];
   for (let i = 0; i < 2; i++) {
     const app = Fastify(); apps.push(app);
@@ -118,7 +128,7 @@ test('real Redis: cross-instance realtime and signed voice webhooks', { timeout:
 
   const app = apps[0];
   const hook = async (event, identity) => {
-    const payload = JSON.stringify({ event, room: { name: `channel:${channelId}` }, ...(identity ? { participant: { identity } } : {}) });
+    const payload = JSON.stringify({ event, room: { name: `channel:${channelId}:0` }, ...(identity ? { participant: { identity, metadata: JSON.stringify({ sid: 'test-session', channelId }) } } : {}) });
     const token = new livekit.AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET);
     token.sha256 = createHash('sha256').update(payload).digest('base64');
     const response = await app.inject({ method: 'POST', url: '/webhook', payload, headers: { 'content-type': 'application/webhook+json', authorization: await token.toJwt() } });

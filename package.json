@@ -20,7 +20,9 @@
     "db:local": "powershell -NoProfile -File scripts/local-db.ps1",
     "test:integration": "node scripts/test-workflows.mjs",
     "test:realtime": "node --test scripts/test-realtime.mjs",
-    "test:redis": "node --test scripts/test-redis.mjs"
+    "test:redis": "node --test scripts/test-redis.mjs",
+    "test:security": "node --test scripts/test-auth-security.mjs scripts/test-attachment-security.mjs scripts/test-voice-security.mjs",
+    "test:security:postgres": "node --test scripts/test-postgres-security.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
