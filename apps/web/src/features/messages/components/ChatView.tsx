@@ -7,6 +7,7 @@ import { useCurrentUser, loadConversations } from "@/stores/workspace.store";
 import { MemberList } from "@/features/members/components/MemberList";
 import { UserCard } from "@/features/members/components/UserCard";
 import { FriendsPanel } from "@/features/members/components/FriendsPanel";
+import { DmUserProfileSidebar } from "@/features/channels/components/DmUserProfileSidebar";
 import { DialogFrame } from "@/components/ui/DialogFrame";
 import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
@@ -282,6 +283,7 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
       {error && <p role="alert" className="px-6 pb-2 text-xs text-rose-300">{error}</p>}
     </main>
     {!isMe && <MemberList isVisible={showMembers} serverId={rawServerId} />}
+    {isMe && !friends && showMembers && <DmUserProfileSidebar userId={rawChannelId} onClose={() => setShowMembers(false)} />}
     {inspected && <UserCard userId={inspected} onClose={() => setInspected(null)} />}
     {dialog && <DialogFrame title={dialog.type === "edit" ? "Sửa tin nhắn" : "Xóa tin nhắn"} onClose={() => { if (!actionBusy) setDialog(null); }}><form onSubmit={submitAction} className="space-y-4">{dialog.type === "edit" ? <label className="block text-sm">Nội dung<textarea autoFocus className="input-ocean mt-2 w-full" value={edited} required maxLength={2000} onChange={(event) => setEdited(event.target.value)} /></label> : <p>Bạn muốn xóa tin nhắn này?</p>}<div className="flex justify-end gap-2"><button type="button" disabled={actionBusy} className="btn-secondary" onClick={() => setDialog(null)}>Hủy</button><button className="btn-primary" disabled={actionBusy || dialog.type === "edit" && !edited.trim()}>{actionBusy ? "Đang lưu..." : "Xác nhận"}</button></div></form></DialogFrame>}
   </div>;

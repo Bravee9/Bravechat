@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import type { CurrentUser } from "@discord-clone/shared";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
-import { ProfileSettingsModal } from "./ProfileSettingsModal";
+import { QuickProfilePopover } from "./QuickProfilePopover";
+import { UserSettingsModal } from "@/features/settings/UserSettingsModal";
 import { workspaceStore } from "@/stores/workspace.store";
 import { http } from "@/services/http";
 import { audioStore } from "@/stores/audio.store";
@@ -18,29 +19,70 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
   const isMicMuted = useStore(audioStore, (state) => state.muted);
   const isDeafened = useStore(audioStore, (state) => state.deafened);
   const effectivelyMuted = isMicMuted || isDeafened;
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [initialSettingsTab, setInitialSettingsTab] = useState("account");
   const [logoutError, setLogoutError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
+
+  const openSettings = (tab = "account") => {
+    setInitialSettingsTab(tab);
+    setSettingsOpen(true);
+    setPopoverOpen(false);
+  };
 
   return (
     <footer
       data-testid="user-profile-bar"
-      className="h-14 bg-[#051424] border-t border-ocean-dark-border px-3 flex items-center justify-between flex-shrink-0 z-20 select-none"
+      className="h-14 bg-[#051424] border-t border-ocean-dark-border px-3 flex items-center justify-between flex-shrink-0 z-20 select-none relative"
     >
-      <button type="button" onClick={() => setSettingsOpen(true)} className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:bg-white/5 p-1 rounded transition-colors text-left">
+      <button
+        type="button"
+        onClick={() => setPopoverOpen(!popoverOpen)}
+        className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:bg-white/5 p-1 rounded transition-colors text-left"
+        data-testid="user-profile-popover-trigger"
+        aria-label="Xem hồ sơ nhanh"
+      >
         <div className="relative flex-shrink-0">
-          {currentUser?.avatarUrl ? <img src={currentUser.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" /> : <div className="w-8 h-8 rounded-full bg-ocean-primary flex items-center justify-center text-white text-xs font-bold shadow-ocean-glow">{currentUser?.displayName?.[0] || "B"}</div>}
-          <div className={cn("absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#051424]", currentUser?.status === "ONLINE" ? "bg-emerald-500" : currentUser?.status === "IDLE" ? "bg-amber-500" : currentUser?.status === "DO_NOT_DISTURB" ? "bg-rose-500" : "bg-slate-500")} />
+          {currentUser?.avatarUrl ? (
+            <img src={currentUser.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-ocean-primary flex items-center justify-center text-white text-xs font-bold shadow-ocean-glow">
+              {currentUser?.displayName?.[0] || currentUser?.username?.[0] || "B"}
+            </div>
+          )}
+          <div
+            className={cn(
+              "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#051424]",
+              currentUser?.status === "ONLINE"
+                ? "bg-emerald-500"
+                : currentUser?.status === "IDLE"
+                ? "bg-amber-500"
+                : currentUser?.status === "DO_NOT_DISTURB"
+                ? "bg-rose-500"
+                : "bg-slate-500"
+            )}
+          />
         </div>
         <div className="min-w-0">
-          <p className="text-ocean-light text-xs font-bold truncate leading-tight">
-            {currentUser?.displayName || "Bravee9"}
+          <p className="text-ocean-light text-xs font-bold truncate leading-tight flex items-center gap-1">
+            <span>{currentUser?.displayName || currentUser?.username || "Bravee9"}</span>
+            <span className="text-[10px] text-ocean-secondary font-mono">MATH</span>
           </p>
           <p className="text-ocean-light/40 text-[10px] truncate font-mono">
             #{currentUser?.discriminator || "0001"}
           </p>
         </div>
       </button>
+
+      {/* Quick Profile Popover */}
+      {popoverOpen && currentUser && (
+        <QuickProfilePopover
+          currentUser={currentUser}
+          onClose={() => setPopoverOpen(false)}
+          onOpenFullSettings={openSettings}
+        />
+      )}
 
       {/* Quick action buttons: Mute Mic, Deafen, Settings */}
       <div className="flex items-center gap-0.5 text-ocean-light/60">
@@ -81,7 +123,7 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
         <Tooltip content="Cài đặt người dùng" side="top">
           <button
             type="button"
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => openSettings("account")}
             data-testid="user-settings-btn"
             className="p-1.5 rounded hover:bg-white/10 hover:text-ocean-light transition-colors cursor-pointer"
             aria-label="Cài đặt người dùng"
@@ -92,10 +134,47 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
             </svg>
           </button>
         </Tooltip>
-        {currentUser ? <button type="button" title="Đăng xuất" aria-label="Đăng xuất" disabled={loggingOut} onClick={async () => { setLoggingOut(true); setLogoutError(""); try { await http.post("/auth/logout"); window.location.href = "/login"; } catch { setLogoutError("Không thể đăng xuất. Vui lòng thử lại."); } finally { setLoggingOut(false); } }} className="rounded p-1.5 text-ocean-light/60 hover:bg-white/10 hover:text-rose-300">⏻</button> : null}
+
+        {currentUser ? (
+          <button
+            type="button"
+            title="Đăng xuất"
+            aria-label="Đăng xuất"
+            disabled={loggingOut}
+            onClick={async () => {
+              setLoggingOut(true);
+              setLogoutError("");
+              try {
+                await http.post("/auth/logout");
+                window.location.href = "/login";
+              } catch {
+                setLogoutError("Không thể đăng xuất. Vui lòng thử lại.");
+              } finally {
+                setLoggingOut(false);
+              }
+            }}
+            className="rounded p-1.5 text-ocean-light/60 hover:bg-white/10 hover:text-rose-300"
+          >
+            ⏻
+          </button>
+        ) : null}
       </div>
-      {logoutError && <p role="alert" className="absolute bottom-14 left-2 rounded bg-rose-950 p-2 text-xs text-rose-200">{logoutError}</p>}
-      {settingsOpen && currentUser ? <ProfileSettingsModal user={currentUser} onClose={() => setSettingsOpen(false)} onSaved={(user) => workspaceStore.set({ currentUser: user })} /> : null}
+
+      {logoutError && (
+        <p role="alert" className="absolute bottom-14 left-2 rounded bg-rose-950 p-2 text-xs text-rose-200">
+          {logoutError}
+        </p>
+      )}
+
+      {/* Comprehensive Settings Modal */}
+      {settingsOpen && currentUser ? (
+        <UserSettingsModal
+          user={currentUser}
+          initialTab={initialSettingsTab}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={(user) => workspaceStore.set({ currentUser: user })}
+        />
+      ) : null}
     </footer>
   );
 }
