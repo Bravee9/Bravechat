@@ -161,7 +161,7 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
     const attachment = await prisma.attachment.findFirst({
       where: {
         id: request.params.attachmentId,
-        message: { channel: { server: { members: { some: { userId: request.user.id, isBanned: false } } } } },
+        message: { isDeleted: false, channel: { server: { members: { some: { userId: request.user.id, isBanned: false } } } } },
       },
       select: { r2Key: true, filename: true, contentType: true },
     })
