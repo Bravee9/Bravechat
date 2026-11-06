@@ -89,3 +89,29 @@ For PostgreSQL integration, create an isolated local database named
 `TEST_DATABASE_URL` to that same URL and run `pnpm test:security:postgres`.
 The test refuses remote hosts and databases without that name prefix, and
 cleans up its own users, sessions, servers, and room leases.
+
+Optionally set `TEST_LIVEKIT_URL=http://127.0.0.1:17880` to an isolated local
+LiveKit instance configured with the development-only `devkey` / `devsecret`
+credentials. The PostgreSQL suite then creates and deletes a real SFU room
+instead of mocking the control API. This checks control-plane behavior; it
+does not claim microphone/video transport or public TURN/NAT coverage.
+
+`TEST_API_URL` selects an isolated local API for `pnpm test:integration` (for
+example `http://127.0.0.1:14000/api`). Set its matching `DATABASE_URL`, keep the
+development mailbox, and do not target a live email provider.
+
+## Verification on 2026-11-06
+
+- Production build and workspace TypeScript checks passed on Node 24 with the
+  declared Node 22+ baseline; Docker bases use Node 22.
+- Lint passed with existing `<img>` optimization warnings.
+- 40 frontend tests, 11 security regressions, and 2 realtime regressions passed.
+- Real Redis 7.4.10 checked cross-instance events and signed webhook presence.
+- Real PostgreSQL 16 checked both reset/login orderings and stale refresh. One
+  test observed `pg_stat_activity.wait_event_type = 'Lock'` before releasing the
+  login transaction, rather than only simulating serialization in a fixture.
+- LiveKit 1.9.0 control API confirmed removal of the old generation room.
+- The full local workflow suite passed account, friendship, channel/DM,
+  authorization, read state, session rotation, and password-recovery scenarios.
+- Production dependency audit reported zero vulnerabilities. This is an audit
+  result at that date, not a guarantee that future advisories cannot apply.
