@@ -78,9 +78,19 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
    * POST /api/uploads (multipart/form-data)
    * Trường text (`purpose`, `channelId`, `serverId`) phải đứng TRƯỚC trường `file`.
    */
-  fastify.post('/', { config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request, reply) => {
-    const data = await request.file().catch(() => undefined)
+  fastify.post('/', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (request, reply) => {
+    let data
+    try {
+      data = await request.file({ limits: { fileSize: env.MAX_FILE_SIZE, files: 1 } })
+    } catch {
+      return reply.status(413).send({ statusCode: 413, message: `Tệp vượt quá giới hạn ${Math.round(env.MAX_FILE_SIZE / 1024 / 1024)}MB.` })
+    }
     if (!data) return reply.status(400).send({ statusCode: 400, message: 'Không nhận được tệp.' })
+
+    if (data.file.truncated) {
+      data.file.resume()
+      return reply.status(413).send({ statusCode: 413, message: `Tệp vượt quá giới hạn ${Math.round(env.MAX_FILE_SIZE / 1024 / 1024)}MB.` })
+    }
 
     const field = (name: string) => {
       const value = data.fields[name] as { value?: unknown } | undefined
@@ -97,6 +107,11 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       buffer = await data.toBuffer()
     } catch {
+      data.file.resume()
+      return reply.status(413).send({ statusCode: 413, message: `Tệp vượt quá giới hạn ${Math.round(env.MAX_FILE_SIZE / 1024 / 1024)}MB.` })
+    }
+
+    if (data.file.truncated) {
       return reply.status(413).send({ statusCode: 413, message: `Tệp vượt quá giới hạn ${Math.round(env.MAX_FILE_SIZE / 1024 / 1024)}MB.` })
     }
     if (!buffer.length) return reply.status(400).send({ statusCode: 400, message: 'Tệp rỗng.' })

@@ -106,14 +106,35 @@ export async function userRoutes(server: FastifyInstance) {
   })
 
   const uploadProfileAsset = (kind: AssetKind) => async (request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {
-    const file = await request.file().catch(() => undefined)
-    if (!file) return reply.status(400).send({ statusCode: 400, message: 'Vui lòng chọn ảnh.' })
-    let uploaded: Buffer
-    try { uploaded = await file.toBuffer() } catch { return reply.status(413).send({ statusCode: 413, message: 'Ảnh vượt quá dung lượng cho phép.' }) }
-    const contentType = sniffImageType(uploaded)
     const rule = ASSET_RULES[kind]
+    const maxMb = Math.round(rule.maxBytes / 1024 / 1024)
+    let file
+    try {
+      file = await request.file({ limits: { fileSize: rule.maxBytes, files: 1 } })
+    } catch {
+      return reply.status(413).send({ statusCode: 413, message: `Ảnh vượt quá dung lượng tối đa ${maxMb}MB.` })
+    }
+    if (!file) return reply.status(400).send({ statusCode: 400, message: 'Vui lòng chọn ảnh.' })
+
+    if (file.file.truncated) {
+      file.file.resume()
+      return reply.status(413).send({ statusCode: 413, message: `Ảnh vượt quá dung lượng tối đa ${maxMb}MB.` })
+    }
+
+    let uploaded: Buffer
+    try {
+      uploaded = await file.toBuffer()
+    } catch {
+      file.file.resume()
+      return reply.status(413).send({ statusCode: 413, message: `Ảnh vượt quá dung lượng tối đa ${maxMb}MB.` })
+    }
+
+    if (file.file.truncated || uploaded.length > rule.maxBytes) {
+      return reply.status(413).send({ statusCode: 413, message: `Ảnh vượt quá dung lượng tối đa ${maxMb}MB.` })
+    }
+
+    const contentType = sniffImageType(uploaded)
     if (!contentType) return reply.status(415).send({ statusCode: 415, message: 'Chỉ nhận ảnh PNG, JPG, GIF, WEBP hoặc AVIF.' })
-    if (uploaded.length > rule.maxBytes) return reply.status(413).send({ statusCode: 413, message: `Ảnh tối đa ${Math.round(rule.maxBytes / 1024 / 1024)}MB.` })
     const current = await prisma.user.findUniqueOrThrow({ where: { id: request.user.id }, select: { avatarKey: true, bannerKey: true } })
     const pending = `pending/${request.user.id}/${randomUUID()}.${contentType === 'image/jpeg' ? 'jpg' : contentType.split('/')[1]}`
     await request.server.r2.storage.putObject(pending, uploaded, contentType)
@@ -123,7 +144,7 @@ export async function userRoutes(server: FastifyInstance) {
     await request.server.r2.storage.deleteQuietly(kind === 'avatar' ? current.avatarKey : current.bannerKey)
     return reply.send({ statusCode: 200, data: { user: { ...user, avatarUrl: mediaUrl(user.avatarKey), bannerUrl: mediaUrl(user.bannerKey) } } })
   }
-  server.post('/@me/avatar', { config: { rateLimit: { max: 100, timeWindow: '1 minute' } } }, uploadProfileAsset('avatar'))
-  server.post('/@me/banner', { config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, uploadProfileAsset('banner'))
+  server.post('/@me/avatar', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, uploadProfileAsset('avatar'))
+  server.post('/@me/banner', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, uploadProfileAsset('banner'))
 
 }

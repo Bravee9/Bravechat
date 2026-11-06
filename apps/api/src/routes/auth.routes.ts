@@ -10,8 +10,9 @@ import { developmentMailbox, sendResetMail } from '../services/reset-mail'
 import { revokeSessions } from './websocket.routes'
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex')
-const email = z.string().trim().toLowerCase().email('Email không hợp lệ.')
+const email = z.string().trim().toLowerCase().max(254, 'Email tối đa 254 ký tự.').email('Email không hợp lệ.')
 const password = z.string().min(8, 'Mật khẩu cần ít nhất 8 ký tự.').max(128).refine((value) => Buffer.byteLength(value, 'utf8') <= 72, 'Mật khẩu tối đa 72 byte UTF-8.')
+const resetToken = z.string().length(64, 'Mã xác thực không hợp lệ.').regex(/^[a-f0-9]{64}$/, 'Mã xác thực không hợp lệ.')
 const userSelect = { id: true, email: true, username: true, displayName: true, discriminator: true, status: true, customStatus: true, bio: true, avatarKey: true, bannerKey: true } as const
 const present = (user: any) => ({ ...user, avatarUrl: mediaUrl(user.avatarKey), bannerUrl: mediaUrl(user.bannerKey) })
 const options = { httpOnly: true, secure: env.FRONTEND_URL.startsWith('https:'), sameSite: 'lax' as const, path: '/' }
@@ -33,13 +34,13 @@ export async function authRoutes(server: FastifyInstance) {
     reply.header('Cache-Control', 'no-store')
     return payload
   })
-  server.post('/register', { config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, async (request, reply) => {
+  server.post('/register', { bodyLimit: 16 * 1024, config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, async (request, reply) => {
     const input = z.object({ email, password, username: z.string().trim().toLowerCase().min(3).max(32).regex(/^[a-z0-9._]+$/), displayName: z.string().trim().max(32).optional() }).parse(request.body)
     const user = await prisma.user.create({ data: { email: input.email, username: input.username, displayName: input.displayName || input.username, passwordHash: await bcrypt.hash(input.password, 12) }, select: userSelect })
     await issue(reply, user, request)
     return reply.code(201).send({ statusCode: 201, data: { user: present(user) } })
   })
-  server.post('/login', { config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, async (request, reply) => {
+  server.post('/login', { bodyLimit: 16 * 1024, config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, async (request, reply) => {
     const input = z.object({ email, password: z.string().min(1).max(128) }).parse(request.body)
     const account = await prisma.user.findUnique({ where: { email: input.email } })
     if (!account || account.isBanned || !await bcrypt.compare(input.password, account.passwordHash)) throw fail(401, 'Email hoặc mật khẩu không chính xác.')
@@ -72,10 +73,11 @@ export async function authRoutes(server: FastifyInstance) {
     reply.header('Cache-Control', 'no-store')
     return { statusCode: 200, data: { user: present(await prisma.user.findUniqueOrThrow({ where: { id: request.user.id }, select: userSelect })) } }
   })
-  server.post('/forgot-password', { config: { rateLimit: { max: 30, timeWindow: '15 minutes' } } }, async (request) => {
+  server.post('/forgot-password', { bodyLimit: 16 * 1024, config: { rateLimit: { max: 30, timeWindow: '15 minutes' } } }, async (request) => {
     const input = z.object({ email }).parse(request.body)
     if (!developmentMailbox() && (!env.RESEND_API_KEY || !env.RESET_EMAIL_FROM)) throw fail(503, 'Dịch vụ gửi email chưa được cấu hình.')
     const user = await prisma.user.findFirst({ where: { email: input.email, isBanned: false }, select: { id: true, email: true } })
+    let devResetUrl: string | undefined
     if (user) {
       const value = randomBytes(32).toString('hex')
       // DB chỉ giữ hash. Token thô chỉ được chuyển tới hộp thư của người nhận.
@@ -83,12 +85,24 @@ export async function authRoutes(server: FastifyInstance) {
         await tx.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } })
         return tx.passwordResetToken.create({ data: { userId: user.id, tokenHash: digest(value), expiresAt: new Date(Date.now() + 15 * 60000) } })
       })
-      try { await sendResetMail(user.email, value) } catch (error) { await prisma.passwordResetToken.update({ where: { id: token.id }, data: { usedAt: new Date() } }); throw error }
+      try {
+        await sendResetMail(user.email, value)
+        if (developmentMailbox()) {
+          devResetUrl = `${env.FRONTEND_URL}/reset-password?token=${value}`
+        }
+      } catch (error) { await prisma.passwordResetToken.update({ where: { id: token.id }, data: { usedAt: new Date() } }); throw error }
     }
-    return { statusCode: 200, data: { delivery: developmentMailbox() ? 'development' : 'email' }, message: 'Nếu email tồn tại, hướng dẫn khôi phục đã được tạo.' }
+    return {
+      statusCode: 200,
+      data: {
+        delivery: developmentMailbox() ? 'development' : 'email',
+        ...(devResetUrl ? { devResetUrl } : {}),
+      },
+      message: 'Nếu email tồn tại, hướng dẫn khôi phục đã được tạo.',
+    }
   })
-  server.post('/reset-password', { config: { rateLimit: { max: 100, timeWindow: '15 minutes' } } }, async (request) => {
-    const input = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/), password }).parse(request.body)
+  server.post('/reset-password', { bodyLimit: 16 * 1024, config: { rateLimit: { max: 100, timeWindow: '15 minutes' } } }, async (request) => {
+    const input = z.object({ token: resetToken, password }).parse(request.body)
     const hash = await bcrypt.hash(input.password, 12)
     // Chỉ request dùng token đầu tiên được đổi mật khẩu; các phiên cũ bị thu hồi cùng transaction.
     const userId = await prisma.$transaction(async (tx) => {

@@ -14,6 +14,8 @@ export async function sendResetMail(email: string, token: string) {
     const directory = resolve(__dirname, '../../../../.local/mail')
     await mkdir(directory, { recursive: true })
     await writeFile(resolve(directory, token.slice(0, 16) + '.json'), JSON.stringify({ to: email, subject: 'Đặt lại mật khẩu Bravechat', text, url: url.toString(), createdAt: new Date().toISOString() }, null, 2), { mode: 0o600 })
+    console.log(`\n📨 [DEV MAILBOX] Đã tạo liên kết đặt lại mật khẩu cho ${email}:`)
+    console.log(`👉 ${url.toString()}\n`)
     return
   }
   if (!env.RESEND_API_KEY || !env.RESET_EMAIL_FROM) throw fail(503, 'Dịch vụ gửi email chưa được cấu hình.')

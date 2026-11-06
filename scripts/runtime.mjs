@@ -12,6 +12,21 @@ export function run(cli, args, cwd = root, options = {}) {
   return spawn(process.execPath, [cli, ...args], { cwd, env: process.env, stdio: 'inherit', windowsHide: true, ...options });
 }
 export async function prepareDatabase() {
+  // Tự động kiểm tra và khởi chạy các Docker containers cần thiết nếu dùng Docker
+  try {
+    await new Promise((resolve) => {
+      const child = spawn('docker', ['compose', 'up', '-d', 'postgres', 'redis', 'livekit'], {
+        cwd: root,
+        stdio: 'ignore',
+        shell: true,
+      });
+      child.on('exit', () => resolve());
+      child.on('error', () => resolve());
+    });
+  } catch {
+    // Bỏ qua nếu môi trường dùng PostgreSQL native ngoài Docker
+  }
+
   if (process.platform === 'win32' && existsSync(path.join(root, '.local/pgdata/PG_VERSION'))) {
     const code = await new Promise((resolve, reject) => {
       const child = spawn('powershell.exe', ['-NoProfile', '-File', path.join(root, 'scripts/local-db.ps1')], { cwd: root, env: process.env, stdio: 'inherit', windowsHide: true });

@@ -48,7 +48,7 @@ export async function serializeMessage(server: FastifyInstance, row: any) {
     user: author.displayName || author.username,
     avatar: (author.displayName || author.username).slice(0, 2).toUpperCase(),
     time: new Date(row.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    replyTo: row.replyTo ? { id: row.replyTo.id, content: row.replyTo.isDeleted ? 'Tin nhắn đã xóa' : row.replyTo.content ?? '', user: parentAuthor.displayName || parentAuthor.username } : null,
+    replyTo: row.replyTo ? { id: row.replyTo.id, content: row.replyTo.isDeleted ? 'Tin nhắn đã xóa' : row.replyTo.content ?? '', user: parentAuthor?.displayName || parentAuthor?.username || 'Người dùng' } : null,
     reactions: Array.from(groups, ([emoji, userIds]) => ({ emoji, count: userIds.length, userIds })),
     attachments,
   }
