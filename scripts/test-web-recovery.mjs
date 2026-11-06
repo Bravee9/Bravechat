@@ -8,7 +8,7 @@ import path from 'node:path'
 import { mkdir } from 'node:fs/promises'
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-const SCREENSHOT_DIR = 'C:\\Users\\brave\\.gemini\\antigravity\\brain\\909c3267-56d8-4a0f-bd30-3e431aca54e2\\screenshots'
+const SCREENSHOT_DIR = 'C:\\Users\\brave\\.gemini\\antigravity\\brain\\6714fbed-d9c8-4567-985b-b7469f54ed11\\screenshots'
 
 async function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
@@ -98,8 +98,9 @@ async function main() {
     console.log('  Submitting new password...')
     await page.click('form button.btn-primary')
 
-    // Wait for success status
+    // Wait for success status and animation to settle
     await page.waitForSelector('div[role="status"]', { timeout: 15000 })
+    await sleep(500)
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '06_password_changed_success.png') })
     console.log('  📸 Captured: 06_password_changed_success.png')
 

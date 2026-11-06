@@ -214,33 +214,36 @@
 
   /* ─── BUTTONS ─────────────────────────────────────────── */
   .btn-primary {
-    @apply bg-ocean-primary text-white
+    @apply inline-flex items-center justify-center
+           bg-ocean-primary text-white
            hover:bg-ocean-hover
            active:scale-[0.98]
            px-6 py-3
            font-bold uppercase tracking-widest text-sm
            transition-all duration-200
            border border-transparent
-           cursor-pointer select-none;
+           cursor-pointer select-none text-center;
   }
 
   .btn-secondary {
-    @apply bg-transparent text-ocean-secondary
+    @apply inline-flex items-center justify-center
+           bg-transparent text-ocean-secondary
            border border-ocean-dark-border
            hover:border-ocean-secondary hover:text-ocean-light
            px-6 py-3
            font-bold uppercase tracking-widest text-sm
            transition-all duration-200
-           cursor-pointer select-none;
+           cursor-pointer select-none text-center;
   }
 
   .btn-ghost {
-    @apply bg-transparent text-ocean-light/70
+    @apply inline-flex items-center justify-center
+           bg-transparent text-ocean-light/70
            hover:text-ocean-light hover:bg-ocean-dark-surface
            px-4 py-2
            font-medium text-sm
            transition-all duration-200
-           cursor-pointer select-none;
+           cursor-pointer select-none text-center;
   }
 
   /* ─── INPUTS ──────────────────────────────────────────── */
