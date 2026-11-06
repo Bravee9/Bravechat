@@ -42,8 +42,15 @@ export async function verifyUploadedObject(fastify: FastifyInstance, key: string
 }
 
 async function canUploadToChannel(channelId: string, userId: string) {
-  return prisma.channel.findFirst({
+  const channel = await prisma.channel.findFirst({
     where: { id: channelId, server: { members: { some: { userId, isBanned: false } } } },
+    select: { id: true },
+  })
+  if (channel) return channel
+
+  // DM recipient support: check user exists and is not banned
+  return prisma.user.findFirst({
+    where: { id: channelId, isBanned: false },
     select: { id: true },
   })
 }

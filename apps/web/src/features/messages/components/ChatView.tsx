@@ -203,20 +203,39 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
     finally { sendingRef.current = false; setSending(false); }
   };
   const handleFiles = async (files: File[]) => {
-    if (isMe || sendingRef.current) return;
+    if (sendingRef.current) return;
     sendingRef.current = true; setUploading(true); setError("");
     const savedKey = key; const uploaded: Array<{ filename: string; contentType: string; key: string }> = [];
     try {
       for (const file of files.slice(0, 10)) {
-        const form = new FormData(); form.append("purpose", "attachment"); form.append("channelId", rawChannelId); form.append("file", file, file.name);
+        const form = new FormData();
+        form.append("purpose", "attachment");
+        form.append("channelId", rawChannelId);
+        form.append("file", file, file.name);
         const response = await fetch(env.apiUrl.replace(/\/$/, "") + "/uploads", { method: "POST", credentials: "include", body: form });
-        const result = await response.json(); if (!response.ok) throw new Error(result.message || "Không thể tải tệp.");
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Không thể tải tệp.");
         uploaded.push(result.data);
       }
-      const result = await http.post<{ message: StoredMessage }>(historyPath, { content: message.trim(), attachments: uploaded, replyToId: replyTo ? String(replyTo.id) : undefined });
-      if (routeRef.current === savedKey) { setMessages((previous) => mergeMessages(previous, [result.message])); setMessage(""); setReplyTo(null); }
-    } catch (reason) { await Promise.all(uploaded.map(({ key: pending }) => http.delete("/uploads/pending", { body: { key: pending } }).catch(() => undefined))); if (routeRef.current === savedKey) setError(reason instanceof Error ? reason.message : "Không thể tải tệp."); }
-    finally { sendingRef.current = false; setUploading(false); }
+      const result = await http.post<{ message: StoredMessage }>(historyPath, {
+        content: message.trim(),
+        attachments: uploaded,
+        replyToId: replyTo ? String(replyTo.id) : undefined,
+        nonce: crypto.randomUUID(),
+      });
+      if (routeRef.current === savedKey) {
+        setMessages((previous) => mergeMessages(previous, [result.message]));
+        setMessage("");
+        setReplyTo(null);
+      }
+      if (isMe) void loadConversations(true);
+    } catch (reason) {
+      await Promise.all(uploaded.map(({ key: pending }) => http.delete("/uploads/pending", { body: { key: pending } }).catch(() => undefined)));
+      if (routeRef.current === savedKey) setError(reason instanceof Error ? reason.message : "Không thể tải tệp.");
+    } finally {
+      sendingRef.current = false;
+      setUploading(false);
+    }
   };
   const loadOlder = async () => {
     if (!messages[0] || olderBusy) return;
@@ -258,7 +277,7 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
         onReply={setReplyTo} onReaction={(item, emoji, remove) => void reaction(item, emoji, remove)} onEdit={(item) => { setEdited(item.content); setDialog({ type: "edit", message: item }); }} onDelete={(item) => setDialog({ type: "delete", message: item })} onInspect={setInspected} />
       <TypingIndicator typingUsers={typing} />
       {replyTo && <div className="mx-6 mb-2 flex justify-between gap-3 rounded border border-ocean-dark-border px-3 py-2 text-xs text-ocean-light/70"><span className="truncate">Trả lời {replyTo.user}: {replyTo.content}</span><button aria-label="Hủy trả lời" onClick={() => setReplyTo(null)}>✕</button></div>}
-      <ChatInput value={message} placeholder={isMe ? "Nhắn tin tới " + name : "Nhắn tin tới #" + name} onChange={(event) => { setMessage(event.target.value); sendTyping("typing_start"); if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = setTimeout(() => sendTyping("typing_stop"), 1500); }} onSubmit={handleSend} onFiles={isMe ? undefined : handleFiles} isUploading={uploading} isSending={sending} />
+      <ChatInput value={message} placeholder={isMe ? "Nhắn tin tới " + name : "Nhắn tin tới #" + name} onChange={(event) => { setMessage(event.target.value); sendTyping("typing_start"); if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = setTimeout(() => sendTyping("typing_stop"), 1500); }} onSubmit={handleSend} onFiles={handleFiles} isUploading={uploading} isSending={sending} />
       {sending && <p role="status" className="px-6 pb-2 text-xs text-ocean-light/60">Đang gửi...</p>}
       {error && <p role="alert" className="px-6 pb-2 text-xs text-rose-300">{error}</p>}
     </main>
