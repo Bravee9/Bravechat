@@ -1,6 +1,6 @@
 "use client";
 
-import { Room, RoomEvent, Track, setLogLevel, type Participant, type RemoteTrack, type TrackPublication } from "livekit-client";
+import { Room, RoomEvent, Track, setLogLevel, type Participant, type RemoteTrack } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { http } from "@/services/http";
 import { audioStore } from "@/stores/audio.store";
@@ -90,7 +90,7 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
       nextRoom
         .on(RoomEvent.ParticipantConnected, syncParticipants)
         .on(RoomEvent.ParticipantDisconnected, syncParticipants)
-        .on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _publication: TrackPublication, participant: Participant) => {
+        .on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
           if (!active()) return;
           const element = track.attach();
           if (element instanceof HTMLMediaElement && track.kind === Track.Kind.Audio) element.muted = audioStore.get().deafened;

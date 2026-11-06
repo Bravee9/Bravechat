@@ -17,15 +17,18 @@ import type { ChatMessage } from "./MessageItem";
 
 type StoredMessage = ChatMessage & { id: string; createdAt: string };
 type Page = { messages: StoredMessage[]; hasMore: boolean };
+type MessageEvent = { type?: string; message?: ChatMessage; messageId?: ChatMessage["id"] };
+type ChatMetadata = { user: { displayName?: string | null; username: string } } | { channel: { name: string; type: string } };
 interface ChatViewProps { serverId?: string; channelId?: string }
 export const mergeMessages = (existing: ChatMessage[], incoming: ChatMessage[]) => {
   const byId = new Map(existing.map((item) => [item.id, item]));
   incoming.forEach((item) => byId.set(item.id, item));
   return Array.from(byId.values()).sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime() || String(a.id).localeCompare(String(b.id)));
 };
-function applyEvent(previous: ChatMessage[], data: any): ChatMessage[] {
+function applyEvent(previous: ChatMessage[], data: MessageEvent): ChatMessage[] {
   if (data.type === "message_delete" || data.type === "dm_delete") return previous.filter((item) => item.id !== data.messageId).map((item) => item.replyTo && item.replyTo.id === data.messageId ? { ...item, replyTo: { ...item.replyTo, content: "Tin nhắn đã xóa" } } : item);
-  if (data.message && typeof data.message.id === "string") return mergeMessages(previous, [data.message]).map((item) => item.replyTo && item.replyTo.id === data.message.id ? { ...item, replyTo: { ...item.replyTo, content: data.message.content } } : item);
+  const message = data.message;
+  if (message && typeof message.id === "string") return mergeMessages(previous, [message]).map((item) => item.replyTo && item.replyTo.id === message.id ? { ...item, replyTo: { ...item.replyTo, content: message.content } } : item);
   return previous;
 }
 export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
@@ -75,7 +78,7 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
     let active = true; let socket: WebSocket | null = null;
     let retryTimer: ReturnType<typeof setTimeout>; let retries = 0; let version = 0;
     let readTimer: ReturnType<typeof setTimeout>;
-    let fetching = false; let buffered: any[] = [];
+    let fetching = false; let buffered: MessageEvent[] = [];
     const abort = new AbortController();
     const markRead = () => {
       // Coalesce ACK trong 500ms và không đánh dấu đã đọc cho tab đang ẩn.
@@ -83,7 +86,7 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
       clearTimeout(readTimer);
       readTimer = setTimeout(() => { void http.post("/channels/" + encodeURIComponent(rawChannelId) + "/read").catch(() => undefined); }, 500);
     };
-    const receive = (event: any) => { if (fetching) buffered.push(event); setMessages((previous) => applyEvent(previous, event)); if (!isMe && event.type === "message_create") markRead(); };
+    const receive = (event: MessageEvent) => { if (fetching) buffered.push(event); setMessages((previous) => applyEvent(previous, event)); if (!isMe && event.type === "message_create") markRead(); };
     const load = async () => {
       const current = ++version; fetching = true; buffered = [];
       try {
@@ -100,8 +103,8 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
         markRead();
       } catch (reason) { if (active && current === version) { fetching = false; setError(reason instanceof Error ? reason.message : "Không thể tải lịch sử."); } }
     };
-    void http.get<any>(isMe ? "/users/" + encodeURIComponent(rawChannelId) : "/channels/" + encodeURIComponent(rawChannelId), { signal: abort.signal })
-      .then((result) => { if (active) { setName(isMe ? result.user.displayName || result.user.username : result.channel.name); if (!isMe) setChannelType(result.channel.type); } })
+    void http.get<ChatMetadata>(isMe ? "/users/" + encodeURIComponent(rawChannelId) : "/channels/" + encodeURIComponent(rawChannelId), { signal: abort.signal })
+      .then((result) => { if (active) { if ("user" in result) setName(result.user.displayName || result.user.username); else { setName(result.channel.name); setChannelType(result.channel.type); } } })
       .catch((reason) => { if (active) setError(reason.message); });
     const userEvent = (event: Event) => {
       const data = (event as CustomEvent).detail;
@@ -169,9 +172,8 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
     try {
       for (const file of files.slice(0, 10)) {
         const form = new FormData(); form.append("purpose", "attachment"); form.append("channelId", rawChannelId); form.append("file", file, file.name);
-        const response = await fetch(env.apiUrl.replace(/\/$/, "") + "/uploads", { method: "POST", credentials: "include", body: form });
-        const result = await response.json(); if (!response.ok) throw new Error(result.message || "Không thể tải tệp.");
-        uploaded.push(result.data);
+        const result = await http.post<{ filename: string; contentType: string; key: string }>("/uploads", form);
+        uploaded.push(result);
       }
       const result = await http.post<{ message: StoredMessage }>(historyPath, { content: message.trim(), attachments: uploaded, replyToId: replyTo ? String(replyTo.id) : undefined });
       if (routeRef.current === savedKey) { setMessages((previous) => mergeMessages(previous, [result.message])); setMessage(""); setReplyTo(null); }

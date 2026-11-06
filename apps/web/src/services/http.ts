@@ -41,6 +41,7 @@ let sessionVersion = 0;
 
 async function request<T>(method: string, path: string, options: RequestOptions = {}, retryAuth = true): Promise<T> {
   const { query, body, headers, ...init } = options;
+  const multipart = typeof FormData !== "undefined" && body instanceof FormData;
 
   // Request mới chờ cookie được xoay vòng, không gửi bằng phiên vừa hết hạn.
   if (refreshInFlight && !path.startsWith("/auth/")) await refreshInFlight;
@@ -53,10 +54,10 @@ async function request<T>(method: string, path: string, options: RequestOptions 
     signal: init.signal ?? AbortSignal.timeout(15000),
     headers: {
       Accept: "application/json",
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(body !== undefined && !multipart ? { "Content-Type": "application/json" } : {}),
       ...headers,
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: multipart ? body : body !== undefined ? JSON.stringify(body) : undefined,
   });
 
   const json: unknown = await response.json().catch(() => null);

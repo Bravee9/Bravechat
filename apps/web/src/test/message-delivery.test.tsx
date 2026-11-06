@@ -18,7 +18,7 @@ afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();vi.useRealTimers()});
 const saved={id:'saved1',content:'hello',user:'Alice',avatar:'AL',time:'10:00',createdAt:'2026-11-01T01:00:00Z'};
 describe('Message delivery',()=>{
  it('never shows raw route IDs while metadata is delayed or after navigating',async()=>{
-  let finish!:(value:any)=>void;
+  let finish!:(value:unknown)=>void;
   vi.mocked(http.get).mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve}));
   const view=render(<ChatView serverId="s1" channelId="private-channel-id"/>);
   expect(screen.getByRole('heading')).toHaveTextContent('Đang tải...');

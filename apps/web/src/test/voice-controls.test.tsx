@@ -4,12 +4,12 @@ import { act,render,screen,fireEvent,waitFor } from '@testing-library/react';
 import { VoiceRoom } from '@/features/messages/components/VoiceRoom';
 import { audioStore } from '@/stores/audio.store';
 import { http } from '@/services/http';
-const sdk=vi.hoisted(()=>({mic:vi.fn().mockResolvedValue(undefined),connect:vi.fn().mockResolvedValue(undefined),disconnect:vi.fn().mockResolvedValue(undefined),logLevel:vi.fn(),handlers:{} as Record<string,(...args:any[])=>void>}));
+const sdk=vi.hoisted(()=>({mic:vi.fn().mockResolvedValue(undefined),connect:vi.fn().mockResolvedValue(undefined),disconnect:vi.fn().mockResolvedValue(undefined),logLevel:vi.fn(),handlers:{} as Record<string,(...args:unknown[])=>void>}));
 vi.mock('@/services/http',()=>({http:{post:vi.fn()}}));
 vi.mock('livekit-client',()=>({
  Room:class {
   localParticipant={identity:'u1',name:'Alice',setMicrophoneEnabled:sdk.mic,setCameraEnabled:vi.fn().mockResolvedValue(undefined),getTrackPublication:()=>undefined};remoteParticipants=new Map();
-  on(event:string,handler:(...args:any[])=>void){sdk.handlers[event]=handler;return this} connect=sdk.connect; disconnect=sdk.disconnect;
+  on(event:string,handler:(...args:unknown[])=>void){sdk.handlers[event]=handler;return this} connect=sdk.connect; disconnect=sdk.disconnect;
  },
  setLogLevel:sdk.logLevel,
  RoomEvent:{ParticipantConnected:'join',ParticipantDisconnected:'leave',TrackSubscribed:'track',TrackUnsubscribed:'untrack',Reconnecting:'reconnecting',Reconnected:'reconnected',Disconnected:'disconnected'},
@@ -26,7 +26,7 @@ describe('Shared voice controls',()=>{
   expect(sdk.logLevel).toHaveBeenCalledWith('silent');
  });
  it('prevents duplicate joins and never connects after unmount while awaiting token',async()=>{
-  let finish!:(value:any)=>void;
+  let finish!:(value:unknown)=>void;
   vi.mocked(http.post).mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve}));
   const view=render(<VoiceRoom channelId="voice1" channelType="VOICE"/>);
   fireEvent.click(screen.getByRole('button',{name:'Tham gia'}));

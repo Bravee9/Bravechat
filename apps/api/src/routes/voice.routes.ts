@@ -29,8 +29,10 @@ export async function voiceRoutes(server: FastifyInstance) {
         const redis = getPresenceRedis()
         if (redis.status === 'wait') await redis.connect()
         const presenceKey = `bravechat:voice:${roomName}`
-        const alreadyJoined = await redis.sismember(presenceKey, request.user.id)
-        if (!alreadyJoined && await redis.scard(presenceKey) >= channel.userLimit) {
+        // Presence giữ từng kết nối; sức chứa tính theo người dùng, kể cả khi mở nhiều tab.
+        const identities = await redis.smembers(presenceKey)
+        const users = new Set(identities.map((identity) => identity.split(':')[0]))
+        if (!users.has(request.user.id) && users.size >= channel.userLimit) {
           return reply.status(409).send({ statusCode: 409, message: 'Voice room đã đạt giới hạn người tham gia.' })
         }
       } catch (error) {

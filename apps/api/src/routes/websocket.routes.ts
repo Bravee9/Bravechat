@@ -87,6 +87,7 @@ export async function websocketRoutes(server: FastifyInstance) {
           const member = await prisma.serverMember.findFirst({ where: { serverId: id, userId: session.userId, isBanned: false }, select: { id: true } })
           if (!member) return socket.send(JSON.stringify({ type: 'server_unavailable', serverId: id }))
           join('server', id, socket); session.servers.add(id)
+          socket.send(JSON.stringify({ type: 'server_joined', serverId: id }))
         } else if (data.type === 'join_channel') {
           const id = String(data.channelId ?? '')
           const channel = await prisma.channel.findFirst({ where: { id, server: { members: { some: { userId: session.userId, isBanned: false } } } }, select: { id: true, serverId: true } })
