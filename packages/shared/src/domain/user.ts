@@ -22,6 +22,7 @@ export interface CurrentUser extends UserSummary {
   discriminator: string;
   customStatus: string | null;
   bio?: string | null;
+  bannerUrl?: string | null;
 }
 
 export interface FriendshipEntry { id: string; user: UserSummary; status: "PENDING" | "ACCEPTED" | "BLOCKED" }

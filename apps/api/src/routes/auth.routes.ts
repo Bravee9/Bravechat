@@ -73,6 +73,37 @@ export async function authRoutes(server: FastifyInstance) {
     reply.header('Cache-Control', 'no-store')
     return { statusCode: 200, data: { user: present(await prisma.user.findUniqueOrThrow({ where: { id: request.user.id }, select: userSelect })) } }
   })
+  server.get('/sessions', { preHandler: [server.authenticate] }, async (request) => {
+    const sessions = await prisma.refreshToken.findMany({
+      where: { userId: request.user.id, isRevoked: false, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    })
+    return {
+      statusCode: 200,
+      data: {
+        sessions: sessions.map((s) => ({
+          id: s.id,
+          userAgent: s.userAgent || 'Trình duyệt Web (Windows)',
+          ipAddress: s.ipAddress || '127.0.0.1',
+          createdAt: s.createdAt,
+          isCurrent: s.id === request.user.sid,
+        })),
+      },
+    }
+  })
+  server.delete<{ Params: { id: string } }>('/sessions/:id', { preHandler: [server.authenticate] }, async (request) => {
+    const target = await prisma.refreshToken.findFirst({
+      where: { id: request.params.id, userId: request.user.id },
+    })
+    if (!target) throw fail(404, 'Không tìm thấy phiên đăng nhập.')
+    await prisma.refreshToken.update({
+      where: { id: target.id },
+      data: { isRevoked: true },
+    })
+    revokeSessions(request.user.id, target.id)
+    return { statusCode: 200, data: null }
+  })
   server.post('/forgot-password', { bodyLimit: 16 * 1024, config: { rateLimit: { max: 30, timeWindow: '15 minutes' } } }, async (request) => {
     const input = z.object({ email }).parse(request.body)
     if (!developmentMailbox() && (!env.RESEND_API_KEY || !env.RESET_EMAIL_FROM)) throw fail(503, 'Dịch vụ gửi email chưa được cấu hình.')
