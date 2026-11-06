@@ -23,11 +23,6 @@ async function setSession(reply: FastifyReply, user: { id: string; email: string
   reply.setCookie('token', access, { ...options, maxAge: 900 })
   reply.setCookie('refreshToken', refresh, { ...options, maxAge: 30 * 86400 })
 }
-async function issue(reply: FastifyReply, user: { id: string; email: string; username: string }, request: FastifyRequest) {
-  const refresh = randomBytes(48).toString('base64url')
-  const session = await prisma.refreshToken.create({ data: refreshData(user.id, refresh, request) })
-  await setSession(reply, user, session.id, refresh)
-}
 function clear(reply: FastifyReply) { reply.clearCookie('token', options); reply.clearCookie('refreshToken', options); reply.clearCookie('refresh', options) }
 export async function authRoutes(server: FastifyInstance) {
   server.addHook('onSend', async (_request, reply, payload) => {
@@ -36,8 +31,16 @@ export async function authRoutes(server: FastifyInstance) {
   })
   server.post('/register', { config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, async (request, reply) => {
     const input = z.object({ email, password, username: z.string().trim().toLowerCase().min(3).max(32).regex(/^[a-z0-9._]+$/), displayName: z.string().trim().max(32).optional() }).parse(request.body)
-    const user = await prisma.user.create({ data: { email: input.email, username: input.username, displayName: input.displayName || input.username, passwordHash: await bcrypt.hash(input.password, 12) }, select: userSelect })
-    await issue(reply, user, request)
+    const passwordHash = await bcrypt.hash(input.password, 12)
+    const refresh = randomBytes(48).toString('base64url')
+    // A newly visible account must already have its initial session so reset
+    // cannot run between account creation and late session issuance either.
+    const { user, session } = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({ data: { email: input.email, username: input.username, displayName: input.displayName || input.username, passwordHash }, select: userSelect })
+      const session = await tx.refreshToken.create({ data: refreshData(user.id, refresh, request) })
+      return { user, session }
+    })
+    await setSession(reply, user, session.id, refresh)
     return reply.code(201).send({ statusCode: 201, data: { user: present(user) } })
   })
   server.post('/login', { config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, async (request, reply) => {
