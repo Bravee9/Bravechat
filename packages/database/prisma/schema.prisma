@@ -189,6 +189,7 @@ model Channel {
   slowModeDelay Int         @default(0) @map("slow_mode_delay") // seconds
   bitrate       Int? // for VOICE channels (bps)
   userLimit     Int?        @map("user_limit") // for VOICE channels
+  voiceEpoch    Int         @default(0) @map("voice_epoch")
   lastMessageId String?     @map("last_message_id")
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
@@ -198,6 +199,7 @@ model Channel {
   category   ChannelCategory?   @relation(fields: [categoryId], references: [id])
   messages   Message[]
   readStates ChannelReadState[]
+  voiceSessions VoiceSession[]
 
   @@map("channels")
 }
@@ -453,6 +455,22 @@ model RefreshToken {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  voiceSessions VoiceSession[]
+
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+// Retain issued room generations even after a participant disconnects. A
+// self-hosted LiveKit token can otherwise be replayed after RemoveParticipant.
+model VoiceSession {
+  channelId String @map("channel_id")
+  sessionId String @map("session_id")
+  epoch Int
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  session RefreshToken @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, sessionId, epoch])
+  @@index([sessionId])
+  @@map("voice_sessions")
 }

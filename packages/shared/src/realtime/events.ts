@@ -62,6 +62,7 @@ export type ServerEvent =
   | { type: "channel_read"; channelId: string; serverId: string }
   | { type: "user_update" }
   | { type: "server_unavailable"; serverId: string }
+  | { type: "server_joined"; serverId: string }
   | { type: "error"; message: string }
   | { type: "typing_start"; channelId: string; username: string }
   | { type: "typing_stop"; channelId: string; username: string };
@@ -74,7 +75,7 @@ const SERVER_EVENT_TYPES: ReadonlySet<string> = new Set<ServerEventType>([
   "channel_joined",
   "message_create",
   "message_update", "message_delete", "dm_create", "dm_update", "dm_delete",
-  "friends_update", "conversations_update", "channel_read", "user_update", "server_unavailable", "error",
+  "friends_update", "conversations_update", "channel_read", "user_update", "server_unavailable", "server_joined", "error",
   "typing_start",
   "typing_stop",
 ]);

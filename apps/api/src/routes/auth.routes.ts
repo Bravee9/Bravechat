@@ -8,6 +8,7 @@ import { mediaUrl } from '../services/storage.service'
 import { fail } from '../services/conversation'
 import { developmentMailbox, sendResetMail } from '../services/reset-mail'
 import { revokeSessions } from './websocket.routes'
+import { revokeVoiceSessions, rotateVoiceSession } from '../services/voice-security'
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex')
 const email = z.string().trim().toLowerCase().email('Email không hợp lệ.')
@@ -22,11 +23,6 @@ async function setSession(reply: FastifyReply, user: { id: string; email: string
   reply.setCookie('token', access, { ...options, maxAge: 900 })
   reply.setCookie('refreshToken', refresh, { ...options, maxAge: 30 * 86400 })
 }
-async function issue(reply: FastifyReply, user: { id: string; email: string; username: string }, request: FastifyRequest) {
-  const refresh = randomBytes(48).toString('base64url')
-  const session = await prisma.refreshToken.create({ data: refreshData(user.id, refresh, request) })
-  await setSession(reply, user, session.id, refresh)
-}
 function clear(reply: FastifyReply) { reply.clearCookie('token', options); reply.clearCookie('refreshToken', options); reply.clearCookie('refresh', options) }
 export async function authRoutes(server: FastifyInstance) {
   server.addHook('onSend', async (_request, reply, payload) => {
@@ -35,16 +31,33 @@ export async function authRoutes(server: FastifyInstance) {
   })
   server.post('/register', { config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, async (request, reply) => {
     const input = z.object({ email, password, username: z.string().trim().toLowerCase().min(3).max(32).regex(/^[a-z0-9._]+$/), displayName: z.string().trim().max(32).optional() }).parse(request.body)
-    const user = await prisma.user.create({ data: { email: input.email, username: input.username, displayName: input.displayName || input.username, passwordHash: await bcrypt.hash(input.password, 12) }, select: userSelect })
-    await issue(reply, user, request)
+    const passwordHash = await bcrypt.hash(input.password, 12)
+    const refresh = randomBytes(48).toString('base64url')
+    // A newly visible account must already have its initial session so reset
+    // cannot run between account creation and late session issuance either.
+    const { user, session } = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({ data: { email: input.email, username: input.username, displayName: input.displayName || input.username, passwordHash }, select: userSelect })
+      const session = await tx.refreshToken.create({ data: refreshData(user.id, refresh, request) })
+      return { user, session }
+    })
+    await setSession(reply, user, session.id, refresh)
     return reply.code(201).send({ statusCode: 201, data: { user: present(user) } })
   })
   server.post('/login', { config: { rateLimit: { max: 50, timeWindow: '1 minute' } } }, async (request, reply) => {
     const input = z.object({ email, password: z.string().min(1).max(128) }).parse(request.body)
     const account = await prisma.user.findUnique({ where: { email: input.email } })
     if (!account || account.isBanned || !await bcrypt.compare(input.password, account.passwordHash)) throw fail(401, 'Email hoặc mật khẩu không chính xác.')
-    const user = await prisma.user.update({ where: { id: account.id }, data: { lastSeenAt: new Date() }, select: userSelect })
-    await issue(reply, user, request)
+    const refresh = randomBytes(48).toString('base64url')
+    const { user, session } = await prisma.$transaction(async (tx) => {
+      // UPDATE takes the same user-row lock as password reset. PostgreSQL
+      // rechecks this predicate after waiting for a concurrent password change.
+      const unchanged = await tx.user.updateMany({ where: { id: account.id, passwordHash: account.passwordHash, isBanned: false }, data: { lastSeenAt: new Date() } })
+      if (unchanged.count !== 1) throw fail(401, 'Email hoặc mật khẩu không chính xác.')
+      const user = await tx.user.findUniqueOrThrow({ where: { id: account.id }, select: userSelect })
+      const session = await tx.refreshToken.create({ data: refreshData(user.id, refresh, request) })
+      return { user, session }
+    })
+    await setSession(reply, user, session.id, refresh)
     return { statusCode: 200, data: { user: present(user) } }
   })
   server.post('/logout', async (request, reply) => {
@@ -52,6 +65,7 @@ export async function authRoutes(server: FastifyInstance) {
     if (!session) { try { await request.jwtVerify(); session = await prisma.refreshToken.findUnique({ where: { id: request.user.sid } }) } catch { /* expired cookies are still cleared */ } }
     if (session) { await prisma.refreshToken.update({ where: { id: session.id }, data: { isRevoked: true } }); revokeSessions(session.userId, session.id) }
     clear(reply)
+    if (session) await revokeVoiceSessions(session.userId, session.id)
     return { statusCode: 200, data: null }
   })
   server.post('/refresh', async (request, reply) => {
@@ -60,12 +74,17 @@ export async function authRoutes(server: FastifyInstance) {
     const nextValue = randomBytes(48).toString('base64url')
     // Consume có điều kiện trong transaction: hai request refresh không tạo hai phiên mới.
     const next = await prisma.$transaction(async (tx) => {
+      // Serialize refresh issuance with reset as well as login. Otherwise a
+      // refresh that read the old session could create a new one after reset.
+      const unchanged = await tx.user.updateMany({ where: { id: stored.userId, passwordHash: stored.user.passwordHash, isBanned: false }, data: { lastSeenAt: new Date() } })
+      if (unchanged.count !== 1) throw fail(401, 'Phiên đăng nhập đã hết hạn.')
       const consumed = await tx.refreshToken.updateMany({ where: { id: stored.id, isRevoked: false }, data: { isRevoked: true } })
       if (consumed.count !== 1) throw fail(401, 'Phiên đăng nhập đã được làm mới.')
       return tx.refreshToken.create({ data: refreshData(stored.userId, nextValue, request) })
     })
-    await setSession(reply, stored.user, next.id, nextValue)
     revokeSessions(stored.userId, stored.id)
+    await rotateVoiceSession(stored.userId, stored.id, next.id)
+    await setSession(reply, stored.user, next.id, nextValue)
     return { statusCode: 200, data: null }
   })
   server.get('/me', { preHandler: [server.authenticate] }, async (request, reply) => {
@@ -89,6 +108,10 @@ export async function authRoutes(server: FastifyInstance) {
   })
   server.post('/reset-password', { config: { rateLimit: { max: 100, timeWindow: '15 minutes' } } }, async (request) => {
     const input = z.object({ token: z.string().regex(/^[a-f0-9]{64}$/), password }).parse(request.body)
+    // Reject random/expired tokens before paying the bcrypt cost. The
+    // transaction below still consumes the token conditionally to prevent reuse.
+    const candidate = await prisma.passwordResetToken.findUnique({ where: { tokenHash: digest(input.token) }, include: { user: { select: { isBanned: true } } } })
+    if (!candidate || candidate.usedAt || candidate.expiresAt <= new Date() || candidate.user.isBanned) throw fail(400, 'Liên kết đã hết hạn hoặc đã sử dụng.')
     const hash = await bcrypt.hash(input.password, 12)
     // Chỉ request dùng token đầu tiên được đổi mật khẩu; các phiên cũ bị thu hồi cùng transaction.
     const userId = await prisma.$transaction(async (tx) => {
@@ -101,6 +124,7 @@ export async function authRoutes(server: FastifyInstance) {
       return token.userId
     })
     revokeSessions(userId)
+    await revokeVoiceSessions(userId)
     return { statusCode: 200, data: null, message: 'Mật khẩu đã được cập nhật. Hãy đăng nhập lại.' }
   })
 }

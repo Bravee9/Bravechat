@@ -1,10 +1,11 @@
 "use client";
 
-import { Room, RoomEvent, Track, setLogLevel, type Participant, type RemoteTrack, type TrackPublication } from "livekit-client";
+import { Room, RoomEvent, Track, setLogLevel, type Participant, type RemoteTrack } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { http } from "@/services/http";
 import { audioStore } from "@/stores/audio.store";
 import { useStore } from "@/lib/store";
+import { waitForVoicePermission } from "../voice-permission";
 
 interface VoiceRoomProps {
   channelId: string;
@@ -90,7 +91,7 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
       nextRoom
         .on(RoomEvent.ParticipantConnected, syncParticipants)
         .on(RoomEvent.ParticipantDisconnected, syncParticipants)
-        .on(RoomEvent.TrackSubscribed, (track: RemoteTrack, _publication: TrackPublication, participant: Participant) => {
+        .on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
           if (!active()) return;
           const element = track.attach();
           if (element instanceof HTMLMediaElement && track.kind === Track.Kind.Audio) element.muted = audioStore.get().deafened;
@@ -108,6 +109,8 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
           setStatus("Mất kết nối");
         });
       await nextRoom.connect(credentials.serverUrl, credentials.token);
+      ensureActive();
+      await waitForVoicePermission(nextRoom, controller.signal);
       ensureActive();
       const enabled = !audioStore.get().muted && !audioStore.get().deafened;
       await nextRoom.localParticipant.setMicrophoneEnabled(enabled);
