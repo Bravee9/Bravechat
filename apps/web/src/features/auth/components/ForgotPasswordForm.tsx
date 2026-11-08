@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { http } from "@/services/http";
 import { cn } from "@/lib/utils";
 
@@ -153,15 +152,6 @@ export function ForgotPasswordForm() {
           </div>
         </form>
       )}
-
-      <div className="pt-2 text-center md:text-left">
-        <Link
-          href="/login"
-          className="text-xs text-ocean-secondary hover:underline font-medium inline-block"
-        >
-          Quay lại đăng nhập
-        </Link>
-      </div>
     </div>
   );
 }

@@ -5,8 +5,6 @@ const nextConfig = {
   output: process.env.DOCKER_BUILD === "true" || process.platform !== "win32" ? "standalone" : undefined,
   // packages/shared is source-only TypeScript (no build step)
   transpilePackages: ["@discord-clone/shared"],
-  // Disable Next.js development indicator badge and toolbar (the floating "N" icon)
-  devIndicators: false,
 };
 
 export default nextConfig;
