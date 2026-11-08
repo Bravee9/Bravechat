@@ -13,13 +13,82 @@ import rateLimit from '@fastify/rate-limit'
 import { env } from '../config/env'
 import r2 from './r2'
 import { prisma } from '../config/prisma'
-import {
-  getRedisClient,
-  isIpBlacklisted,
-  blacklistIp,
-  recordRateLimitViolation,
-  unblacklistIp,
-} from '../config/redis'
+import Redis from 'ioredis'
+
+let redisClientInstance: Redis | null = null
+const localBlacklistCache = new Map<string, number>()
+
+function getRedisClient(): Redis | null {
+  if (env.REDIS_ENABLED !== 'true') return null
+  if (!redisClientInstance && env.REDIS_URL) {
+    redisClientInstance = new Redis(env.REDIS_URL, {
+      maxRetriesPerRequest: 2,
+      retryStrategy: (times) => (times > 5 ? null : Math.min(times * 200, 2000)),
+    })
+    redisClientInstance.on('error', () => undefined)
+  }
+  return redisClientInstance
+}
+
+async function isIpBlacklisted(ip: string): Promise<boolean> {
+  const now = Date.now()
+  const cachedExpiry = localBlacklistCache.get(ip)
+  if (cachedExpiry) {
+    if (cachedExpiry > now) return true
+    localBlacklistCache.delete(ip)
+  }
+  const client = getRedisClient()
+  if (!client) return false
+  try {
+    const isBanned = await client.exists(`bravechat:blacklist:${ip}`)
+    if (isBanned === 1) {
+      const ttl = await client.ttl(`bravechat:blacklist:${ip}`)
+      localBlacklistCache.set(ip, now + (ttl > 0 ? ttl * 1000 : 900000))
+      return true
+    }
+  } catch {
+    return false
+  }
+  return false
+}
+
+async function blacklistIp(ip: string, ttlSeconds = 900, reason = 'Excessive traffic'): Promise<void> {
+  localBlacklistCache.set(ip, Date.now() + ttlSeconds * 1000)
+  const client = getRedisClient()
+  if (client) {
+    try {
+      await client.set(`bravechat:blacklist:${ip}`, JSON.stringify({ reason, bannedAt: new Date().toISOString() }), 'EX', ttlSeconds)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+async function recordRateLimitViolation(ip: string): Promise<void> {
+  const client = getRedisClient()
+  if (!client) return
+  try {
+    const strikeKey = `bravechat:strikes:${ip}`
+    const strikeCount = await client.incr(strikeKey)
+    if (strikeCount === 1) await client.expire(strikeKey, 300)
+    if (strikeCount >= 3) await blacklistIp(ip, 900, 'Automated botnet defense')
+  } catch {
+    // ignore
+  }
+}
+
+async function unblacklistIp(ip: string): Promise<void> {
+  localBlacklistCache.delete(ip)
+  const client = getRedisClient()
+  if (client) {
+    try {
+      const keys = await client.keys(`*${ip}*`)
+      if (keys.length > 0) await client.del(...keys)
+    } catch {
+      // ignore
+    }
+  }
+}
 
 const normalizeOrigin = (value: string) => value.replace(/\/$/, '')
 

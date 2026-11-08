@@ -27,11 +27,15 @@ const envSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6379'),
   REDIS_ENABLED: z.enum(['true', 'false']).default('false'),
 
-  // Auth
+  // Auth & Email Delivery (Gmail SMTP / Resend)
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default('7d'),
   RESEND_API_KEY: z.string().optional(),
   RESET_EMAIL_FROM: z.string().optional(),
+  GMAIL_USER: optionalCredential(z.string().trim().email()),
+  GMAIL_APP_PASSWORD: optionalCredential(z.string().trim().min(8)),
+  SMTP_HOST: z.string().default('smtp.gmail.com'),
+  SMTP_PORT: z.coerce.number().default(465),
 
   // Cloudflare R2 / MinIO (Object Storage)
   STORAGE_DRIVER: z.enum(['r2', 'minio', 's3']).default('r2'),

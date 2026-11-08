@@ -7,6 +7,8 @@ import { http } from "@/services/http";
 import { useStore } from "@/lib/store";
 import { i18nStore, type Language } from "@/stores/i18n.store";
 import { workspaceStore } from "@/stores/workspace.store";
+import { QrCodeSvg } from "@/components/ui/QrCodeSvg";
+import { GmailSmtpModal } from "@/features/auth/components/GmailSmtpModal";
 
 interface UserSession {
   id: string;
@@ -14,6 +16,16 @@ interface UserSession {
   ipAddress: string;
   createdAt: string;
   isCurrent: boolean;
+}
+
+interface SecurityLogItem {
+  id: string;
+  event: string;
+  method: string;
+  status: "SUCCESS" | "CHALLENGE" | "FAILED";
+  ipAddress: string;
+  userAgent: string;
+  createdAt: string;
 }
 
 interface UserSettingsModalProps {
@@ -41,11 +53,29 @@ export function UserSettingsModal({
   const [showPhone, setShowPhone] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
 
-  // Security / 2FA state
+  // Security / 2FA / Gmail state
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [twoFactorSetupStep, setTwoFactorSetupStep] = useState<"idle" | "qr" | "success">("idle");
+  const [twoFactorSecret, setTwoFactorSecret] = useState("JBSWY3DPEHPK3PXP");
+  const [twoFactorOtpauthUrl, setTwoFactorOtpauthUrl] = useState("");
+  const [twoFactorDevCode, setTwoFactorDevCode] = useState("");
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [twoFactorBackupCodes, setTwoFactorBackupCodes] = useState<string[]>([]);
+  const [gmailLoginOtpEnabled, setGmailLoginOtpEnabled] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(Boolean(user.isEmailVerified));
+  const [emailVerifyStep, setEmailVerifyStep] = useState<"idle" | "otp">("idle");
+  const [emailVerifyCode, setEmailVerifyCode] = useState("");
+  const [emailVerifyDevOtp, setEmailVerifyDevOtp] = useState("");
+  const [securityLogs, setSecurityLogs] = useState<SecurityLogItem[]>([]);
+  const [showGmailSmtpModal, setShowGmailSmtpModal] = useState(false);
+
+  // QR Remote Device Approval state
+  const [qrInputCode, setQrInputCode] = useState("");
+  const [qrScannedDevice, setQrScannedDevice] = useState<{
+    qrId: string;
+    shortCode: string;
+    device: { ipAddress: string; userAgent: string };
+  } | null>(null);
 
   // Password change state
   const [changingPassword, setChangingPassword] = useState(false);
@@ -73,12 +103,30 @@ export function UserSettingsModal({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // Load sessions when entering devices tab
+  // Load sessions & security state when entering devices or security tab
   useEffect(() => {
     if (activeTab === "devices" || activeTab === "security") {
       void loadSessions();
+      void loadSecurityInfo();
     }
   }, [activeTab]);
+
+  const loadSecurityInfo = async () => {
+    try {
+      const res = await http.get<{
+        isEmailVerified: boolean;
+        twoFactorEnabled: boolean;
+        gmailLoginOtpEnabled: boolean;
+        logs: SecurityLogItem[];
+      }>("/auth/security");
+      setIsEmailVerified(res.isEmailVerified);
+      setTwoFactorEnabled(res.twoFactorEnabled);
+      setGmailLoginOtpEnabled(res.gmailLoginOtpEnabled);
+      setSecurityLogs(res.logs || []);
+    } catch {
+      // ignore
+    }
+  };
 
   const loadSessions = async () => {
     setLoadingSessions(true);
@@ -159,25 +207,162 @@ export function UserSettingsModal({
     }
   };
 
-  const handleSetup2FA = () => {
+  const handleSetup2FA = async () => {
+    setError("");
     if (twoFactorSetupStep === "idle") {
-      setTwoFactorSetupStep("qr");
-      // Generate sample backup codes
-      setTwoFactorBackupCodes([
-        "7A9B-4D2E",
-        "1C3F-8E5A",
-        "9B2C-6D4E",
-        "5E1A-7F3B",
-        "8D4C-2E9A",
-        "3F6B-1A8E",
-      ]);
-    } else if (twoFactorSetupStep === "qr") {
-      if (twoFactorCode.trim().length === 6) {
-        setTwoFactorEnabled(true);
-        setTwoFactorSetupStep("success");
-      } else {
-        setError("Vui lòng nhập đủ 6 chữ số từ ứng dụng xác thực.");
+      try {
+        const res = await http.post<{
+          secret: string;
+          otpauthUrl: string;
+          devCurrentCode?: string;
+        }>("/auth/2fa/setup");
+        setTwoFactorSecret(res.secret);
+        setTwoFactorOtpauthUrl(res.otpauthUrl);
+        if (res.devCurrentCode) setTwoFactorDevCode(res.devCurrentCode);
+        setTwoFactorSetupStep("qr");
+      } catch {
+        setTwoFactorSetupStep("qr");
       }
+    } else if (twoFactorSetupStep === "qr") {
+      if (twoFactorCode.trim().length !== 6) {
+        setError("Vui lòng nhập đủ 6 chữ số từ ứng dụng xác thực.");
+        return;
+      }
+      try {
+        const res = await http.post<{
+          twoFactorEnabled: boolean;
+          backupCodes: string[];
+        }>("/auth/2fa/enable", { code: twoFactorCode.trim() });
+        setTwoFactorEnabled(res.twoFactorEnabled);
+        setTwoFactorBackupCodes(res.backupCodes);
+        setTwoFactorSetupStep("success");
+        void loadSecurityInfo();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Mã xác thực 2FA không hợp lệ.");
+      }
+    }
+  };
+
+  const handleToggleGmailLoginOtp = async (nextVal: boolean) => {
+    setError("");
+    try {
+      const res = await http.post<{ gmailLoginOtpEnabled: boolean }>("/auth/security/preferences", {
+        gmailLoginOtpEnabled: nextVal,
+      });
+      setGmailLoginOtpEnabled(res.gmailLoginOtpEnabled);
+      setSuccessMsg(
+        res.gmailLoginOtpEnabled
+          ? "Đã bật xác minh đăng nhập bước 2 qua Gmail (OTP 6 chữ số)!"
+          : "Đã tắt yêu cầu xác minh Gmail OTP bắt buộc khi đăng nhập."
+      );
+      setTimeout(() => setSuccessMsg(""), 3000);
+      void loadSecurityInfo();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể cập nhật cài đặt bảo mật.");
+    }
+  };
+
+  const handleSendVerifyEmailOtp = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await http.post<{ delivery: string; devOtp?: string }>("/auth/verify-email/send");
+      setEmailVerifyStep("otp");
+      if (res.devOtp) setEmailVerifyDevOtp(res.devOtp);
+      setSuccessMsg("Đã gửi mã xác minh 6 chữ số tới hộp thư Gmail của bạn.");
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể gửi mã xác minh Gmail.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleConfirmVerifyEmailOtp = async () => {
+    if (emailVerifyCode.trim().length !== 6) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await http.post<{ user: CurrentUser }>("/auth/verify-email/confirm", {
+        code: emailVerifyCode.trim(),
+      });
+      setIsEmailVerified(true);
+      setEmailVerifyStep("idle");
+      onSaved(res.user);
+      workspaceStore.set({ currentUser: res.user });
+      setSuccessMsg("Đã xác minh địa chỉ Gmail chính chủ thành công!");
+      setTimeout(() => setSuccessMsg(""), 4000);
+      void loadSecurityInfo();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Mã xác minh Gmail không chính xác.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleChangePasswordReal = async () => {
+    setError("");
+    if (!currentPassword || newPassword.length < 8) {
+      setError("Vui lòng nhập mật khẩu hiện tại và mật khẩu mới tối thiểu 8 ký tự.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setError("Mật khẩu mới xác nhận chưa trùng khớp.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await http.post("/auth/change-password", {
+        currentPassword,
+        newPassword,
+      });
+      setSuccessMsg("Mật khẩu đã được cập nhật thành công và các thiết bị khác đã được đăng xuất.");
+      setChangingPassword(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setTimeout(() => setSuccessMsg(""), 4000);
+      void loadSecurityInfo();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể đổi mật khẩu.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleScanQrDevice = async () => {
+    if (!qrInputCode.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await http.post<{
+        qrId: string;
+        shortCode: string;
+        device: { ipAddress: string; userAgent: string };
+      }>("/auth/qr/scan", { code: qrInputCode.trim() });
+      setQrScannedDevice(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Mã QR không tồn tại hoặc đã hết hạn.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleApproveQrDevice = async () => {
+    if (!qrScannedDevice) return;
+    setBusy(true);
+    setError("");
+    try {
+      await http.post("/auth/qr/approve", { qrId: qrScannedDevice.qrId });
+      setSuccessMsg(`Đã phê duyệt đăng nhập bằng mã QR (${qrScannedDevice.shortCode}) thành công!`);
+      setQrScannedDevice(null);
+      setQrInputCode("");
+      void loadSessions();
+      void loadSecurityInfo();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể phê duyệt thiết bị QR.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -188,13 +373,13 @@ export function UserSettingsModal({
   };
 
   const navigationItems = [
-    { id: "account", label: t.account, section: "USER_SETTINGS", icon: "👤" },
-    { id: "security", label: t.security, section: "USER_SETTINGS", icon: "🛡️" },
-    { id: "devices", label: t.devices, section: "USER_SETTINGS", icon: "💻" },
-    { id: "privacy", label: t.privacy, section: "USER_SETTINGS", icon: "🔒" },
-    { id: "nitro", label: t.nitro, section: "BILLING_SETTINGS", icon: "✦", badge: "VIP" },
-    { id: "language", label: t.language, section: "APP_SETTINGS", icon: "🌐" },
-    { id: "voice", label: t.voiceVideo, section: "APP_SETTINGS", icon: "🎙️" },
+    { id: "account", label: t.account, section: "USER_SETTINGS" },
+    { id: "security", label: t.security, section: "USER_SETTINGS" },
+    { id: "devices", label: t.devices, section: "USER_SETTINGS" },
+    { id: "privacy", label: t.privacy, section: "USER_SETTINGS" },
+    { id: "nitro", label: t.nitro, section: "BILLING_SETTINGS", badge: "VIP" },
+    { id: "language", label: t.language, section: "APP_SETTINGS" },
+    { id: "voice", label: t.voiceVideo, section: "APP_SETTINGS" },
   ];
 
   const filteredNav = navigationItems.filter((item) =>
@@ -240,9 +425,12 @@ export function UserSettingsModal({
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-1.5 text-xs text-ocean-light/40 hover:text-white"
+                  className="absolute right-2 top-2 text-ocean-light/40 hover:text-white"
+                  aria-label="Xóa tìm kiếm"
                 >
-                  ✕
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               )}
             </div>
@@ -268,7 +456,6 @@ export function UserSettingsModal({
                   )}
                 >
                   <div className="flex items-center gap-2.5">
-                    <span>{item.icon}</span>
                     <span>{item.label}</span>
                   </div>
                 </button>
@@ -292,7 +479,6 @@ export function UserSettingsModal({
                   )}
                 >
                   <div className="flex items-center gap-2.5">
-                    <span>{item.icon}</span>
                     <span>{item.label}</span>
                   </div>
                   {item.badge && (
@@ -321,7 +507,6 @@ export function UserSettingsModal({
                   )}
                 >
                   <div className="flex items-center gap-2.5">
-                    <span>{item.icon}</span>
                     <span>{item.label}</span>
                   </div>
                 </button>
@@ -359,7 +544,9 @@ export function UserSettingsModal({
             className="w-9 h-9 rounded-full border border-ocean-dark-border hover:border-ocean-secondary bg-[#051424] text-ocean-light hover:text-white flex items-center justify-center transition-colors text-sm font-bold shadow-md cursor-pointer"
             aria-label="Đóng"
           >
-            ✕
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
           <span className="text-[10px] text-ocean-light/40 font-mono mt-1">ESC</span>
         </div>
@@ -589,10 +776,115 @@ export function UserSettingsModal({
           </div>
         )}
 
-        {/* ─── TAB: SECURITY (2FA & SESSIONS) ─────────────────────────── */}
+        {/* ─── TAB: SECURITY (2FA, GMAIL OTP, QR & SESSIONS) ─────────────── */}
         {activeTab === "security" && (
           <div className="space-y-6">
-            <h2 className="text-xl font-bold text-ocean-light">{t.passwordAndSecurity}</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-ocean-light">{t.passwordAndSecurity}</h2>
+              <button
+                type="button"
+                onClick={() => setShowGmailSmtpModal(true)}
+                className="btn-secondary text-xs px-3.5 py-2 flex items-center gap-1.5"
+              >
+                <span>Cấu hình Gmail SMTP</span>
+              </button>
+            </div>
+
+            {/* Gmail Account Verification & 2-Step Login OTP Card */}
+            <div className="rounded-2xl border border-ocean-dark-border bg-[#051424] p-6 space-y-4 shadow-xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-sm text-ocean-light">
+                      Xác minh địa chỉ Gmail & Bảo mật đăng nhập
+                    </h3>
+                    {isEmailVerified ? (
+                      <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] px-2 py-0.5 rounded font-bold">
+                        Đã xác minh Gmail
+                      </span>
+                    ) : (
+                      <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded font-bold">
+                        Chưa xác minh
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-ocean-light/60 mt-1">
+                    Địa chỉ liên kết: <strong className="font-mono text-ocean-light">{user.email}</strong>
+                  </p>
+                </div>
+
+                {!isEmailVerified && emailVerifyStep === "idle" && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={handleSendVerifyEmailOtp}
+                    className="btn-primary text-xs px-4 py-2"
+                  >
+                    Gửi mã xác minh Gmail
+                  </button>
+                )}
+              </div>
+
+              {emailVerifyStep === "otp" && (
+                <div className="p-4 rounded-xl bg-black/40 border border-ocean-secondary/40 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-ocean-light">
+                      Nhập mã 6 chữ số đã gửi tới <strong>{user.email}</strong>:
+                    </span>
+                    {emailVerifyDevOtp && (
+                      <button
+                        type="button"
+                        onClick={() => setEmailVerifyCode(emailVerifyDevOtp)}
+                        className="font-mono text-emerald-300 hover:underline cursor-pointer"
+                      >
+                        Mã Dev: <strong>{emailVerifyDevOtp}</strong> (Điền nhanh)
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={emailVerifyCode}
+                      onChange={(e) => setEmailVerifyCode(e.target.value.replace(/\D/g, ""))}
+                      className="input-ocean w-36 text-center font-mono text-base font-bold tracking-widest"
+                    />
+                    <button
+                      type="button"
+                      disabled={busy || emailVerifyCode.length !== 6}
+                      onClick={handleConfirmVerifyEmailOtp}
+                      className="btn-primary text-xs px-4"
+                    >
+                      Xác nhận Gmail
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-ocean-dark-border/40 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-bold text-ocean-light">
+                    Bắt buộc xác minh Mã OTP qua Gmail mỗi khi đăng nhập (2-Step Gmail Verification)
+                  </p>
+                  <p className="text-[11px] text-ocean-light/55 mt-0.5">
+                    Khi bật, mọi lần đăng nhập bằng mật khẩu đều yêu cầu nhập mã 6 số gửi về Gmail của bạn.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleToggleGmailLoginOtp(!gmailLoginOtpEnabled)}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                    gmailLoginOtpEnabled
+                      ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/50"
+                      : "btn-secondary"
+                  )}
+                >
+                  {gmailLoginOtpEnabled ? "Đang bật" : "Bật ngay"}
+                </button>
+              </div>
+            </div>
 
             {/* Change Password Card */}
             <div className="rounded-2xl border border-ocean-dark-border bg-[#051424] p-6 space-y-4 shadow-xl">
@@ -643,13 +935,11 @@ export function UserSettingsModal({
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        setSuccessMsg("Mật khẩu đã được cập nhật thành công.");
-                        setChangingPassword(false);
-                      }}
+                      disabled={busy}
+                      onClick={() => void handleChangePasswordReal()}
                       className="btn-primary text-xs py-1.5 px-4"
                     >
-                      Cập nhật mật khẩu
+                      {busy ? "Đang cập nhật..." : "Cập nhật mật khẩu"}
                     </button>
                   </div>
                 </div>
@@ -663,40 +953,64 @@ export function UserSettingsModal({
                   <h3 className="font-bold text-sm text-ocean-light">{t.twoFactorAuth}</h3>
                   <p className="text-xs text-ocean-light/60 mt-1 max-w-md">{t.twoFactorDesc}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleSetup2FA}
-                  className={cn(
-                    "text-xs px-4 py-2 rounded-lg font-semibold transition-all cursor-pointer",
-                    twoFactorEnabled
-                      ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/50 cursor-default"
-                      : "btn-primary"
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleSetup2FA()}
+                    className={cn(
+                      "text-xs px-4 py-2 rounded-lg font-semibold transition-all cursor-pointer",
+                      twoFactorEnabled
+                        ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500/50 cursor-default"
+                        : "btn-primary"
+                    )}
+                  >
+                    {twoFactorEnabled ? "Đã kích hoạt" : t.twoFactorSetup}
+                  </button>
+                  {twoFactorEnabled && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await http.post("/auth/2fa/disable").catch(() => undefined);
+                        setTwoFactorEnabled(false);
+                        setTwoFactorSetupStep("idle");
+                        void loadSecurityInfo();
+                      }}
+                      className="text-xs text-rose-400 hover:underline px-2 py-1 cursor-pointer"
+                    >
+                      Tắt 2FA
+                    </button>
                   )}
-                >
-                  {twoFactorEnabled ? "Đã Kích Hoạt ✓" : t.twoFactorSetup + " >"}
-                </button>
+                </div>
               </div>
 
               {twoFactorSetupStep === "qr" && (
                 <div className="p-4 rounded-xl bg-black/40 border border-ocean-secondary/40 space-y-3 animate-fadeIn">
                   <p className="text-xs font-semibold text-ocean-light">
-                    1. Quét mã QR bằng Google Authenticator hoặc Authy:
+                    1. Quét mã QR chuẩn TOTP bằng Google Authenticator hoặc Authy:
                   </p>
-                  <div className="flex items-center gap-4 bg-white/5 p-3 rounded-lg border border-white/5">
-                    <div className="w-24 h-24 bg-white rounded-lg p-1.5 flex items-center justify-center">
-                      <div className="w-full h-full bg-slate-900 rounded grid grid-cols-4 gap-0.5 p-1">
-                        <div className="bg-white col-span-2 row-span-2" />
-                        <div className="bg-white" />
-                        <div className="bg-white" />
-                        <div className="bg-white" />
-                        <div className="bg-white col-span-2 row-span-2" />
-                      </div>
-                    </div>
-                    <div>
+                  <div className="flex flex-wrap items-center gap-4 bg-white/5 p-3 rounded-lg border border-white/5">
+                    <QrCodeSvg
+                      value={
+                        twoFactorOtpauthUrl ||
+                        `otpauth://totp/Bravechat:${user.email}?secret=${twoFactorSecret}&issuer=Bravechat`
+                      }
+                      size={112}
+                      showCenterLogo={false}
+                    />
+                    <div className="space-y-1">
                       <p className="text-xs text-ocean-light/50">Mã bí mật (Secret key):</p>
-                      <code className="text-xs font-mono text-ocean-secondary font-bold">
-                        JBSWY3DPEHPK3PXP
+                      <code className="text-xs font-mono text-ocean-secondary font-bold block">
+                        {twoFactorSecret}
                       </code>
+                      {twoFactorDevCode && (
+                        <button
+                          type="button"
+                          onClick={() => setTwoFactorCode(twoFactorDevCode)}
+                          className="text-[11px] font-mono text-emerald-300 hover:underline cursor-pointer block pt-1"
+                        >
+                          Mã TOTP hiện tại: <strong>{twoFactorDevCode}</strong> (Điền nhanh)
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -714,7 +1028,7 @@ export function UserSettingsModal({
                     />
                     <button
                       type="button"
-                      onClick={handleSetup2FA}
+                      onClick={() => void handleSetup2FA()}
                       className="btn-primary text-xs px-4"
                     >
                       Xác nhận kích hoạt
@@ -726,8 +1040,10 @@ export function UserSettingsModal({
               {twoFactorSetupStep === "success" && (
                 <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 space-y-3 animate-fadeIn">
                   <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs">
-                    <span>✓</span>
-                    <span>Xác thực 2 yếu tố đã được bảo vệ thành công!</span>
+                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Xác thực 2 yếu tố đã được kích hoạt thành công!</span>
                   </div>
                   <p className="text-xs text-ocean-light/70">
                     Lưu lại 6 mã dự phòng này để đăng nhập khi mất điện thoại:
@@ -743,6 +1059,42 @@ export function UserSettingsModal({
               )}
             </div>
 
+            {/* Security Audit Logs Card */}
+            {securityLogs.length > 0 && (
+              <div className="rounded-2xl border border-ocean-dark-border bg-[#051424] p-6 space-y-3 shadow-xl">
+                <h3 className="font-bold text-sm text-ocean-light">
+                  Nhật ký hoạt động bảo mật gần đây
+                </h3>
+                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                  {securityLogs.slice(0, 8).map((log) => (
+                    <div
+                      key={log.id}
+                      className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 border border-white/5 text-xs"
+                    >
+                      <div>
+                        <p className="font-semibold text-ocean-light">{log.event}</p>
+                        <p className="text-[11px] font-mono text-ocean-light/50 mt-0.5">
+                          IP: {log.ipAddress} · {new Date(log.createdAt).toLocaleString("vi-VN")}
+                        </p>
+                      </div>
+                      <span
+                        className={cn(
+                          "text-[10px] font-bold px-2 py-0.5 rounded uppercase",
+                          log.status === "SUCCESS"
+                            ? "bg-emerald-500/20 text-emerald-300"
+                            : log.status === "CHALLENGE"
+                              ? "bg-ocean-secondary/20 text-ocean-secondary"
+                              : "bg-rose-500/20 text-rose-300"
+                        )}
+                      >
+                        {log.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Quick Link to Devices */}
             <div className="rounded-2xl border border-ocean-dark-border bg-[#051424] p-6 flex items-center justify-between shadow-xl">
               <div>
@@ -756,15 +1108,76 @@ export function UserSettingsModal({
                 onClick={() => setActiveTab("devices")}
                 className="btn-secondary text-xs px-4 py-2"
               >
-                Quản lý thiết bị &gt;
+                Quản lý thiết bị & Phê duyệt QR &gt;
               </button>
             </div>
           </div>
         )}
 
-        {/* ─── TAB: ACTIVE SESSIONS (DEVICES) ────────────────────────── */}
+        {/* ─── TAB: ACTIVE SESSIONS (DEVICES) & QR APPROVAL ─────────── */}
         {activeTab === "devices" && (
           <div className="space-y-6">
+            {/* Remote QR Code Approval Card */}
+            <div className="rounded-2xl border border-ocean-secondary/40 bg-[#051424] p-6 space-y-4 shadow-xl">
+              <div>
+                <h3 className="font-bold text-sm text-ocean-light">
+                  Phê duyệt Đăng nhập bằng Mã QR cho Thiết bị mới
+                </h3>
+                <p className="text-xs text-ocean-light/60 mt-1">
+                  Nhập mã nhanh (ví dụ <code className="text-ocean-secondary">BC-8F3A2C</code>) hiển thị bên dưới mã QR trên màn hình đăng nhập máy tính hoặc trình duyệt khác.
+                </p>
+              </div>
+
+              {!qrScannedDevice ? (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Nhập mã BC-XXXXXX hoặc dán link QR"
+                    value={qrInputCode}
+                    onChange={(e) => setQrInputCode(e.target.value)}
+                    className="input-ocean flex-1 font-mono text-xs uppercase"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy || !qrInputCode.trim()}
+                    onClick={() => void handleScanQrDevice()}
+                    className="btn-primary text-xs px-4 py-2"
+                  >
+                    Kiểm tra thiết bị
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-black/40 border border-ocean-secondary/50 space-y-3 animate-fadeIn">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-ocean-secondary">
+                      Thiết bị chờ phê duyệt ({qrScannedDevice.shortCode})
+                    </span>
+                    <span className="font-mono text-white">IP: {qrScannedDevice.device.ipAddress}</span>
+                  </div>
+                  <p className="text-xs text-ocean-light/75 truncate">
+                    Trình duyệt: {qrScannedDevice.device.userAgent}
+                  </p>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setQrScannedDevice(null)}
+                      className="btn-secondary text-xs px-3 py-1.5"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void handleApproveQrDevice()}
+                      className="btn-primary text-xs px-4 py-1.5 font-bold"
+                    >
+                      Phê duyệt đăng nhập ngay
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-ocean-light">{t.devices}</h2>
@@ -800,8 +1213,10 @@ export function UserSettingsModal({
                     )}
                   >
                     <div className="flex items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center text-lg">
-                        {session.userAgent.includes("Windows") || session.userAgent.includes("Mac") ? "💻" : "📱"}
+                      <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center text-ocean-light/70">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -873,17 +1288,16 @@ export function UserSettingsModal({
             {/* Perks Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { icon: "📦", title: "Dung lượng tải 500MB", desc: t.nitroUploadPerk },
-                { icon: "🎖️", title: "Huy hiệu MATH VIP", desc: t.nitroBadgePerk },
-                { icon: "🎥", title: "LiveKit SFU 1080p 60FPS", desc: t.nitroHdPerk },
-                { icon: "🎨", title: "Tùy biến Banner & Avatar", desc: t.nitroBannerPerk },
+                { title: "Dung lượng tải 500MB", desc: t.nitroUploadPerk },
+                { title: "Huy hiệu MATH VIP", desc: t.nitroBadgePerk },
+                { title: "LiveKit SFU 1080p 60FPS", desc: t.nitroHdPerk },
+                { title: "Tùy biến Banner & Avatar", desc: t.nitroBannerPerk },
               ].map((perk) => (
                 <div
                   key={perk.title}
                   className="p-5 rounded-2xl bg-[#051424] border border-ocean-dark-border hover:border-purple-500/40 transition-colors shadow-lg"
                 >
-                  <span className="text-2xl">{perk.icon}</span>
-                  <h4 className="font-bold text-sm text-ocean-light mt-3">{perk.title}</h4>
+                  <h4 className="font-bold text-sm text-ocean-light">{perk.title}</h4>
                   <p className="text-xs text-ocean-light/60 mt-1 leading-relaxed">{perk.desc}</p>
                 </div>
               ))}
@@ -983,6 +1397,9 @@ export function UserSettingsModal({
               </div>
             </div>
           </div>
+        )}
+        {showGmailSmtpModal && (
+          <GmailSmtpModal onClose={() => setShowGmailSmtpModal(false)} />
         )}
       </main>
     </div>

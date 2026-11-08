@@ -72,7 +72,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body className="bg-ocean-dark-bg text-ocean-light font-sans antialiased">
+      <body className="bg-ocean-dark-bg text-ocean-light font-sans antialiased" suppressHydrationWarning>
         {children}
         <CookieBanner />
       </body>
