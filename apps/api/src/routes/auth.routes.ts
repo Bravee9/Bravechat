@@ -907,7 +907,7 @@ export async function authRoutes(server: FastifyInstance) {
 
       const user = await prisma.user.findFirst({
         where: { email: input.email, isBanned: false },
-        select: { id: true, email: true },
+        select: { id: true, email: true, username: true, displayName: true },
       })
       let devResetUrl: string | undefined
       let devOtpCode: string | undefined
@@ -938,7 +938,8 @@ export async function authRoutes(server: FastifyInstance) {
         })
 
         try {
-          await resetMail.sendResetMail?.(user.email, value, otpCode)
+          const recipientName = user.displayName || user.username
+          await resetMail.sendResetMail?.(user.email, value, recipientName)
           if (env.NODE_ENV !== 'production') {
             devResetUrl = `${env.FRONTEND_URL}/reset-password?token=${value}`
             if (!gmailReady) devOtpCode = otpCode

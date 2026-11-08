@@ -274,26 +274,28 @@ function buildDiscordEmailTemplate(content: {
   <title>Bravechat</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f2f3f5; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f2f3f5; padding: 40px 16px;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f2f3f5; padding: 48px 16px;">
     <tr>
       <td align="center">
         <!-- Brand Header -->
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; margin-bottom: 24px;">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; margin: 0 auto 24px auto;">
           <tr>
             <td align="center">
-              <span style="font-size: 26px; font-weight: 800; color: #0077b6; letter-spacing: -0.5px;">Bravechat</span>
+              <span style="font-size: 26px; font-weight: 800; color: #0077b6; letter-spacing: -0.5px; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                Brave<span style="color: #00b4d8;">chat</span>
+              </span>
             </td>
           </tr>
         </table>
 
         <!-- Main Card -->
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; background-color: #ffffff; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; background-color: #ffffff; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin: 0 auto;">
           <tr>
             <td style="padding: 40px 48px;">
-              <h2 style="margin: 0 0 16px; font-size: 20px; font-weight: 700; color: #2e3338;">
+              <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #2e3338; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
                 ${content.heading}
               </h2>
-              <p style="margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #4f5660;">
+              <p style="margin: 0 0 24px 0; font-size: 15px; line-height: 24px; color: #4f5660; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
                 ${content.bodyText}
               </p>
 
@@ -313,10 +315,10 @@ function buildDiscordEmailTemplate(content: {
 
               ${
                 content.buttonUrl && content.buttonLabel
-                  ? `<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 28px 0;">
+                  ? `<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 28px 0 32px 0;">
                       <tr>
                         <td align="center">
-                          <a href="${content.buttonUrl}" style="background-color: #0077b6; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: 600; font-size: 15px; display: inline-block;">
+                          <a href="${content.buttonUrl}" target="_blank" style="background-color: #0077b6; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: 600; font-size: 15px; display: inline-block; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
                             ${content.buttonLabel}
                           </a>
                         </td>
@@ -325,28 +327,28 @@ function buildDiscordEmailTemplate(content: {
                   : ''
               }
 
-              ${
-                content.buttonUrl
-                  ? `<p style="margin: 24px 0 0; font-size: 12px; line-height: 1.5; color: #747f8d; word-break: break-all;">
-                      Hoac sao chep va mo lien ket sau trong trinh duyet:<br />
-                      <a href="${content.buttonUrl}" style="color: #0077b6; text-decoration: underline;">${content.buttonUrl}</a>
-                    </p>`
-                  : ''
-              }
-
               <!-- Divider -->
               <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 32px; border-top: 1px solid #ebedef;">
                 <tr>
                   <td style="padding-top: 24px;">
-                    <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #747f8d;">
-                      ${content.footerNote || 'Can giup do? Hay lien he doi ngu ho tro cua chung toi hoac phan hoi truc tiep email nay.'}
+                    <p style="margin: 0 0 8px 0; font-size: 12px; line-height: 18px; color: #747f8d; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                      ${content.footerNote || `Cần giúp đỡ? <a href="${env.FRONTEND_URL}" style="color: #0077b6; text-decoration: underline;">Hãy liên hệ đội ngũ hỗ trợ của chúng tôi</a> hoặc phản hồi trực tiếp email này.`}
                     </p>
-                    <p style="margin: 12px 0 0; font-size: 11px; color: #99aab5;">
-                      Duoc gui boi Bravechat
+                    <p style="margin: 0; font-size: 12px; line-height: 18px; color: #747f8d; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                      Muốn cung cấp phản hồi? Hãy cho chúng tôi biết ý kiến của bạn trên <a href="${env.FRONTEND_URL}" style="color: #0077b6; text-decoration: underline;">trang phản hồi</a>.
                     </p>
                   </td>
                 </tr>
               </table>
+            </td>
+          </tr>
+        </table>
+
+        <!-- External Footer -->
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; margin: 20px auto 0 auto;">
+          <tr>
+            <td align="center" style="font-size: 11px; line-height: 16px; color: #99aab5; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+              Được gửi bởi Bravechat • <a href="${env.FRONTEND_URL}" style="color: #0077b6; text-decoration: underline;">Tham khảo blog của chúng tôi</a> • @bravechat
             </td>
           </tr>
         </table>
@@ -364,15 +366,15 @@ export async function sendResetMail(email: string, token: string, username?: str
   const subject = 'Yêu Cầu Đặt Lại Mật Khẩu Bravechat'
   const text =
     `${greeting}\n\n` +
-    `Ban co the dat lai mat khau Bravechat bang cach mo lien ket ben duoi. Neu ban khong yeu cau dat lai mat khau, vui long bo qua email nay.\n\n` +
+    `Your Bravechat password can be reset by clicking the button below. If you did not request a new password, please ignore this email.\n\n` +
     `${url.toString()}\n\n` +
-    `Lien ket co hieu luc trong 15 phut va chi su dung mot lan duy nhat.\n` +
-    `Duoc gui boi Bravechat.`
+    `Liên kết có hiệu lực trong 15 phút và chỉ sử dụng một lần duy nhất.\n\n` +
+    `Được gửi bởi Bravechat.`
 
   const html = buildDiscordEmailTemplate({
     heading: greeting,
     bodyText:
-      'Ban co the dat lai mat khau Bravechat bang cach nhan vao nut ben duoi. Neu ban khong yeu cau dat lai mat khau, vui long bo qua email nay.',
+      'Your Bravechat password can be reset by clicking the button below. If you did not request a new password, please ignore this email.',
     buttonLabel: 'Reset Password',
     buttonUrl: url.toString(),
   })
@@ -395,22 +397,22 @@ export async function sendVerificationOtpMail(
 ) {
   const title =
     purpose === 'login'
-      ? 'Ma Xac Minh Dang Nhap Bravechat'
-      : 'Ma Xac Minh Dia Chi Email Bravechat'
+      ? 'Mã Xác Minh Đăng Nhập Bravechat'
+      : 'Mã Xác Minh Địa Chỉ Email Bravechat'
   const subject = `${title}: ${otpCode}`
   const text =
-    `Chao ban,\n\n` +
-    `Ma xac minh bao mat tai khoan Bravechat cua ban la: ${otpCode}\n` +
-    `Ma co hieu luc trong 5 phut. Vui long khong chia se ma nay cho bat ky ai.\n\n` +
-    `Duoc gui boi Bravechat.`
+    `Chào bạn,\n\n` +
+    `Mã xác minh bảo mật tài khoản Bravechat của bạn là: ${otpCode}\n` +
+    `Mã có hiệu lực trong 5 phút. Vui lòng không chia sẻ mã này cho bất kỳ ai.\n\n` +
+    `Được gửi bởi Bravechat.`
 
   const html = buildDiscordEmailTemplate({
-    heading: 'Xac minh bao mat tai khoan',
+    heading: 'Xác minh bảo mật tài khoản',
     bodyText:
-      'Su dung ma xac minh gom 6 chu so duoi day de tiep tuc. Ma co hieu luc trong vong 5 phut va chi su dung mot lan.',
+      'Sử dụng mã xác minh gồm 6 chữ số dưới đây để tiếp tục. Mã có hiệu lực trong vòng 5 phút và chỉ sử dụng một lần.',
     codeBlock: otpCode,
     footerNote:
-      'Neu ban khong thuc hien thao tac nay, hay kiem tra va doi mat khau ngay lap tuc de bao ve tai khoan cua ban.',
+      'Nếu bạn không thực hiện thao tác này, hãy kiểm tra và đổi mật khẩu ngay lập tức để bảo vệ tài khoản của bạn.',
   })
 
   return deliverEmail({
