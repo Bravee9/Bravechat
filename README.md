@@ -27,7 +27,7 @@ Bravechat enforces strict separation of concerns across independent architectura
 |      FRONTEND CLIENT (WEB)    |         |       BACKEND SERVICE (API)   |
 |            apps/web           |         |             apps/api          |
 +-------------------------------+         +-------------------------------+
-| Presentation (Next.js 14)     |         | REST Routes & Controllers     |
+| Presentation (Next.js 15)     |         | REST Routes & Controllers     |
 | Features & UI Components      |         | Business Services             |
 | State Stores & Typed Clients  |         | Prisma ORM Repositories       |
 | HTTP Client & WS Realtime     |         | Plugins (JWT, S3/R2, WS, Redis|
@@ -93,7 +93,7 @@ Bravechat/
 |   |-- PULL_REQUEST_TEMPLATE.md      # Pull request review template
 |   `-- workflows/ci.yml              # Automated continuous integration pipeline
 |-- apps/
-|   |-- web/                          # Next.js 14 frontend client (Port 3000)
+|   |-- web/                          # Next.js 15 frontend client (Port 3000)
 |   |   |-- src/
 |   |   |   |-- app/                  # App router pages and layouts
 |   |   |   |-- components/           # Reusable UI primitives and design components
@@ -135,7 +135,7 @@ Bravechat/
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18.x or 20.x LTS
+- Node.js 22.x or 24.x LTS
 - pnpm 8.x or higher (`npm install -g pnpm`)
 - Docker and Docker Compose
 

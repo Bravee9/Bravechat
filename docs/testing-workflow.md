@@ -122,3 +122,17 @@ Không dùng `docker compose down -v` trừ khi cố ý xóa toàn bộ database
 - R2 smoke test đạt hoặc đã ghi rõ lỗi CORS do quyền token.
 - Các luồng đăng nhập, hồ sơ, server, message, attachment, DM và điều khoản đa ngôn ngữ đã chạy qua checklist.
 - `git diff --check` không báo lỗi; commit chỉ chứa một nhóm thay đổi có thông điệp rõ ràng.
+
+## 10. Kiểm thử Redis thật
+
+Khởi động Redis riêng trên cổng 16379 rồi chạy từ thư mục gốc:
+
+```powershell
+docker run --detach --rm --name bravechat-redis-test --publish 127.0.0.1:16379:6379 redis:7-alpine
+pnpm test:redis
+docker stop bravechat-redis-test
+```
+
+Nếu Redis test đã chạy ở địa chỉ khác, đặt `$env:TEST_REDIS_URL` trước khi chạy. Bài test dùng khóa ngẫu nhiên riêng và tự dọn khóa, không gọi `FLUSHDB`.
+
+Test chạy hai Fastify API và WebSocket thật, kiểm tra 50 đăng ký server, truyền sự kiện và thu hồi phiên giữa hai instance qua Redis Pub/Sub. Webhook có chữ ký được xác thực bằng LiveKit SDK thật để kiểm tra join/leave, nhiều tab cùng tài khoản, giới hạn phòng và dọn presence khi phòng kết thúc. PostgreSQL được giả lập; bài test không kết nối máy chủ LiveKit và không kiểm tra âm thanh/video.

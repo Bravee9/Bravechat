@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { http } from "@/services/http";
 import { audioStore } from "@/stores/audio.store";
 import { useStore } from "@/lib/store";
+import { waitForVoicePermission } from "../voice-permission";
 
 interface VoiceRoomProps {
   channelId: string;
@@ -108,6 +109,8 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
           setStatus("Mất kết nối");
         });
       await nextRoom.connect(credentials.serverUrl, credentials.token);
+      ensureActive();
+      await waitForVoicePermission(nextRoom, controller.signal);
       ensureActive();
       const enabled = !audioStore.get().muted && !audioStore.get().deafened;
       await nextRoom.localParticipant.setMicrophoneEnabled(enabled);

@@ -31,6 +31,9 @@ export async function serializable<T>(work: (tx: Prisma.TransactionClient) => Pr
 
 // Dùng một DTO cho REST và WebSocket để reply/reaction không mất khi tải lại lịch sử.
 export async function serializeMessage(server: FastifyInstance, row: any) {
+  // Nonce retries and mutations can load a soft-deleted row. Never serialize
+  // its content or mint fresh attachment URLs through those alternate paths.
+  if (row.isDeleted) throw fail(410, 'Tin nhắn đã bị xóa.')
   const author = row.author ?? row.sender
   const parentAuthor = row.replyTo?.author ?? row.replyTo?.sender
   const groups = new Map<string, string[]>()

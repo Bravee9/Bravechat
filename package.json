@@ -7,7 +7,7 @@
   "license": "MIT",
   "packageManager": "pnpm@11.27.1",
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=22.0.0",
     "pnpm": ">=8.0.0"
   },
   "scripts": {
@@ -18,10 +18,14 @@
     "clean": "turbo run clean",
     "db:prepare": "node scripts/db.mjs",
     "db:local": "powershell -NoProfile -File scripts/local-db.ps1",
-    "test:integration": "node scripts/test-workflows.mjs"
+    "test:integration": "node scripts/test-workflows.mjs",
+    "test:realtime": "node --test scripts/test-realtime.mjs",
+    "test:redis": "node --test scripts/test-redis.mjs",
+    "test:security": "node --test scripts/test-auth-security.mjs scripts/test-attachment-security.mjs scripts/test-voice-security.mjs",
+    "test:security:postgres": "node --test scripts/test-postgres-security.mjs"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^22",
     "prisma": "^5.22.0",
     "puppeteer-core": "^25.16.0",
     "turbo": "^2.0.0",

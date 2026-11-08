@@ -64,7 +64,7 @@ function toRealtimeEvent(value: unknown): RealtimeEvent | null {
 function applyEvent(previous: ChatMessage[], data: RealtimeEvent): ChatMessage[] {
   if (data.type === "message_delete" || data.type === "dm_delete") return previous.filter((item) => item.id !== data.messageId).map((item) => item.replyTo && item.replyTo.id === data.messageId ? { ...item, replyTo: { ...item.replyTo, content: "Tin nhắn đã xóa" } } : item);
   const message = data.message;
-  if (message) return mergeMessages(previous, [message]).map((item) => item.replyTo && item.replyTo.id === message.id ? { ...item, replyTo: { ...item.replyTo, content: message.content } } : item);
+  if (message && typeof message.id === "string") return mergeMessages(previous, [message]).map((item) => item.replyTo && item.replyTo.id === message.id ? { ...item, replyTo: { ...item.replyTo, content: message.content } } : item);
   return previous;
 }
 export function ChatView({ serverId, channelId }: ChatViewProps = {}) {
@@ -209,14 +209,9 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
     const savedKey = key; const uploaded: Array<{ filename: string; contentType: string; key: string }> = [];
     try {
       for (const file of files.slice(0, 10)) {
-        const form = new FormData();
-        form.append("purpose", "attachment");
-        form.append("channelId", rawChannelId);
-        form.append("file", file, file.name);
-        const response = await fetch(env.apiUrl.replace(/\/$/, "") + "/uploads", { method: "POST", credentials: "include", body: form });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || "Không thể tải tệp.");
-        uploaded.push(result.data);
+        const form = new FormData(); form.append("purpose", "attachment"); form.append("channelId", rawChannelId); form.append("file", file, file.name);
+        const result = await http.post<{ filename: string; contentType: string; key: string }>("/uploads", form);
+        uploaded.push(result);
       }
       const result = await http.post<{ message: StoredMessage }>(historyPath, {
         content: message.trim(),

@@ -43,6 +43,7 @@ const envSchema = z.object({
   // Bỏ trống nếu bucket private (khi đó media đi qua /api/media/*)
   R2_PUBLIC_URL: z.preprocess((value) => (value === '' || (typeof value === 'string' && value.includes('xxxx')) ? undefined : value), z.string().url().optional()),
   LIVEKIT_URL: z.string().url().optional(),
+  LIVEKIT_API_URL: z.string().url().optional(),
   LIVEKIT_API_KEY: z.string().optional(),
   LIVEKIT_API_SECRET: z.string().optional(),
   LIVEKIT_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(300),

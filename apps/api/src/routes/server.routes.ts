@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../config/prisma'
 import { mediaUrl } from '../services/storage.service'
 import { revokeServerMembership } from './websocket.routes'
+import { revokeVoiceSessions } from '../services/voice-security'
 import { unreadActivity, serverActivity, type ChannelActivity } from '../services/read-state'
 
 const createSchema = z.object({ name: z.string().trim().min(2).max(100) })
@@ -137,6 +138,7 @@ export async function serverRoutes(server: FastifyInstance) {
     if (membership.isOwner) return reply.status(409).send({ statusCode: 409, message: 'Chủ server cần chuyển quyền sở hữu trước khi rời server.' })
     await prisma.serverMember.delete({ where: { id: membership.id } })
     revokeServerMembership(request.params.serverId, request.user.id)
+    await revokeVoiceSessions(request.user.id, undefined, request.params.serverId)
     return reply.send({ statusCode: 200, data: { serverId: request.params.serverId } })
   })
 

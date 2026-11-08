@@ -5,6 +5,29 @@ const response = (status: number) => ({ status, ok: status === 200, json: async 
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("Session refresh coordination", () => {
+  it("refreshes an expired session and retries the complete multipart upload", async () => {
+    vi.resetModules();
+    const { http } = await import("@/services/http");
+    const form = new FormData();
+    form.append("file", new File(["attachment"], "note.txt", { type: "text/plain" }));
+    let uploads = 0;
+    const fetcher = vi.fn((url: string) => {
+      if (url.endsWith("/auth/refresh")) return Promise.resolve(response(200));
+      return Promise.resolve(response(++uploads === 1 ? 401 : 200));
+    });
+    vi.stubGlobal("fetch", fetcher);
+    await http.post("/uploads", form);
+    const uploadCalls = fetcher.mock.calls.filter(([url]) => url.endsWith("/uploads"));
+    expect(uploadCalls).toHaveLength(2);
+    for (const call of uploadCalls) {
+      const init = (call as unknown as [string, RequestInit])[1];
+      expect(init.body).toBe(form);
+      expect(new Headers(init.headers).has("Content-Type")).toBe(false);
+      expect(init.credentials).toBe("include");
+    }
+    expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/auth/refresh"))).toHaveLength(1);
+  });
+
   it("retries a late 401 with the refreshed cookie instead of rotating again", async () => {
     vi.resetModules();
     const { http } = await import("@/services/http");
