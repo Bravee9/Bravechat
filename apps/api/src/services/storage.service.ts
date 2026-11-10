@@ -40,9 +40,17 @@ export const ASSET_RULES: Record<AssetKind, { prefix: string; maxBytes: number }
 export const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'])
 
 export function createR2Client() {
+  const isCustomOrMinio =
+    env.S3_FORCE_PATH_STYLE ||
+    env.STORAGE_DRIVER === 'minio' ||
+    env.R2_ENDPOINT_URL.includes('127.0.0.1') ||
+    env.R2_ENDPOINT_URL.includes('localhost') ||
+    env.R2_ENDPOINT_URL.includes('minio')
+
   return new S3Client({
     region: 'auto',
     endpoint: env.R2_ENDPOINT_URL,
+    forcePathStyle: isCustomOrMinio,
     credentials: {
       accessKeyId: env.R2_ACCESS_KEY_ID,
       secretAccessKey: env.R2_SECRET_ACCESS_KEY,

@@ -38,7 +38,23 @@ export async function serializeMessage(server: FastifyInstance, row: any) {
   const parentAuthor = row.replyTo?.author ?? row.replyTo?.sender
   const groups = new Map<string, string[]>()
   for (const reaction of row.reactions ?? []) groups.set(reaction.emoji, [...(groups.get(reaction.emoji) ?? []), reaction.userId])
-  const attachments = await Promise.all((row.attachments ?? []).map(async (item: any) => ({
+  const rawAttachments = [...(row.attachments ?? [])]
+  if (row.r2Key && rawAttachments.length === 0) {
+    const filename = row.r2Key.split('/').pop() || 'attachment'
+    const ext = filename.split('.').pop()?.toLowerCase() || ''
+    const isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'].includes(ext)
+    const isVid = ['mp4', 'webm', 'mov'].includes(ext)
+    const isAud = ['mp3', 'wav', 'ogg', 'flac'].includes(ext)
+    const contentType = isImg ? `image/${ext === 'jpg' ? 'jpeg' : ext}` : isVid ? `video/${ext}` : isAud ? `audio/${ext}` : 'application/octet-stream'
+    rawAttachments.push({
+      id: `dm_${row.id}`,
+      filename,
+      contentType,
+      size: 0,
+      r2Key: row.r2Key,
+    })
+  }
+  const attachments = await Promise.all(rawAttachments.map(async (item: any) => ({
     id: item.id, filename: item.filename, contentType: item.contentType, size: item.size,
     ...(server.r2 && env.STORAGE_ENABLED ? {
       url: await server.r2.storage.presignGet(item.r2Key, { filename: item.filename, contentType: item.contentType }),
@@ -51,7 +67,7 @@ export async function serializeMessage(server: FastifyInstance, row: any) {
     user: author.displayName || author.username,
     avatar: (author.displayName || author.username).slice(0, 2).toUpperCase(),
     time: new Date(row.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    replyTo: row.replyTo ? { id: row.replyTo.id, content: row.replyTo.isDeleted ? 'Tin nhắn đã xóa' : row.replyTo.content ?? '', user: parentAuthor.displayName || parentAuthor.username } : null,
+    replyTo: row.replyTo ? { id: row.replyTo.id, content: row.replyTo.isDeleted ? 'Tin nhắn đã xóa' : row.replyTo.content ?? '', user: parentAuthor?.displayName || parentAuthor?.username || 'Người dùng' } : null,
     reactions: Array.from(groups, ([emoji, userIds]) => ({ emoji, count: userIds.length, userIds })),
     attachments,
   }

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../config/prisma'
 import { fail, friendshipPair, serializable } from '../services/conversation'
@@ -29,15 +30,23 @@ export async function friendRoutes(server: FastifyInstance) {
     const target = await prisma.user.findUnique({ where: { username: input.username }, select: { id: true, isBanned: true } })
     if (!target || target.isBanned) throw fail(404, 'Không tìm thấy người dùng.')
     if (target.id === request.user.id) throw fail(400, 'Bạn không thể kết bạn với chính mình.')
-    const result = await serializable(async (tx) => {
-      const rows = await tx.friendship.findMany({ where: friendshipPair(request.user.id, target.id) })
-      if (rows.some((row) => row.status === 'BLOCKED')) throw fail(403, 'Không thể gửi lời mời cho người dùng này.')
-      if (rows[0]) {
-        if (rows[0].status === 'PENDING' && rows[0].friendId === request.user.id) throw fail(409, 'Người này đã gửi lời mời cho bạn. Hãy mở mục Đang chờ để chấp nhận.')
-        return rows[0]
+    let result
+    try {
+      result = await serializable(async (tx) => {
+        const rows = await tx.friendship.findMany({ where: friendshipPair(request.user.id, target.id) })
+        if (rows.some((row) => row.status === 'BLOCKED')) throw fail(403, 'Không thể gửi lời mời cho người dùng này.')
+        if (rows[0]) {
+          if (rows[0].status === 'PENDING' && rows[0].friendId === request.user.id) throw fail(409, 'Người này đã gửi lời mời cho bạn. Hãy mở mục Đang chờ để chấp nhận.')
+          return rows[0]
+        }
+        return tx.friendship.create({ data: { userId: request.user.id, friendId: target.id } })
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw fail(409, 'Người này đã gửi lời mời cho bạn hoặc lời mời đang chờ xử lý.')
       }
-      return tx.friendship.create({ data: { userId: request.user.id, friendId: target.id } })
-    })
+      throw error
+    }
     notify(request.user.id, target.id)
     return reply.code(201).send({ statusCode: 201, data: { friendship: result } })
   })

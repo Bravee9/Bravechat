@@ -65,6 +65,16 @@ export function ChatInput({
           className="flex-1 bg-transparent border-none text-ocean-light text-sm focus:outline-none py-3 px-1 placeholder:text-ocean-light/30"
         />
 
+        {isUploading && (
+          <div className="flex items-center gap-1.5 pr-2 text-xs text-ocean-secondary font-medium animate-pulse" data-testid="uploading-indicator">
+            <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
+            <span className="hidden sm:inline">Đang tải tệp...</span>
+          </div>
+        )}
+
         <div className="pr-3 pl-2 py-3 flex items-center gap-2 text-ocean-light/50">
           <button
             type="submit"

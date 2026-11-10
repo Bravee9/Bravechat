@@ -164,9 +164,44 @@ export async function messageRoutes(server: FastifyInstance) {
     return { statusCode: 200, data: { messages: await Promise.all(page.map((row) => serializeMessage(server, row))), hasMore, nextCursor: page[0]?.id ?? null } }
   })
   server.post<{ Params: { userId: string } }>('/dm/:userId', { config: { rateLimit: { max: 300, timeWindow: '1 minute' } } }, async (request, reply) => {
-    const input = z.object({ content: z.string().trim().min(1).max(2000), nonce: z.string().uuid().optional(), replyToId: z.string().optional() }).parse(request.body)
+    const input = z.object({
+      content: z.string().trim().max(2000).default(''),
+      nonce: z.string().uuid().optional(),
+      replyToId: z.string().optional(),
+      attachments: z.array(attachmentInput).max(10).default([]),
+    }).parse(request.body)
+
+    if (!input.content && input.attachments.length === 0) {
+      throw fail(400, 'Tin nhắn phải có nội dung hoặc tệp đính kèm.')
+    }
+
     const otherId = request.params.userId
     if (otherId === request.user.id || !await prisma.user.findFirst({ where: { id: otherId, isBanned: false }, select: { id: true } })) throw fail(404, 'Không tìm thấy người dùng.')
+
+    let r2KeyToSave: string | null = null
+    if (input.attachments.length > 0) {
+      const firstAttachment = input.attachments[0]
+      const verified = await verifyUploadedObject(server, firstAttachment.key, request.user.id, firstAttachment.contentType)
+      if (!verified) throw fail(400, 'Tệp đính kèm chưa hoàn tất tải lên hoặc không hợp lệ.')
+
+      const conversationTag = [request.user.id, otherId].sort().join('-')
+      const ext = extname(firstAttachment.filename).toLowerCase().replace(/[^.a-z0-9]/g, '').slice(0, 12)
+      const targetKey = `attachments/dm-${conversationTag}/${randomUUID()}${ext}`
+
+      try {
+        await server.r2.s3.send(new CopyObjectCommand({
+          Bucket: env.R2_BUCKET_NAME,
+          Key: targetKey,
+          CopySource: `${env.R2_BUCKET_NAME}/${firstAttachment.key.split('/').map(encodeURIComponent).join('/')}`,
+        }))
+        r2KeyToSave = targetKey
+        await server.r2.s3.send(new DeleteObjectCommand({ Bucket: env.R2_BUCKET_NAME, Key: firstAttachment.key })).catch(() => undefined)
+      } catch (err) {
+        request.log.error(err, 'Failed to commit DM attachment')
+        throw fail(502, 'Không thể hoàn tất lưu tệp đính kèm.')
+      }
+    }
+
     const result = await serializable(async (tx) => {
       if (await tx.friendship.findFirst({ where: { ...friendshipPair(request.user.id, otherId), status: 'BLOCKED' }, select: { id: true } })) throw fail(403, 'Không thể gửi tin nhắn cho người dùng này.')
       if (input.nonce) {
@@ -177,7 +212,20 @@ export async function messageRoutes(server: FastifyInstance) {
         }
       }
       if (input.replyToId && !await tx.directMessage.findFirst({ where: { id: input.replyToId, ...pairFilter(request.user.id, otherId), isDeleted: false }, select: { id: true } })) throw fail(400, 'Không tìm thấy tin nhắn được trả lời trong cuộc trò chuyện này.')
-      return { row: await tx.directMessage.create({ data: { senderId: request.user.id, receiverId: otherId, content: input.content, nonce: input.nonce, replyToId: input.replyToId }, include: dmInclude }), created: true }
+      return {
+        row: await tx.directMessage.create({
+          data: {
+            senderId: request.user.id,
+            receiverId: otherId,
+            content: input.content || null,
+            r2Key: r2KeyToSave,
+            nonce: input.nonce,
+            replyToId: input.replyToId
+          },
+          include: dmInclude
+        }),
+        created: true
+      }
     })
     const message = await serializeMessage(server, result.row)
     if (result.created) for (const id of [request.user.id, otherId]) publishUserEvent(id, { type: 'dm_create', message, senderId: request.user.id, receiverId: otherId })

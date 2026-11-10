@@ -1,18 +1,20 @@
 /**
  * components/auth/AuthLayout.tsx
- * Shared layout wrapper for login and register pages
+ * Discord-inspired centered modal layout for authentication flows
  */
 
 import Link from "next/link";
 import { OceanBackground } from "@/components/ui/OceanBackground";
+import { cn } from "@/lib/utils";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
   title: string;
   subtitle: string;
-  switchText: string;
-  switchLink: string;
-  switchLabel: string;
+  switchText?: string;
+  switchLink?: string;
+  switchLabel?: string;
+  sidePanel?: React.ReactNode;
 }
 
 export function AuthLayout({
@@ -22,97 +24,92 @@ export function AuthLayout({
   switchText,
   switchLink,
   switchLabel,
+  sidePanel,
 }: AuthLayoutProps) {
   return (
-    <div className="relative min-h-screen flex">
-      {/* Ocean background */}
+    <div className="relative min-h-screen flex flex-col justify-between w-full overflow-hidden bg-ocean-dark-bg selection:bg-ocean-primary selection:text-white">
+      {/* Background canvas */}
       <OceanBackground />
 
-      {/* Left panel — branding (hidden on mobile) */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-16 relative z-10 border-r border-white/5 bg-ocean-dark-bg/20 backdrop-blur-sm">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-3 group w-fit mb-8">
-          <img src="/logo-96.png" alt="Logo Bravechat" width={40} height={40} className="w-10 h-10 object-contain" />
-          <span className="font-bold text-2xl text-ocean-light tracking-tight">
+      {/* Top brand header */}
+      <header className="relative z-20 p-6 sm:p-8">
+        <Link href="/" className="inline-flex items-center gap-2.5 group">
+          <img
+            src="/logo-96.png"
+            alt="Bravechat"
+            width={34}
+            height={34}
+            className="w-8 h-8 object-contain"
+          />
+          <span className="font-bold text-xl text-white tracking-tight">
             Brave<span className="text-ocean-secondary">chat</span>
           </span>
         </Link>
+      </header>
 
-        {/* Center content */}
-        <div className="max-w-md">
-          <div className="section-tag mb-8">
-            <span className="w-1.5 h-1.5 bg-ocean-secondary inline-block animate-pulse" />
-            Real-time · Secure · Scalable
-          </div>
-          <h1 className="text-5xl font-black text-ocean-light tracking-tighter leading-normal mb-6 py-2">
-            GIAO TIẾP
-            <br />
-            <span className="text-gradient-ocean">BẮT ĐẦU TỪ ĐÂY</span>
-          </h1>
-          <p className="text-ocean-light/80 leading-relaxed">
-            Tham gia hàng triệu người dùng trên Bravechat — nền tảng giao tiếp
-            thời gian thực dành cho cộng đồng, nhóm và bạn bè.
-          </p>
+      {/* Centered modal container */}
+      <main className="flex-1 flex items-center justify-center px-4 py-6 sm:py-10 relative z-10">
+        <div
+          className={cn(
+            "w-full rounded-lg bg-[#0b1d33]/95 border border-white/10 shadow-2xl backdrop-blur-md p-6 sm:p-8 transition-all animate-fade-in",
+            sidePanel ? "max-w-[784px]" : "max-w-[480px]"
+          )}
+        >
+          <div
+            className={cn(
+              sidePanel
+                ? "grid grid-cols-1 md:grid-cols-[1fr_260px] gap-8 items-center"
+                : "block"
+            )}
+          >
+            {/* Primary credentials column */}
+            <div className={cn(sidePanel ? "md:pr-8 md:border-r md:border-white/10" : "")}>
+              <div className="mb-6 text-center md:text-left">
+                <h1 className="text-2xl font-bold text-white tracking-tight">
+                  {title}
+                </h1>
+                <p className="text-ocean-light/70 text-sm mt-1.5 leading-relaxed">
+                  {subtitle}
+                </p>
+              </div>
 
+              {children}
 
-        </div>
-
-        {/* Bottom */}
-        <p className="text-ocean-light/60 text-xs font-mono">
-          © {new Date().getFullYear()} Bravechat · Built by Bravee9
-        </p>
-      </div>
-
-      {/* Right panel — auth form */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
-        {/* Mobile logo */}
-        <Link href="/" className="flex justify-center items-center gap-3 mb-12 lg:hidden group">
-          <img src="/logo-96.png" alt="Logo Bravechat" width={40} height={40} className="w-10 h-10 object-contain" />
-          <span className="font-bold text-xl text-ocean-light tracking-tight">
-            Brave<span className="text-ocean-secondary">chat</span>
-          </span>
-        </Link>
-
-        <div className="w-full max-w-md">
-          {/* Card */}
-          <div className="bg-ocean-dark-surface/40 backdrop-blur-2xl border border-white/10 shadow-2xl shadow-black/50 p-8 md:p-10 animate-fade-in">
-            {/* Header */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-black text-ocean-light tracking-tight">
-                {title}
-              </h2>
-              <p className="text-ocean-light/70 text-sm mt-2">{subtitle}</p>
+              {switchText && switchLink && switchLabel && (
+                <p className="auth-switch-link mt-4 text-xs sm:text-sm text-ocean-light/60 text-center md:text-left">
+                  {switchText}{" "}
+                  <Link
+                    href={switchLink}
+                    className="text-ocean-secondary hover:underline font-medium transition-colors"
+                  >
+                    {switchLabel}
+                  </Link>
+                </p>
+              )}
             </div>
 
-            {/* Form content */}
-            {children}
-
-            {/* Switch link */}
-            <p className="mt-6 text-center text-ocean-light/60 text-sm">
-              {switchText}{" "}
-              <Link
-                href={switchLink}
-                className="text-ocean-secondary font-bold hover:text-ocean-light transition-colors"
-              >
-                {switchLabel}
-              </Link>
-            </p>
+            {/* Optional QR Code panel (desktop side-by-side) */}
+            {sidePanel && (
+              <div className="hidden md:flex flex-col items-center justify-center">
+                {sidePanel}
+              </div>
+            )}
           </div>
-
-          {/* Legal note */}
-          <p className="mt-6 text-center text-ocean-light/60 text-xs leading-relaxed px-4">
-            Bằng cách tiếp tục, bạn đồng ý với{" "}
-            <Link href="/terms" className="underline hover:text-ocean-light/60">
-              Điều khoản dịch vụ
-            </Link>{" "}
-            và{" "}
-            <Link href="/privacy" className="underline hover:text-ocean-light/60">
-              Chính sách bảo mật
-            </Link>{" "}
-            của chúng tôi.
-          </p>
         </div>
-      </div>
+      </main>
+
+      {/* Footer legal disclaimer */}
+      <footer className="relative z-10 py-4 px-4 text-center text-xs text-ocean-light/50">
+        Bằng cách tiếp tục, bạn đồng ý với{" "}
+        <Link href="/terms" className="underline hover:text-ocean-light/70">
+          Điều khoản dịch vụ
+        </Link>{" "}
+        và{" "}
+        <Link href="/privacy" className="underline hover:text-ocean-light/70">
+          Chính sách bảo mật
+        </Link>{" "}
+        của chúng tôi.
+      </footer>
     </div>
   );
 }

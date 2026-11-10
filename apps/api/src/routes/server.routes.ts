@@ -47,9 +47,26 @@ export async function serverRoutes(server: FastifyInstance) {
     return reply.send({ statusCode: 200, data: memberships.map(({ server: item }) => ({ id: item.id, name: item.name, iconUrl: mediaUrl(item.iconKey), ...serverActivity(activity, item.id) })) })
   })
 
-  server.post<{ Body: z.infer<typeof createSchema> }>('/', async (request, reply) => {
+  server.post<{ Body: z.infer<typeof createSchema> }>('/', {
+    config: {
+      rateLimit: {
+        max: 10,
+        timeWindow: '1 hour',
+        errorResponseBuilder: () => ({
+          statusCode: 429,
+          error: 'Too Many Requests',
+          message: 'Bạn chỉ có thể tạo tối đa 10 máy chủ trong 1 giờ. Vui lòng thử lại sau.',
+        }),
+      },
+    },
+  }, async (request, reply) => {
     const parsed = createSchema.safeParse(request.body)
     if (!parsed.success) return reply.status(400).send({ statusCode: 400, message: 'Tên server cần dài từ 2 đến 100 ký tự.' })
+
+    const ownedCount = await prisma.server.count({ where: { ownerId: request.user.id } })
+    if (ownedCount >= 20) {
+      return reply.status(403).send({ statusCode: 403, message: 'Bạn đã đạt giới hạn tối đa 20 máy chủ được phép tạo trên một tài khoản.' })
+    }
     const serverId = await prisma.$transaction(async (transaction) => {
       const createdServer = await transaction.server.create({ data: { name: parsed.data.name, ownerId: request.user.id } })
       await transaction.serverMember.create({ data: { userId: request.user.id, serverId: createdServer.id, isOwner: true } })
@@ -131,6 +148,8 @@ export async function serverRoutes(server: FastifyInstance) {
     const membership = await prisma.serverMember.findFirst({ where: { serverId: request.params.serverId, userId: request.user.id, isBanned: false }, select: { isOwner: true } })
     if (!membership) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy server hoặc bạn không có quyền truy cập.' })
     if (!membership.isOwner) return reply.status(403).send({ statusCode: 403, message: 'Chỉ chủ server mới có thể tạo kênh.' })
+    const totalChannels = await prisma.channel.count({ where: { serverId: request.params.serverId } })
+    if (totalChannels >= 50) return reply.status(403).send({ statusCode: 403, message: 'Máy chủ đã đạt giới hạn tối đa 50 kênh.' })
     const category = parsed.data.categoryId
       ? await prisma.channelCategory.findFirst({ where: { id: parsed.data.categoryId, serverId: request.params.serverId }, select: { id: true } })
       : await prisma.channelCategory.findFirst({ where: { serverId: request.params.serverId }, orderBy: { position: 'asc' }, select: { id: true } })

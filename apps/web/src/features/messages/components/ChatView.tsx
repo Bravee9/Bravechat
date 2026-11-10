@@ -7,6 +7,7 @@ import { useCurrentUser, loadConversations } from "@/stores/workspace.store";
 import { MemberList } from "@/features/members/components/MemberList";
 import { UserCard } from "@/features/members/components/UserCard";
 import { FriendsPanel } from "@/features/members/components/FriendsPanel";
+import { DmUserProfileSidebar } from "@/features/channels/components/DmUserProfileSidebar";
 import { DialogFrame } from "@/components/ui/DialogFrame";
 import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
@@ -17,15 +18,50 @@ import type { ChatMessage } from "./MessageItem";
 
 type StoredMessage = ChatMessage & { id: string; createdAt: string };
 type Page = { messages: StoredMessage[]; hasMore: boolean };
-type MessageEvent = { type?: string; message?: ChatMessage; messageId?: ChatMessage["id"] };
-type ChatMetadata = { user: { displayName?: string | null; username: string } } | { channel: { name: string; type: string } };
+type ChannelMetadata = {
+  channel?: { name?: string; type?: string | null };
+  user?: { displayName?: string | null; username?: string };
+};
+type RealtimeEvent = {
+  type?: string;
+  channelId?: string;
+  messageId?: string | number;
+  message?: StoredMessage;
+  username?: string;
+  senderId?: string;
+  receiverId?: string;
+  status?: "connected" | "connecting" | "disconnected";
+  errorMessage?: string;
+};
 interface ChatViewProps { serverId?: string; channelId?: string }
 export const mergeMessages = (existing: ChatMessage[], incoming: ChatMessage[]) => {
   const byId = new Map(existing.map((item) => [item.id, item]));
   incoming.forEach((item) => byId.set(item.id, item));
   return Array.from(byId.values()).sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime() || String(a.id).localeCompare(String(b.id)));
 };
-function applyEvent(previous: ChatMessage[], data: MessageEvent): ChatMessage[] {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function toRealtimeEvent(value: unknown): RealtimeEvent | null {
+  if (!isRecord(value)) return null;
+  const message = isRecord(value.message) && typeof value.message.id === "string"
+    ? value.message as unknown as StoredMessage
+    : undefined;
+  return {
+    type: typeof value.type === "string" ? value.type : undefined,
+    channelId: typeof value.channelId === "string" ? value.channelId : undefined,
+    messageId: typeof value.messageId === "string" || typeof value.messageId === "number" ? value.messageId : undefined,
+    message,
+    username: typeof value.username === "string" ? value.username : undefined,
+    senderId: typeof value.senderId === "string" ? value.senderId : undefined,
+    receiverId: typeof value.receiverId === "string" ? value.receiverId : undefined,
+    status: value.status === "connected" || value.status === "connecting" || value.status === "disconnected" ? value.status : undefined,
+    errorMessage: typeof value.message === "string" ? value.message : undefined,
+  };
+}
+
+function applyEvent(previous: ChatMessage[], data: RealtimeEvent): ChatMessage[] {
   if (data.type === "message_delete" || data.type === "dm_delete") return previous.filter((item) => item.id !== data.messageId).map((item) => item.replyTo && item.replyTo.id === data.messageId ? { ...item, replyTo: { ...item.replyTo, content: "Tin nhắn đã xóa" } } : item);
   const message = data.message;
   if (message && typeof message.id === "string") return mergeMessages(previous, [message]).map((item) => item.replyTo && item.replyTo.id === message.id ? { ...item, replyTo: { ...item.replyTo, content: message.content } } : item);
@@ -78,7 +114,7 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
     let active = true; let socket: WebSocket | null = null;
     let retryTimer: ReturnType<typeof setTimeout>; let retries = 0; let version = 0;
     let readTimer: ReturnType<typeof setTimeout>;
-    let fetching = false; let buffered: MessageEvent[] = [];
+    let fetching = false; let buffered: RealtimeEvent[] = [];
     const abort = new AbortController();
     const markRead = () => {
       // Coalesce ACK trong 500ms và không đánh dấu đã đọc cho tab đang ẩn.
@@ -86,7 +122,7 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
       clearTimeout(readTimer);
       readTimer = setTimeout(() => { void http.post("/channels/" + encodeURIComponent(rawChannelId) + "/read").catch(() => undefined); }, 500);
     };
-    const receive = (event: MessageEvent) => { if (fetching) buffered.push(event); setMessages((previous) => applyEvent(previous, event)); if (!isMe && event.type === "message_create") markRead(); };
+    const receive = (event: RealtimeEvent) => { if (fetching) buffered.push(event); setMessages((previous) => applyEvent(previous, event)); if (!isMe && event.type === "message_create") markRead(); };
     const load = async () => {
       const current = ++version; fetching = true; buffered = [];
       try {
@@ -103,13 +139,14 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
         markRead();
       } catch (reason) { if (active && current === version) { fetching = false; setError(reason instanceof Error ? reason.message : "Không thể tải lịch sử."); } }
     };
-    void http.get<ChatMetadata>(isMe ? "/users/" + encodeURIComponent(rawChannelId) : "/channels/" + encodeURIComponent(rawChannelId), { signal: abort.signal })
-      .then((result) => { if (active) { if ("user" in result) setName(result.user.displayName || result.user.username); else { setName(result.channel.name); setChannelType(result.channel.type); } } })
-      .catch((reason) => { if (active) setError(reason.message); });
+    void http.get<ChannelMetadata>(isMe ? "/users/" + encodeURIComponent(rawChannelId) : "/channels/" + encodeURIComponent(rawChannelId), { signal: abort.signal })
+      .then((result) => { if (active) { setName(isMe ? result.user?.displayName || result.user?.username || "Người dùng" : result.channel?.name || "Kênh"); if (!isMe) setChannelType(result.channel?.type ?? null); } })
+      .catch((reason) => { if (active) setError(reason instanceof Error ? reason.message : "Không thể tải thông tin kênh."); });
     const userEvent = (event: Event) => {
-      const data = (event as CustomEvent).detail;
+      const data = toRealtimeEvent((event as CustomEvent<unknown>).detail);
+      if (!data) return;
       if (data.type === "ready" && isMe) void load();
-      if (isMe && data.type === "connection") setStatus(data.status);
+      if (isMe && data.type === "connection" && data.status) setStatus(data.status);
       if (isMe && data.type?.startsWith("dm_") && (data.senderId === rawChannelId || data.receiverId === rawChannelId)) { receive(data); if (data.type === "dm_create" && document.visibilityState === "visible") void http.get(historyPath, { query: { limit: 1 } }).catch(() => undefined); }
     };
     window.addEventListener("bravechat:realtime", userEvent);
@@ -123,12 +160,13 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
       currentSocket.onmessage = (event) => {
         if (!active) return;
         try {
-          const data = JSON.parse(event.data);
+          const data = toRealtimeEvent(JSON.parse(event.data));
+          if (!data) return;
           if (data.type === "channel_joined") { retries = 0; void load(); }
-          else if (data.channelId === rawChannelId && ["message_create", "message_update", "message_delete"].includes(data.type)) receive(data);
-          else if (data.type === "typing_start" && data.username !== user?.username) setTyping((previous) => Array.from(new Set([...previous, data.username])));
-          else if (data.type === "typing_stop") setTyping((previous) => previous.filter((value) => value !== data.username));
-          else if (data.type === "error") setError(data.message);
+          else if (data.channelId === rawChannelId && data.type && ["message_create", "message_update", "message_delete"].includes(data.type)) receive(data);
+          else if (data.type === "typing_start" && data.username && data.username !== user?.username) { const username = data.username; setTyping((previous) => Array.from(new Set([...previous, username]))); }
+          else if (data.type === "typing_stop" && data.username) { const username = data.username; setTyping((previous) => previous.filter((value) => value !== username)); }
+          else if (data.type === "error") setError(data.errorMessage ?? "Máy chủ không thể xử lý yêu cầu.");
         } catch { setError("Không đọc được cập nhật từ máy chủ."); }
       };
       currentSocket.onclose = (event) => {
@@ -166,7 +204,7 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
     finally { sendingRef.current = false; setSending(false); }
   };
   const handleFiles = async (files: File[]) => {
-    if (isMe || sendingRef.current) return;
+    if (sendingRef.current) return;
     sendingRef.current = true; setUploading(true); setError("");
     const savedKey = key; const uploaded: Array<{ filename: string; contentType: string; key: string }> = [];
     try {
@@ -175,10 +213,25 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
         const result = await http.post<{ filename: string; contentType: string; key: string }>("/uploads", form);
         uploaded.push(result);
       }
-      const result = await http.post<{ message: StoredMessage }>(historyPath, { content: message.trim(), attachments: uploaded, replyToId: replyTo ? String(replyTo.id) : undefined });
-      if (routeRef.current === savedKey) { setMessages((previous) => mergeMessages(previous, [result.message])); setMessage(""); setReplyTo(null); }
-    } catch (reason) { await Promise.all(uploaded.map(({ key: pending }) => http.delete("/uploads/pending", { body: { key: pending } }).catch(() => undefined))); if (routeRef.current === savedKey) setError(reason instanceof Error ? reason.message : "Không thể tải tệp."); }
-    finally { sendingRef.current = false; setUploading(false); }
+      const result = await http.post<{ message: StoredMessage }>(historyPath, {
+        content: message.trim(),
+        attachments: uploaded,
+        replyToId: replyTo ? String(replyTo.id) : undefined,
+        nonce: crypto.randomUUID(),
+      });
+      if (routeRef.current === savedKey) {
+        setMessages((previous) => mergeMessages(previous, [result.message]));
+        setMessage("");
+        setReplyTo(null);
+      }
+      if (isMe) void loadConversations(true);
+    } catch (reason) {
+      await Promise.all(uploaded.map(({ key: pending }) => http.delete("/uploads/pending", { body: { key: pending } }).catch(() => undefined)));
+      if (routeRef.current === savedKey) setError(reason instanceof Error ? reason.message : "Không thể tải tệp.");
+    } finally {
+      sendingRef.current = false;
+      setUploading(false);
+    }
   };
   const loadOlder = async () => {
     if (!messages[0] || olderBusy) return;
@@ -220,11 +273,12 @@ function ChannelChat({ rawServerId, rawChannelId }: { rawServerId: string; rawCh
         onReply={setReplyTo} onReaction={(item, emoji, remove) => void reaction(item, emoji, remove)} onEdit={(item) => { setEdited(item.content); setDialog({ type: "edit", message: item }); }} onDelete={(item) => setDialog({ type: "delete", message: item })} onInspect={setInspected} />
       <TypingIndicator typingUsers={typing} />
       {replyTo && <div className="mx-6 mb-2 flex justify-between gap-3 rounded border border-ocean-dark-border px-3 py-2 text-xs text-ocean-light/70"><span className="truncate">Trả lời {replyTo.user}: {replyTo.content}</span><button aria-label="Hủy trả lời" onClick={() => setReplyTo(null)}>✕</button></div>}
-      <ChatInput value={message} placeholder={isMe ? "Nhắn tin tới " + name : "Nhắn tin tới #" + name} onChange={(event) => { setMessage(event.target.value); sendTyping("typing_start"); if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = setTimeout(() => sendTyping("typing_stop"), 1500); }} onSubmit={handleSend} onFiles={isMe ? undefined : handleFiles} isUploading={uploading} isSending={sending} />
+      <ChatInput value={message} placeholder={isMe ? "Nhắn tin tới " + name : "Nhắn tin tới #" + name} onChange={(event) => { setMessage(event.target.value); sendTyping("typing_start"); if (typingTimer.current) clearTimeout(typingTimer.current); typingTimer.current = setTimeout(() => sendTyping("typing_stop"), 1500); }} onSubmit={handleSend} onFiles={handleFiles} isUploading={uploading} isSending={sending} />
       {sending && <p role="status" className="px-6 pb-2 text-xs text-ocean-light/60">Đang gửi...</p>}
       {error && <p role="alert" className="px-6 pb-2 text-xs text-rose-300">{error}</p>}
     </main>
     {!isMe && <MemberList isVisible={showMembers} serverId={rawServerId} />}
+    {isMe && !friends && showMembers && <DmUserProfileSidebar userId={rawChannelId} onClose={() => setShowMembers(false)} />}
     {inspected && <UserCard userId={inspected} onClose={() => setInspected(null)} />}
     {dialog && <DialogFrame title={dialog.type === "edit" ? "Sửa tin nhắn" : "Xóa tin nhắn"} onClose={() => { if (!actionBusy) setDialog(null); }}><form onSubmit={submitAction} className="space-y-4">{dialog.type === "edit" ? <label className="block text-sm">Nội dung<textarea autoFocus className="input-ocean mt-2 w-full" value={edited} required maxLength={2000} onChange={(event) => setEdited(event.target.value)} /></label> : <p>Bạn muốn xóa tin nhắn này?</p>}<div className="flex justify-end gap-2"><button type="button" disabled={actionBusy} className="btn-secondary" onClick={() => setDialog(null)}>Hủy</button><button className="btn-primary" disabled={actionBusy || dialog.type === "edit" && !edited.trim()}>{actionBusy ? "Đang lưu..." : "Xác nhận"}</button></div></form></DialogFrame>}
   </div>;

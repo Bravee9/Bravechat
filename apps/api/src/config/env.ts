@@ -27,17 +27,23 @@ const envSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6379'),
   REDIS_ENABLED: z.enum(['true', 'false']).default('false'),
 
-  // Auth
+  // Auth & Email Delivery (Gmail SMTP / Resend)
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default('7d'),
   RESEND_API_KEY: z.string().optional(),
   RESET_EMAIL_FROM: z.string().optional(),
+  GMAIL_USER: optionalCredential(z.string().trim().email()),
+  GMAIL_APP_PASSWORD: optionalCredential(z.string().trim().min(8)),
+  SMTP_HOST: z.string().default('smtp.gmail.com'),
+  SMTP_PORT: z.coerce.number().default(465),
 
-  // Cloudflare R2 (Object Storage)
+  // Cloudflare R2 / MinIO (Object Storage)
+  STORAGE_DRIVER: z.enum(['r2', 'minio', 's3']).default('r2'),
+  S3_FORCE_PATH_STYLE: z.preprocess((val) => val === 'true' || val === true, z.boolean().default(false)),
   R2_BUCKET_NAME: z.string().trim().min(3).optional(),
   R2_ENDPOINT_URL: z.string().trim().url().optional(),
-  R2_ACCESS_KEY_ID: optionalCredential(z.string().trim().min(16)),
-  R2_SECRET_ACCESS_KEY: optionalCredential(z.string().trim().min(32)),
+  R2_ACCESS_KEY_ID: optionalCredential(z.string().trim().min(5)),
+  R2_SECRET_ACCESS_KEY: optionalCredential(z.string().trim().min(8)),
   // Bỏ trống nếu bucket private (khi đó media đi qua /api/media/*)
   R2_PUBLIC_URL: z.preprocess((value) => (value === '' || (typeof value === 'string' && value.includes('xxxx')) ? undefined : value), z.string().url().optional()),
   LIVEKIT_URL: z.string().url().optional(),
@@ -68,5 +74,6 @@ export const env = {
   R2_ENDPOINT_URL: parsed.data.R2_ENDPOINT_URL ?? 'http://127.0.0.1:9000',
   R2_ACCESS_KEY_ID: parsed.data.R2_ACCESS_KEY_ID ?? '',
   R2_SECRET_ACCESS_KEY: parsed.data.R2_SECRET_ACCESS_KEY ?? '',
+  S3_FORCE_PATH_STYLE: parsed.data.S3_FORCE_PATH_STYLE || false,
 }
 export type Env = typeof env

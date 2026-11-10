@@ -155,6 +155,47 @@ services:
     profiles:
       - tools
 
+  # ─── MinIO S3 Object Storage (Local / Self-hosted) ────────
+  minio:
+    image: minio/minio:RELEASE.2024-05-10T01-41-38Z
+    container_name: discord_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: miniopassword
+    volumes:
+      - minio_data:/data
+    networks:
+      - discord_network
+    profiles:
+      - storage
+      - tools
+
+  minio-init:
+    image: minio/mc:RELEASE.2024-05-09T17-04-24Z
+    container_name: discord_minio_init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set local http://minio:9000 minioadmin miniopassword;
+      /usr/bin/mc mb --ignore-existing local/bravechat-media;
+      /usr/bin/mc anonymous set download local/bravechat-media/avatars;
+      /usr/bin/mc anonymous set download local/bravechat-media/banners;
+      /usr/bin/mc anonymous set download local/bravechat-media/server-icons;
+      /usr/bin/mc anonymous set download local/bravechat-media/server-banners;
+      exit 0;
+      "
+    networks:
+      - discord_network
+    profiles:
+      - storage
+      - tools
+
   # ─── pgAdmin (DB GUI - Dev only) ──────────────────────────
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -180,6 +221,8 @@ volumes:
     name: discord_postgres_data
   redis_data:
     name: discord_redis_data
+  minio_data:
+    name: discord_minio_data
 
 # ─── Networks ─────────────────────────────────────────────
 networks:

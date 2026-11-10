@@ -27,6 +27,7 @@
   "devDependencies": {
     "@types/node": "^22",
     "prisma": "^5.22.0",
+    "puppeteer-core": "^25.16.0",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
   },

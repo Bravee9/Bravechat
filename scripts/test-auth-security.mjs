@@ -99,3 +99,72 @@ test('a delayed refresh cannot recreate a session after password reset', async (
   assert.equal((await refresh).statusCode, 401);
   assert.equal(f.sessions.filter((row) => !row.isRevoked).length, 0);
 });
+
+test('step-2 Gmail OTP login challenge verifies 6-digit OTP and marks email verified', async (t) => {
+  const f = await fixture(); t.after(() => f.app.close());
+  const step1 = await f.app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { email: f.user.email, password: 'OldPassword1', requireGmailOtp: true },
+  });
+  assert.equal(step1.statusCode, 200);
+  const data = step1.json().data;
+  assert.equal(data.requiresVerification, true);
+  assert.equal(typeof data.challengeToken, 'string');
+  assert.equal(typeof data.devOtp, 'string');
+
+  const wrong = await f.app.inject({
+    method: 'POST',
+    url: '/auth/login/verify',
+    payload: { challengeToken: data.challengeToken, code: '000000' },
+  });
+  assert.equal(wrong.statusCode, 401);
+
+  const verified = await f.app.inject({
+    method: 'POST',
+    url: '/auth/login/verify',
+    payload: { challengeToken: data.challengeToken, code: data.devOtp },
+  });
+  assert.equal(verified.statusCode, 200);
+  assert.ok(verified.cookies.find((c) => c.name === 'token'));
+});
+
+test('QR code login lifecycle: init, scan, approve, and status poll issues session cookies', async (t) => {
+  const f = await fixture(); t.after(() => f.app.close());
+  const login = await f.login();
+  const authCookie = login.cookies.find((c) => c.name === 'token').value;
+
+  const initRes = await f.app.inject({ method: 'POST', url: '/auth/qr/init' });
+  assert.equal(initRes.statusCode, 200);
+  const qr = initRes.json().data;
+  assert.ok(qr.qrId && qr.pollSecret && qr.shortCode.startsWith('BC-'));
+
+  const scanRes = await f.app.inject({
+    method: 'POST',
+    url: '/auth/qr/scan',
+    cookies: { token: authCookie },
+    payload: { code: qr.shortCode },
+  });
+  assert.equal(scanRes.statusCode, 200);
+
+  const scannedStatus = await f.app.inject({
+    method: 'GET',
+    url: `/auth/qr/status?qrId=${encodeURIComponent(qr.qrId)}&pollSecret=${encodeURIComponent(qr.pollSecret)}`,
+  });
+  assert.equal(scannedStatus.json().data.status, 'SCANNED');
+
+  const approveRes = await f.app.inject({
+    method: 'POST',
+    url: '/auth/qr/approve',
+    cookies: { token: authCookie },
+    payload: { qrId: qr.qrId },
+  });
+  assert.equal(approveRes.statusCode, 200);
+
+  const approvedStatus = await f.app.inject({
+    method: 'GET',
+    url: `/auth/qr/status?qrId=${encodeURIComponent(qr.qrId)}&pollSecret=${encodeURIComponent(qr.pollSecret)}`,
+  });
+  assert.equal(approvedStatus.json().data.status, 'APPROVED');
+  assert.ok(approvedStatus.cookies.find((c) => c.name === 'token'));
+});
