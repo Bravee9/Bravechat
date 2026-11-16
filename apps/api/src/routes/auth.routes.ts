@@ -253,19 +253,6 @@ async function loadUserSecurity(userId: string): Promise<UserSecurityState> {
   return state
 }
 
-function getUserSecurity(userId: string): UserSecurityState {
-  let state = userSecurityMap.get(userId)
-  if (!state) {
-    state = {
-      twoFactorEnabled: false,
-      backupCodes: [],
-      gmailLoginOtpEnabled: false,
-    }
-    userSecurityMap.set(userId, state)
-  }
-  return state
-}
-
 function recordSecurityLog(
   userId: string,
   entry: Omit<SecurityLogEntry, 'id' | 'createdAt'>
