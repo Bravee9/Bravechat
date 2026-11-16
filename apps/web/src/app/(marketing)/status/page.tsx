@@ -1,6 +1,6 @@
 /**
- * app/status/page.tsx
- * Trạng thái Hệ thống / System Status
+ * app/(marketing)/status/page.tsx
+ * Trạng thái Hệ thống / System Status — JetBrains Dark Style
  */
 
 import type { Metadata } from "next";
@@ -12,85 +12,89 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Trạng thái hệ thống",
   description:
-    "Theo dõi trạng thái hoạt động theo thời gian thực của các dịch vụ Bravechat: API, WebSocket, cơ sở dữ liệu, lưu trữ và xác thực.",
+    "Theo dõi trạng thái hoạt động của các dịch vụ trên Bravechat: ứng dụng Web, tin nhắn, phòng thoại, lưu trữ tệp và đăng nhập.",
 };
 
-// Static status data — replace with real API call when backend is ready
 const SERVICES = [
-  { id: "api", name: "API Server", nameEn: "REST API", status: "operational" as const },
-  { id: "websocket", name: "WebSocket (Real-time)", nameEn: "WebSocket Gateway", status: "operational" as const },
-  { id: "database", name: "Cơ sở dữ liệu", nameEn: "PostgreSQL Database", status: "operational" as const },
-  { id: "cache", name: "Cache / Hàng đợi", nameEn: "Redis Cache & Queue", status: "operational" as const },
-  { id: "storage", name: "Lưu trữ Media", nameEn: "Cloudflare R2 Storage", status: "operational" as const },
-  { id: "cdn", name: "Mạng phân phối nội dung", nameEn: "Cloudflare CDN", status: "operational" as const },
-  { id: "auth", name: "Dịch vụ xác thực", nameEn: "Authentication Service", status: "operational" as const },
+  { id: "web", name: "Ứng dụng Web & Giao diện", nameEn: "Web Application", status: "operational" as const },
+  { id: "messaging", name: "Hệ thống Tin nhắn & Kênh", nameEn: "Real-time Messaging", status: "operational" as const },
+  { id: "voice", name: "Phòng thoại & Chia sẻ màn hình", nameEn: "Voice & Screen Share", status: "operational" as const },
+  { id: "media", name: "Lưu trữ Tệp & Hình ảnh", nameEn: "File & Media Uploads", status: "operational" as const },
+  { id: "auth", name: "Đăng nhập & Bảo mật tài khoản", nameEn: "Authentication & 2FA", status: "operational" as const },
 ];
 
-const INCIDENTS: { date: string; title: string; status: string; description: string }[] = [];
-
 const STATUS_LABELS = {
-  operational: { vi: "Hoạt động bình thường", en: "Operational", color: "text-emerald-400", dot: "bg-emerald-500" },
-  degraded: { vi: "Hiệu suất giảm", en: "Degraded Performance", color: "text-amber-400", dot: "bg-amber-500 animate-pulse" },
-  partial: { vi: "Gián đoạn một phần", en: "Partial Outage", color: "text-orange-400", dot: "bg-orange-500 animate-pulse" },
-  outage: { vi: "Ngừng hoạt động", en: "Major Outage", color: "text-red-400", dot: "bg-red-500 animate-pulse" },
-  maintenance: { vi: "Đang bảo trì", en: "Under Maintenance", color: "text-ocean-secondary", dot: "bg-ocean-secondary" },
+  operational: {
+    vi: "Hoạt động bình thường",
+    en: "Operational",
+    color: "text-[#21D789]",
+    dot: "bg-[#21D789]",
+  },
+  degraded: {
+    vi: "Hiệu suất giảm",
+    en: "Degraded Performance",
+    color: "text-[#FDB60D]",
+    dot: "bg-[#FDB60D]",
+  },
 };
 
-const overallStatus = SERVICES.every((s) => s.status === "operational")
-  ? "operational"
-  : "degraded";
-
 export default function StatusPage() {
-  const overall = STATUS_LABELS[overallStatus];
+  const overall = STATUS_LABELS.operational;
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen bg-[#0B0B0D] text-[#E6EDF3]">
       <OceanBackground />
       <Navbar />
 
-      <main className="relative z-10 max-w-4xl mx-auto px-6 pt-28 pb-20">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-xs text-ocean-light/60 mb-10 font-mono">
-          <Link href="/" className="hover:text-ocean-secondary transition-colors">Trang chủ</Link>
+      <main className="relative z-10 max-w-4xl mx-auto px-6 pt-12 pb-24">
+        <nav className="flex items-center gap-2 text-xs text-[#7D7D7D] mb-8 font-mono">
+          <Link href="/" className="hover:text-white transition-colors">
+            Trang chủ
+          </Link>
           <span>/</span>
-          <span className="text-ocean-secondary">Trạng thái</span>
+          <span className="text-[#07C3F2]">Trạng thái hệ thống</span>
         </nav>
 
-        {/* Overall status banner */}
-        <div
-          className={`mb-12 p-8 border ${overallStatus === "operational" ? "border-emerald-500/30 bg-emerald-500/5" : "border-amber-500/30 bg-amber-500/5"}`}
-        >
-          <div className="flex items-center gap-4">
-            <div className={`w-5 h-5 ${overall.dot}`} />
+        <div className="mb-10 p-6 bg-[#16161A] border border-[#2B2D30] rounded-[4px] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <span className={`w-3.5 h-3.5 rounded-full ${overall.dot}`} />
             <div>
-              <h1 className="text-2xl md:text-3xl font-black text-ocean-light tracking-tight">
+              <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">
                 {overall.vi}
               </h1>
-              <p className={`text-sm font-mono mt-0.5 ${overall.color}`}>{overall.en}</p>
+              <p className="text-xs font-mono text-[#A8A8B0] mt-0.5">
+                Tất cả dịch vụ chính đang vận hành ổn định
+              </p>
             </div>
           </div>
-          <p className="text-ocean-light/60 text-xs font-mono mt-4">
-            Cập nhật lần cuối / Last updated: {new Date().toLocaleString("vi-VN")}
-          </p>
+          <span className="text-xs font-mono text-[#7D7D7D]">
+            {overall.en}
+          </span>
         </div>
 
-        {/* Services */}
-        <div className="mb-16">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-ocean-secondary mb-5">
-            Các dịch vụ / Services
+        <div className="mb-12">
+          <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-[#7D7D7D] mb-3">
+            Danh mục dịch vụ
           </h2>
-          <div className="border border-ocean-dark-border divide-y divide-ocean-dark-border">
+          <div className="bg-[#16161A] border border-[#2B2D30] rounded-[4px] divide-y divide-[#2B2D30]">
             {SERVICES.map((svc) => {
               const cfg = STATUS_LABELS[svc.status];
               return (
-                <div key={svc.id} className="px-6 py-4 flex items-center justify-between gap-4 hover:bg-ocean-dark-surface/40 transition-colors">
+                <div
+                  key={svc.id}
+                  className="px-5 py-4 flex items-center justify-between gap-4 hover:bg-[#1E1F22] transition-colors"
+                >
                   <div>
-                    <p className="text-ocean-light font-bold text-sm">{svc.name}</p>
-                    <p className="text-ocean-light/50 text-xs font-mono mt-0.5">{svc.nameEn}</p>
+                    <p className="text-white font-semibold text-sm">{svc.name}</p>
+                    <p className="text-[#7D7D7D] text-xs font-mono mt-0.5">
+                      {svc.nameEn}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <div className={`w-2 h-2 ${cfg.dot}`} />
-                    <span className={`text-xs font-bold ${cfg.color}`}>{cfg.vi}</span>
+                    <div className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+                    <span className={`text-xs font-medium ${cfg.color}`}>
+                      {cfg.vi}
+                    </span>
                   </div>
                 </div>
               );
@@ -98,57 +102,13 @@ export default function StatusPage() {
           </div>
         </div>
 
-        {/* Uptime history — 90 days placeholder */}
-        <div className="mb-16">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-ocean-secondary mb-5">
-            Lịch sử Uptime (90 ngày) / Uptime History
-          </h2>
-          <div className="border border-ocean-dark-border p-6">
-            <div className="flex gap-0.5 mb-3">
-              {Array.from({ length: 90 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex-1 h-8 bg-emerald-500/70 hover:bg-emerald-400 transition-colors cursor-pointer"
-                  title={`Ngày ${90 - i}: Hoạt động bình thường`}
-                />
-              ))}
-            </div>
-            <div className="flex justify-between text-ocean-light/50 text-xs font-mono">
-              <span>90 ngày trước</span>
-              <span className="text-emerald-400 font-bold">99.9% Uptime</span>
-              <span>Hôm nay</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Incidents */}
-        <div>
-          <h2 className="text-xs font-bold uppercase tracking-widest text-ocean-secondary mb-5">
-            Sự cố gần đây / Recent Incidents
-          </h2>
-          {INCIDENTS.length === 0 ? (
-            <div className="border border-ocean-dark-border p-8 text-center">
-              <div className="w-10 h-10 bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto mb-3">
-                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="square" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <p className="text-ocean-light/70 text-sm">Không có sự cố nào trong 90 ngày qua.</p>
-              <p className="text-ocean-light/40 text-xs font-mono mt-1">No incidents reported in the past 90 days.</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {INCIDENTS.map((incident) => (
-                <div key={incident.date} className="border border-ocean-dark-border p-6">
-                  <div className="flex items-start justify-between gap-4 mb-2">
-                    <h3 className="text-ocean-light font-bold">{incident.title}</h3>
-                    <span className="text-ocean-light/60 text-xs font-mono flex-shrink-0">{incident.date}</span>
-                  </div>
-                  <p className="text-ocean-light/70 text-sm">{incident.description}</p>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="bg-[#16161A] border border-[#2B2D30] rounded-[4px] p-6 text-center">
+          <p className="text-white font-semibold text-sm">
+            Không ghi nhận sự cố gián đoạn gần đây
+          </p>
+          <p className="text-[#A8A8B0] text-xs mt-1">
+            Nếu bạn gặp sự cố khi kết nối hoặc đăng nhập, vui lòng kiểm tra lại kết nối mạng hoặc thử tải lại trang.
+          </p>
         </div>
       </main>
 

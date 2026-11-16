@@ -34,26 +34,26 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
   return (
     <footer
       data-testid="user-profile-bar"
-      className="h-14 bg-[#051424] border-t border-ocean-dark-border px-3 flex items-center justify-between flex-shrink-0 z-20 select-none relative"
+      className="h-14 bg-[#141417] border-t border-[#2B2D30] px-3 flex items-center justify-between flex-shrink-0 z-20 select-none relative"
     >
       <button
         type="button"
         onClick={() => setPopoverOpen(!popoverOpen)}
-        className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:bg-white/5 p-1 rounded transition-colors text-left"
+        className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:bg-[#24262B] p-1 rounded-[4px] transition-colors text-left"
         data-testid="user-profile-popover-trigger"
         aria-label="Xem hồ sơ nhanh"
       >
         <div className="relative flex-shrink-0">
           {currentUser?.avatarUrl ? (
-            <img src={currentUser.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+            <img src={currentUser.avatarUrl} alt="" className="h-8 w-8 rounded-[6px] object-cover" />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-ocean-primary flex items-center justify-center text-white text-xs font-bold shadow-ocean-glow">
+            <div className="w-8 h-8 rounded-[6px] bg-[#087CFA] flex items-center justify-center text-white text-xs font-mono font-bold">
               {currentUser?.displayName?.[0] || currentUser?.username?.[0] || "B"}
             </div>
           )}
           <div
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#051424]",
+              "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#141417]",
               currentUser?.status === "ONLINE"
                 ? "bg-emerald-500"
                 : currentUser?.status === "IDLE"
@@ -65,11 +65,10 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
           />
         </div>
         <div className="min-w-0">
-          <p className="text-ocean-light text-xs font-bold truncate leading-tight flex items-center gap-1">
+          <p className="text-[#E6EDF3] text-xs font-bold truncate leading-tight flex items-center gap-1">
             <span>{currentUser?.displayName || currentUser?.username || "Bravee9"}</span>
-            <span className="text-[10px] text-ocean-secondary font-mono">MATH</span>
           </p>
-          <p className="text-ocean-light/40 text-[10px] truncate font-mono">
+          <p className="text-[#7D7D7D] text-[10px] truncate font-mono">
             #{currentUser?.discriminator || "0001"}
           </p>
         </div>

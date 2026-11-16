@@ -1,122 +1,142 @@
-/**
- * components/landing/FooterSection.tsx
- * Site footer — Ocean Swiss Minimalist
- */
-
 import Link from "next/link";
-import { CookieSettingsButton } from "@/components/consent/CookieSettingsButton";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 
-const FOOTER_LINKS = {
-  "Sản phẩm": [
-    { label: "Tính năng", href: "#features" },
-    { label: "Lộ trình", href: "/roadmap" },
-    { label: "Changelog", href: "/changelog" },
-    { label: "Trạng thái hệ thống", href: "/status" },
-  ],
-  "Phát triển": [
-    { label: "API Reference", href: "/docs/api-reference" },
-    { label: "Kiến trúc", href: "/docs/architecture" },
-    { label: "Database Schema", href: "/docs/database-schema" },
-    { label: "GitHub", href: "https://github.com/Bravee9/Bravechat" },
-  ],
-  "Pháp lý": [
-    { label: "Điều khoản sử dụng", href: "/terms" },
-    { label: "Chính sách bảo mật", href: "/privacy" },
-    { label: "Cookie Policy", href: "/cookies" },
-  ],
-};
-
-export function FooterSection({ language = "vi" }: { language?: "vi" | "en" }) {
+export function FooterSection({ language: _language }: { language?: "vi" | "en" } = {}) {
   return (
-    <footer className="bg-ocean-dark-bg border-t border-ocean-dark-border">
-      <div className="max-w-7xl mx-auto px-6 py-16">
-        {/* Top section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 pb-12 border-b border-ocean-dark-border">
-          {/* Brand */}
-          <div className="lg:col-span-2">
-            <div className="flex items-center gap-3 mb-6">
-              <img src="/logo-96.png" alt="Logo Bravechat" width={32} height={32} loading="lazy" className="w-8 h-8 object-contain" />
-              <span className="font-bold text-xl text-ocean-light tracking-tight">
-                Brave<span className="text-ocean-secondary">chat</span>
-              </span>
-            </div>
-            <p className="text-ocean-light/70 text-sm leading-relaxed max-w-xs">
-              {language === "en" ? "A real-time communication platform for communities, teams, and businesses. Built by " : "Nền tảng giao tiếp thời gian thực dành cho cộng đồng, tổ chức và doanh nghiệp. Phát triển bởi "}{" "}
-              <a
-                href="https://github.com/Bravee9"
-                target="_blank"
-                rel="noreferrer"
-                className="text-ocean-secondary hover:text-ocean-light"
-              >
-                Bravee9
-              </a>{" "}
-              ·{" "}
-              <a
-                href="https://github.com/Shuji7245"
-                target="_blank"
-                rel="noreferrer"
-                className="text-ocean-secondary hover:text-ocean-light"
-              >
-                Shuji7245
-              </a>
+    <footer
+      id="footer"
+      className="bg-[#09090b] border-t border-[#2B2D30] pb-[30px] pt-[64px] px-6 lg:px-[75.6px] relative shrink-0 w-full"
+      data-node-id="67:262"
+    >
+      <div className="max-w-[1360.813px] mx-auto w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr] xl:grid-cols-[496.31px_248.17px_248.16px_248.17px] gap-[40px]">
+          {/* Column 1: BrandLogo & Tagline */}
+          <div className="flex flex-col gap-3 items-start" data-node-id="67:263">
+            <BrandLogo href="/" size="lg" />
+            <p className="font-['Inter',sans-serif] text-[#9999a2] text-[13px] max-w-[300px] leading-relaxed pt-1">
+              Không gian trò chuyện trực tuyến theo máy chủ và kênh dành cho mọi người.
             </p>
-
-
           </div>
 
-          {/* Links */}
-          {Object.entries(FOOTER_LINKS).map(([category, links]) => (
-            <div key={category}>
-              <h4 className="text-ocean-light text-xs font-bold uppercase tracking-widest mb-5">
-                {language === "en" ? ({ "Sản phẩm": "Product", "Phát triển": "Development", "Pháp lý": "Legal" }[category] ?? category) : category}
-              </h4>
-              <ul className="flex flex-col gap-3">
-                {links.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="text-ocean-light/70 text-sm hover:text-ocean-secondary transition-colors"
-                    >
-                      {language === "en" ? ({ "Tính năng": "Features", "Lộ trình": "Roadmap", "Changelog": "Changelog", "Trạng thái hệ thống": "System status", "Kiến trúc": "Architecture", "Điều khoản sử dụng": "Terms of Service", "Chính sách bảo mật": "Privacy Policy", "Cookie Policy": "Cookie Policy" }[link.label] ?? link.label) : link.label}
-                    </Link>
-                  </li>
-                ))}
-                {category === "Pháp lý" && (
-                  <li>
-                    <CookieSettingsButton language={language} />
-                  </li>
-                )}
-              </ul>
+          {/* Column 2: Sản phẩm */}
+          <div className="flex flex-col gap-[12px] items-start" data-node-id="67:269">
+            <div className="pb-[6px]" data-node-id="67:270">
+              <p
+                className="font-['Inter',sans-serif] font-bold text-[13px] text-white whitespace-nowrap"
+                data-node-id="67:271"
+              >
+                Sản phẩm
+              </p>
             </div>
-          ))}
+            <Link
+              href="/#features"
+              className="font-['Inter',sans-serif] font-normal text-[#999] hover:text-white text-[13px] whitespace-nowrap transition-colors"
+              data-node-id="67:273"
+            >
+              Tính năng
+            </Link>
+            <Link
+              href="/channels"
+              className="font-['Inter',sans-serif] font-normal text-[#999] hover:text-white text-[13px] whitespace-nowrap transition-colors"
+              data-node-id="67:276"
+            >
+              Mở ứng dụng Web
+            </Link>
+            <Link
+              href="/roadmap"
+              className="font-['Inter',sans-serif] font-normal text-[#999] hover:text-white text-[13px] whitespace-nowrap transition-colors"
+              data-node-id="67:278"
+            >
+              Lộ trình
+            </Link>
+          </div>
+
+          {/* Column 3: Tài nguyên */}
+          <div className="flex flex-col gap-[12px] items-start" data-node-id="67:281">
+            <div className="pb-[6px]" data-node-id="67:282">
+              <p
+                className="font-['Inter',sans-serif] font-bold text-[13px] text-white whitespace-nowrap"
+                data-node-id="67:283"
+              >
+                Tài nguyên
+              </p>
+            </div>
+            <Link
+              href="/docs"
+              className="font-['Inter',sans-serif] font-normal text-[#999] hover:text-white text-[13px] whitespace-nowrap transition-colors"
+              data-node-id="67:284"
+            >
+              Hướng dẫn sử dụng
+            </Link>
+            <Link
+              href="/status"
+              className="font-['Inter',sans-serif] font-normal text-[#999] hover:text-white text-[13px] whitespace-nowrap transition-colors"
+              data-node-id="67:286"
+            >
+              Trạng thái dịch vụ
+            </Link>
+            <Link
+              href="/changelog"
+              className="font-['Inter',sans-serif] font-normal text-[#999] hover:text-white text-[13px] whitespace-nowrap transition-colors"
+              data-node-id="67:288"
+            >
+              Nhật ký cập nhật
+            </Link>
+          </div>
+
+          {/* Column 4: Chính sách */}
+          <div className="flex flex-col gap-[12px] items-start" data-node-id="67:291">
+            <div className="pb-[6px]" data-node-id="67:292">
+              <p
+                className="font-['Inter',sans-serif] font-bold text-[13px] text-white whitespace-nowrap"
+                data-node-id="67:293"
+              >
+                Pháp lý
+              </p>
+            </div>
+            <Link
+              href="/terms"
+              className="font-['Inter',sans-serif] font-normal text-[#999] hover:text-white text-[13px] whitespace-nowrap transition-colors"
+              data-node-id="67:296"
+            >
+              Điều khoản sử dụng
+            </Link>
+            <Link
+              href="/privacy"
+              className="font-['Inter',sans-serif] font-normal text-[#999] hover:text-white text-[13px] whitespace-nowrap transition-colors"
+              data-node-id="67:298"
+            >
+              Chính sách bảo mật
+            </Link>
+            <Link
+              href="/cookies"
+              className="font-['Inter',sans-serif] font-normal text-[#999] hover:text-white text-[13px] whitespace-nowrap transition-colors"
+              data-node-id="67:294"
+            >
+              Chính sách Cookie
+            </Link>
+          </div>
         </div>
 
-        {/* Bottom bar */}
-        <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-ocean-light/70 text-xs font-mono">
-            © {new Date().getFullYear()} Bravechat.
-          </p>
-          <div className="flex items-center gap-6">
-            {/* GitHub */}
-            <a
-              id="footer-github"
-              href="https://github.com/Bravee9/Bravechat"
-              target="_blank"
-              rel="noreferrer"
-              className="text-ocean-light/70 hover:text-ocean-secondary transition-colors"
-              aria-label="GitHub Repository"
+        {/* Bottom Copyright & Language Bar */}
+        <div className="pt-[30px] mt-[40px] w-full" data-node-id="67:306">
+          <div
+            className="border-[#2B2D30] border-solid border-t flex items-center justify-between pt-[24px] w-full"
+            data-node-id="67:301"
+          >
+            <p
+              className="font-mono font-medium text-[#7D7D7D] text-[11px] whitespace-nowrap"
+              data-node-id="67:302"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
-              </svg>
-            </a>
-
-            {/* Status indicator */}
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-emerald-500 animate-pulse" />
-              <span className="text-ocean-light/70 text-xs font-mono">
-                {language === "en" ? "All systems operational" : "Hệ thống hoạt động bình thường"}
-              </span>
+              © 2026 Bravechat
+            </p>
+            <div className="flex items-start" data-node-id="67:304">
+              <p
+                className="font-mono font-medium text-[#7D7D7D] text-[11px] whitespace-nowrap"
+                data-node-id="67:305"
+              >
+                Web · Sắp có trên Windows, macOS, Linux, iOS &amp; Android
+              </p>
             </div>
           </div>
         </div>

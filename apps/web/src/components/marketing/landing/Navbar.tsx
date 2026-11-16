@@ -1,133 +1,135 @@
-/**
- * components/landing/Navbar.tsx
- * Landing page navigation — Ocean Swiss Minimalist
- */
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 
-const NAV_LINKS = [
-  { label: "Tính năng", href: "/#features" },
-  { label: "Cộng đồng", href: "/#community" },
-  { label: "Lộ trình", href: "/roadmap" },
-  { label: "Tài liệu", href: "/docs" },
-];
+const imgIconSearch = "/figma-assets/icon-search.svg";
+const imgIconArrowHeader = "/figma-assets/icon-arrow-header.svg";
 
-export function Navbar({ language = "vi" }: { language?: "vi" | "en" }) {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+export function Navbar({ language: _language }: { language?: "vi" | "en" } = {}) {
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <header
-      className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isScrolled
-          ? "glass-ocean shadow-md shadow-black/20"
-          : "bg-transparent"
-      )}
+      className="sticky top-0 z-50 backdrop-blur-[16px] bg-[rgba(13,13,16,0.92)] border-b border-[#2e2e34] w-full"
+      data-node-id="67:8"
+      data-name="MarketingHeader"
     >
-      <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <img src="/logo-96.png" alt="Logo Bravechat" width={32} height={32} className="w-8 h-8 object-contain" />
-          <span className="font-bold text-xl text-ocean-light tracking-tight group-hover:text-white transition-colors">
-            Brave<span className="text-ocean-secondary">chat</span>
-          </span>
-        </Link>
+      <div className="max-w-[1512px] mx-auto h-[64px] px-5 lg:px-[45.36px] flex items-center justify-between">
+        {/* BrandMark: favicon.png + Bravechat */}
+        <BrandLogo href="/" size="md" />
 
-        {/* Desktop nav links */}
-        <div className="hidden md:flex items-center gap-8">
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-ocean-secondary text-sm font-medium uppercase tracking-wider hover:text-ocean-light transition-colors duration-200 relative group"
+        {/* Center/Right Navigation */}
+        <div
+          className="hidden md:flex flex-1 items-start justify-end min-w-px relative"
+          data-node-id="67:36"
+        >
+          <div className="flex items-start lg:pr-[60.48px] pr-6 relative shrink-0" data-node-id="67:35">
+            <nav
+              className="flex gap-6 lg:gap-[39.312px] items-center relative shrink-0"
+              aria-label="Điều hướng chính"
+              data-node-id="67:12"
             >
-              {language === "en" ? ({ "Tính năng": "Features", "Cộng đồng": "Community", "Lộ trình": "Roadmap", "Tài liệu": "Documentation" }[link.label] ?? link.label) : link.label}
-              {/* Underline indicator */}
-              <span className="absolute -bottom-1 left-0 w-0 h-px bg-ocean-primary group-hover:w-full transition-all duration-300" />
-            </Link>
-          ))}
+              <Link
+                href="/#features"
+                className="flex flex-col items-center justify-center py-[10px] font-['Inter',sans-serif] font-semibold text-[#aaaab3] hover:text-white text-[13px] text-center whitespace-nowrap transition-colors"
+                data-node-id="67:13"
+              >
+                Tính năng
+              </Link>
+              <Link
+                href="/docs"
+                className="flex flex-col items-center justify-center py-[10px] font-['Inter',sans-serif] font-semibold text-[#aaaab3] hover:text-white text-[13px] text-center whitespace-nowrap transition-colors"
+                data-node-id="67:16"
+              >
+                Tài liệu
+              </Link>
+              <Link
+                href="/roadmap"
+                className="flex flex-col items-center justify-center py-[10px] font-['Inter',sans-serif] font-semibold text-[#aaaab3] hover:text-white text-[13px] text-center whitespace-nowrap transition-colors"
+                data-node-id="67:18"
+              >
+                Lộ trình
+              </Link>
+              <Link
+                href="/status"
+                className="flex flex-col items-center justify-center py-[10px] font-['Inter',sans-serif] font-semibold text-[#aaaab3] hover:text-white text-[13px] text-center whitespace-nowrap transition-colors"
+                data-node-id="67:20"
+              >
+                Trạng thái
+              </Link>
+            </nav>
+          </div>
         </div>
 
-        {/* CTA buttons */}
-        <div className="hidden md:flex items-center gap-3">
+        {/* Right Actions */}
+        <div className="hidden md:flex gap-[9px] items-center relative shrink-0" data-node-id="67:22">
           <Link
             href="/login"
-            className="text-ocean-secondary text-sm font-bold uppercase tracking-wider hover:text-ocean-light transition-colors px-4 py-2"
+            className="flex flex-col items-center justify-center py-[10px] px-2 font-['Inter',sans-serif] font-semibold text-[#aaaab3] hover:text-white text-[13px] text-center whitespace-nowrap transition-colors"
+            data-node-id="67:23"
           >
-            {language === "en" ? "Log in" : "Đăng nhập"}
+            Đăng nhập
           </Link>
           <Link
-            href="/register"
-            className="btn-primary text-xs py-2.5 px-5"
+            href="/docs"
+            aria-label="Tra cứu tài liệu"
+            className="bg-[#19191d] hover:bg-[#232329] border border-[#3a3a40] border-solid flex items-center justify-center relative shrink-0 size-[38px] transition-colors"
+            data-node-id="67:25"
           >
-            {language === "en" ? "Get started" : "Bắt đầu ngay"}
+            <img alt="" src={imgIconSearch} className="block shrink-0" />
+          </Link>
+          <Link
+            href="/channels"
+            className="bg-[#087CFA] hover:bg-[#3574F0] border border-[#3574F0] border-solid flex gap-[14px] items-center justify-center min-h-[40px] px-[20px] relative rounded-[2px] shrink-0 transition-colors"
+            data-node-id="67:29"
+          >
+            <span
+              className="font-['Inter',sans-serif] font-bold text-[13px] text-center text-white whitespace-nowrap"
+              data-node-id="67:30"
+            >
+              Mở Bravechat
+            </span>
+            <img alt="" src={imgIconArrowHeader} className="block shrink-0" />
           </Link>
         </div>
 
-        {/* Mobile menu toggle */}
+        {/* Mobile Menu Button */}
         <button
-          id="mobile-menu-toggle"
-          onClick={() => setIsMobileOpen(!isMobileOpen)}
-          className="md:hidden text-ocean-secondary hover:text-ocean-light transition-colors p-2"
-          aria-label={language === "en" ? "Open/close menu" : "Mở/đóng menu"}
-          aria-expanded={isMobileOpen}
-          aria-controls="mobile-menu"
+          type="button"
+          onClick={() => setMobileOpen((v) => !v)}
+          className="md:hidden px-3 py-1.5 bg-[#19191d] border border-[#3a3a40] text-xs font-mono text-[#dfe7ff]"
+          aria-label="Menu"
         >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            {isMobileOpen ? (
-              <path
-                strokeLinecap="square"
-                strokeLinejoin="miter"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            ) : (
-              <path
-                strokeLinecap="square"
-                strokeLinejoin="miter"
-                strokeWidth={2}
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            )}
-          </svg>
+          {mobileOpen ? "ĐÓNG" : "MENU"}
         </button>
-      </nav>
+      </div>
 
-      {/* Mobile menu */}
-      {isMobileOpen && (
-        <div id="mobile-menu" className="md:hidden bg-ocean-dark-surface border-t border-ocean-dark-border animate-fade-in">
-          <div className="px-6 py-4 flex flex-col gap-4">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setIsMobileOpen(false)}
-                className="text-ocean-secondary font-medium uppercase tracking-wider hover:text-ocean-light transition-colors"
-              >
-                {language === "en" ? ({ "Tính năng": "Features", "Cộng đồng": "Community", "Lộ trình": "Roadmap", "Tài liệu": "Documentation" }[link.label] ?? link.label) : link.label}
-              </Link>
-            ))}
-            <div className="divider-ocean" />
-            <Link href="/login" className="btn-secondary text-center text-xs">
-              {language === "en" ? "Log in" : "Đăng nhập"}
+      {mobileOpen && (
+        <div className="md:hidden bg-[#101013] border-b border-[#2e2e34] px-5 py-4 space-y-3 text-[13px] font-['Inter',sans-serif]">
+          <Link href="/#features" className="block text-[#aaaab3] hover:text-white" onClick={() => setMobileOpen(false)}>
+            Tính năng
+          </Link>
+          <Link href="/docs" className="block text-[#aaaab3] hover:text-white" onClick={() => setMobileOpen(false)}>
+            Tài liệu
+          </Link>
+          <Link href="/roadmap" className="block text-[#aaaab3] hover:text-white" onClick={() => setMobileOpen(false)}>
+            Lộ trình
+          </Link>
+          <Link href="/status" className="block text-[#aaaab3] hover:text-white" onClick={() => setMobileOpen(false)}>
+            Trạng thái
+          </Link>
+          <div className="pt-2 flex items-center gap-3">
+            <Link href="/login" className="px-4 py-2 border border-[#3a3a40] text-[#aaaab3] hover:text-white">
+              Đăng nhập
             </Link>
-            <Link href="/register" className="btn-primary text-center text-xs">
-              {language === "en" ? "Get started" : "Bắt đầu ngay"}
+            <Link
+              href="/channels"
+              className="bg-[#087CFA] border border-[#3574F0] px-4 py-2 rounded-[2px] font-bold text-white inline-flex items-center gap-2"
+            >
+              <span>Mở Bravechat</span>
+              <img alt="" src={imgIconArrowHeader} className="block shrink-0" />
             </Link>
           </div>
         </div>

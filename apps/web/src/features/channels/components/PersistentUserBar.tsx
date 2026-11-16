@@ -13,7 +13,7 @@ export function PersistentUserBar() {
   const currentUser = useCurrentUser();
 
   return (
-    <div className="profile-dock absolute bottom-0 left-0 w-[312px] z-40 border-r border-ocean-dark-border">
+    <div className="profile-dock absolute bottom-0 left-0 w-[312px] z-40 border-r border-[#2B2D30]">
       <UserProfileBar currentUser={currentUser} />
     </div>
   );

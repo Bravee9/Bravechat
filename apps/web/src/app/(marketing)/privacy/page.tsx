@@ -102,35 +102,31 @@ export default function PrivacyPage() {
       <Section id="storage">
         <SectionHeading en="Storage & Security">4. Lưu trữ & Bảo mật</SectionHeading>
         <p>
-          Dữ liệu của bạn được lưu trữ trên các máy chủ bảo mật. Chúng tôi áp dụng các biện pháp
-          bảo mật sau:
+          Dữ liệu của bạn được lưu trữ trên hệ thống máy chủ bảo mật. Chúng tôi áp dụng các biện pháp
+          bảo vệ sau:
         </p>
         <ul>
           <li>
-            <strong>Bcrypt hashing</strong> cho toàn bộ mật khẩu — mật khẩu gốc không bao giờ được
+            <strong>Mã hóa mật khẩu một chiều</strong> cho toàn bộ tài khoản — mật khẩu gốc không bao giờ được
             lưu trữ.
           </li>
           <li>
-            <strong>JWT (JSON Web Tokens)</strong> có thời hạn ngắn kết hợp với refresh token
-            rotation để xác thực phiên.
+            <strong>Phiên đăng nhập có thời hạn ngắn</strong> kết hợp cơ chế làm mới phiên tự động và xác thực hai lớp (2FA).
           </li>
           <li>
-            <strong>Rate limiting</strong> chống brute-force và tấn công từ chối dịch vụ.
+            <strong>Giới hạn tần suất truy cập</strong> nhằm ngăn chặn hành vi dò mật khẩu và lạm dụng dịch vụ.
           </li>
           <li>
-            <strong>TLS/HTTPS</strong> cho toàn bộ lưu lượng mạng.
+            <strong>Kết nối mã hóa TLS/HTTPS</strong> cho toàn bộ lưu lượng truyền tải.
           </li>
           <li>
-            Tệp media được lưu trữ trên{" "}
-            <strong>Cloudflare R2</strong> với kiểm soát truy cập nghiêm ngặt.
+            <strong>Kiểm soát tệp tải lên</strong> với cơ chế kiểm tra định dạng thực tế trước khi lưu trữ.
           </li>
         </ul>
         <Bilingual>
-          Your data is stored on secured servers. We apply: Bcrypt hashing for all passwords (raw
-          passwords are never stored); short-lived JWT with refresh token rotation for session
-          authentication; rate limiting against brute-force and denial-of-service attacks;
-          TLS/HTTPS for all network traffic; and media files stored on Cloudflare R2 with strict
-          access controls.
+          Your data is stored on secured servers. We apply: one-way password hashing (raw
+          passwords are never stored); short-lived session tokens with automatic rotation and optional 2FA;
+          rate limiting against brute-force and abuse; TLS/HTTPS encryption for all network traffic; and strict file validation before storage.
         </Bilingual>
       </Section>
 

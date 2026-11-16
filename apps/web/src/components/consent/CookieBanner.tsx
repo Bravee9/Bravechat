@@ -51,7 +51,7 @@ export function CookieBanner() {
       aria-modal="false"
       aria-labelledby="cookie-banner-title"
       aria-describedby="cookie-banner-desc"
-      className="fixed inset-x-0 bottom-0 z-[70] border-t border-ocean-dark-border bg-ocean-dark-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] animate-fade-in sm:inset-x-auto sm:bottom-4 sm:left-4 sm:max-w-md sm:border sm:p-5"
+      className="fixed inset-x-0 bottom-0 z-[70] border-t border-[#2B2D30] bg-[#16161A] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] animate-fade-in sm:inset-x-auto sm:bottom-4 sm:right-4 sm:max-w-md sm:border sm:p-5 shadow-2xl"
     >
       <h2
         id="cookie-banner-title"

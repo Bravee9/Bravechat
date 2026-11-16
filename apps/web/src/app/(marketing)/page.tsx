@@ -1,10 +1,9 @@
 /**
- * app/page.tsx
- * Landing page — Bravechat
+ * app/(marketing)/page.tsx
+ * Landing page — Bravechat (Figma Design 67:4)
  */
 
 import type { Metadata } from "next";
-import { OceanBackground } from "@/components/ui/OceanBackground";
 import { Navbar } from "@/components/marketing/landing/Navbar";
 import { HeroSection } from "@/components/marketing/landing/HeroSection";
 import { FeaturesSection } from "@/components/marketing/landing/FeaturesSection";
@@ -30,9 +29,17 @@ export const metadata: Metadata = {
 
 export default function LandingPage() {
   return (
-    <main className="relative">
-      {/* Animated ocean background — fixed behind everything */}
-      <OceanBackground />
+    <main
+      className="figma-landing relative bg-[#0b0b0d] min-h-screen text-white overflow-x-hidden"
+      data-node-id="67:4"
+    >
+      <a
+        href="#hero"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:left-2 focus:top-2 bg-[#111827] px-3 py-2 rounded-[6px] text-sm font-semibold text-white"
+        data-node-id="67:307"
+      >
+        Skip to content
+      </a>
 
       {/* Navigation */}
       <Navbar />

@@ -168,3 +168,79 @@ test('QR code login lifecycle: init, scan, approve, and status poll issues sessi
   assert.equal(approvedStatus.json().data.status, 'APPROVED');
   assert.ok(approvedStatus.cookies.find((c) => c.name === 'token'));
 });
+
+test('gmail-config requires authentication and blocks arbitrary third-party test recipients', async (t) => {
+  const f = await fixture(); t.after(() => f.app.close());
+
+  const unauthGet = await f.app.inject({ method: 'GET', url: '/auth/gmail-config' });
+  assert.equal(unauthGet.statusCode, 401);
+
+  const unauthPost = await f.app.inject({
+    method: 'POST',
+    url: '/auth/gmail-config',
+    payload: { gmailUser: 'sender@gmail.com', gmailAppPassword: 'abcd efgh ijkl mnop' },
+  });
+  assert.equal(unauthPost.statusCode, 401);
+
+  const login = await f.login();
+  const authCookie = login.cookies.find((c) => c.name === 'token').value;
+
+  const thirdPartyRelay = await f.app.inject({
+    method: 'POST',
+    url: '/auth/gmail-config',
+    cookies: { token: authCookie },
+    payload: {
+      gmailUser: 'sender@gmail.com',
+      gmailAppPassword: 'abcd efgh ijkl mnop',
+      testRecipient: 'victim@external.example',
+    },
+  });
+  assert.equal(thirdPartyRelay.statusCode, 403);
+});
+
+test('disabling 2FA requires re-authentication with password or TOTP code', async (t) => {
+  const f = await fixture(); t.after(() => f.app.close());
+  const login = await f.login();
+  const authCookie = login.cookies.find((c) => c.name === 'token').value;
+
+  const setupRes = await f.app.inject({
+    method: 'POST',
+    url: '/auth/2fa/setup',
+    cookies: { token: authCookie },
+  });
+  assert.equal(setupRes.statusCode, 200);
+  const { devCurrentCode } = setupRes.json().data;
+
+  const enableRes = await f.app.inject({
+    method: 'POST',
+    url: '/auth/2fa/enable',
+    cookies: { token: authCookie },
+    payload: { code: devCurrentCode },
+  });
+  assert.equal(enableRes.statusCode, 200);
+
+  const missingReauth = await f.app.inject({
+    method: 'POST',
+    url: '/auth/2fa/disable',
+    cookies: { token: authCookie },
+    payload: {},
+  });
+  assert.equal(missingReauth.statusCode, 400);
+
+  const wrongPassword = await f.app.inject({
+    method: 'POST',
+    url: '/auth/2fa/disable',
+    cookies: { token: authCookie },
+    payload: { password: 'WrongPassword999' },
+  });
+  assert.equal(wrongPassword.statusCode, 401);
+
+  const validDisable = await f.app.inject({
+    method: 'POST',
+    url: '/auth/2fa/disable',
+    cookies: { token: authCookie },
+    payload: { password: 'OldPassword1' },
+  });
+  assert.equal(validDisable.statusCode, 200);
+  assert.equal(validDisable.json().data.twoFactorEnabled, false);
+});

@@ -1,6 +1,6 @@
 /**
- * app/docs/page.tsx
- * Trang chủ Tài liệu / Docs Index
+ * app/(marketing)/docs/page.tsx
+ * Trang chủ Tài liệu hướng dẫn — JetBrains Dark Style
  */
 
 import type { Metadata } from "next";
@@ -8,66 +8,93 @@ import { DocsLayout } from "@/components/marketing/docs/DocsLayout";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Tài liệu",
-  description: "Tài liệu kỹ thuật của Bravechat — API Reference, Kiến trúc hệ thống và Database Schema.",
+  title: "Tài liệu hướng dẫn",
+  description:
+    "Hướng dẫn sử dụng Bravechat — cách tạo máy chủ, quản lý kênh riêng tư, phân quyền thành viên và tích hợp tự động hóa.",
 };
+
+const QUICK_START_STEPS = [
+  {
+    step: "01",
+    title: "Tạo tài khoản hoặc đăng nhập",
+    detail:
+      "Đăng ký bằng địa chỉ email của bạn và thiết lập tên hiển thị. Bạn có thể bật xác thực hai lớp (2FA) ngay trong phần Cài đặt cá nhân.",
+  },
+  {
+    step: "02",
+    title: "Tạo hoặc tham gia máy chủ",
+    detail:
+      "Tạo không gian riêng cho nhóm bạn, lớp học, cộng đồng hoặc dự án, hoặc tham gia máy chủ có sẵn thông qua mã mời.",
+  },
+  {
+    step: "03",
+    title: "Tổ chức danh mục & kênh riêng tư",
+    detail:
+      "Phân chia kênh văn bản và phòng thoại theo chủ đề. Đặt chế độ Kênh riêng tư cho những nội dung chỉ dành cho các vai trò được chỉ định.",
+  },
+  {
+    step: "04",
+    title: "Trò chuyện, họp thoại & quản lý quyền hạn",
+    detail:
+      "Gửi tin nhắn, chia sẻ tệp đính kèm, tham gia phòng thoại và điều chỉnh quyền hạn chi tiết cho từng thành viên ngay trong giao diện quản trị.",
+  },
+];
 
 const DOC_CARDS = [
   {
     href: "/docs/architecture",
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="square" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-      </svg>
-    ),
-    title: "Kiến trúc",
-    titleEn: "Architecture",
-    description: "Tổng quan kiến trúc hệ thống — Monorepo, stack công nghệ, luồng dữ liệu và cơ sở hạ tầng.",
+    badge: "KHÔNG GIAN LÀM VIỆC",
+    title: "Tổ chức Không gian & Phân quyền",
+    description:
+      "Cách bố trí máy chủ, danh mục, kênh riêng tư và bảng phân quyền vai trò (Owner, Admin, Moderator, Member).",
   },
   {
     href: "/docs/api-reference",
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="square" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    ),
-    title: "API Reference",
-    titleEn: "API Reference",
-    description: "Tài liệu toàn bộ các endpoint REST API — xác thực, máy chủ, kênh, tin nhắn và người dùng.",
+    badge: "TÍCH HỢP",
+    title: "Giao tiếp & Tích hợp",
+    description:
+      "Chuẩn kết nối cho ứng dụng khách, thông báo tự động và quản lý tài nguyên máy chủ qua giao diện lập trình.",
   },
   {
     href: "/docs/database-schema",
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="square" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-      </svg>
-    ),
-    title: "Database Schema",
-    titleEn: "Database Schema",
-    description: "Cấu trúc cơ sở dữ liệu PostgreSQL — ERD tổng quan và chi tiết từng bảng dữ liệu.",
+    badge: "AN TOÀN DỮ LIỆU",
+    title: "Cấu trúc Dữ liệu & Bảo mật",
+    description:
+      "Mô hình thông tin người dùng, máy chủ, kênh, tin nhắn và các nguyên tắc bảo vệ quyền riêng tư.",
   },
 ];
 
 export default function DocsPage() {
   return (
-    <DocsLayout title="Tài liệu" description="Tài liệu kỹ thuật chính thức của Bravechat dành cho nhà phát triển và cộng tác viên.">
-      {/* Tech stack summary */}
+    <DocsLayout
+      title="Tài liệu hướng dẫn"
+      description="Hướng dẫn thiết lập không gian trò chuyện, quản lý thành viên, phân quyền truy cập kênh và sử dụng các tính năng trên Bravechat."
+    >
+      {/* Quick start steps */}
       <div className="mb-12">
-        <h2 className="text-lg font-black text-ocean-light mb-4 tracking-tight">Tổng quan Stack</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-ocean-dark-border">
-          {[
-            { label: "Frontend", value: "Next.js 14" },
-            { label: "Backend", value: "Fastify" },
-            { label: "Database", value: "PostgreSQL" },
-            { label: "Cache", value: "Redis" },
-            { label: "Storage", value: "Cloudflare R2" },
-            { label: "ORM", value: "Prisma" },
-            { label: "Realtime", value: "WebSocket" },
-            { label: "Auth", value: "JWT + Bcrypt" },
-          ].map((item) => (
-            <div key={item.label} className="bg-ocean-dark-bg p-4">
-              <p className="text-ocean-light/60 text-xs font-mono uppercase tracking-wide mb-1">{item.label}</p>
-              <p className="text-ocean-secondary font-bold text-sm">{item.value}</p>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-white tracking-tight">
+            Bắt đầu nhanh
+          </h2>
+          <span className="text-xs font-mono text-[#7D7D7D]">4 BƯỚC CƠ BẢN</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {QUICK_START_STEPS.map((item) => (
+            <div
+              key={item.step}
+              className="bg-[#16161A] border border-[#2B2D30] rounded-[4px] p-5 flex flex-col justify-between"
+            >
+              <div>
+                <span className="inline-block font-mono text-xs font-bold text-[#07C3F2] mb-2">
+                  {item.step}
+                </span>
+                <h3 className="text-white font-semibold text-base mb-1.5">
+                  {item.title}
+                </h3>
+                <p className="text-[#A8A8B0] text-sm leading-relaxed">
+                  {item.detail}
+                </p>
+              </div>
             </div>
           ))}
         </div>
@@ -75,33 +102,42 @@ export default function DocsPage() {
 
       {/* Doc cards */}
       <div className="mb-12">
-        <h2 className="text-lg font-black text-ocean-light mb-4 tracking-tight">Tài liệu có sẵn</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-ocean-dark-border">
+        <h2 className="text-lg font-bold text-white mb-4 tracking-tight">
+          Chuyên mục hướng dẫn
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {DOC_CARDS.map((card) => (
             <Link
               key={card.href}
               href={card.href}
-              className="bg-ocean-dark-bg p-6 hover:bg-ocean-dark-surface group transition-colors block"
+              className="bg-[#16161A] border border-[#2B2D30] hover:border-[#087CFA] rounded-[4px] p-6 group transition-colors flex flex-col justify-between"
             >
-              <div className="text-ocean-secondary mb-4 group-hover:text-ocean-light transition-colors">
-                {card.icon}
+              <div>
+                <span className="inline-block font-mono text-[11px] font-semibold text-[#087CFA] tracking-wider uppercase mb-3">
+                  {card.badge}
+                </span>
+                <h3 className="text-white font-bold text-base mb-2 group-hover:text-[#07C3F2] transition-colors">
+                  {card.title}
+                </h3>
+                <p className="text-[#A8A8B0] text-sm leading-relaxed">
+                  {card.description}
+                </p>
               </div>
-              <h3 className="text-ocean-light font-bold mb-1">{card.title}</h3>
-              <p className="text-ocean-secondary text-xs italic mb-3">{card.titleEn}</p>
-              <p className="text-ocean-light/60 text-sm leading-relaxed">{card.description}</p>
+              <span className="mt-6 text-xs font-mono text-[#CDCDCD] group-hover:text-white inline-flex items-center gap-1.5">
+                Xem chi tiết <span>→</span>
+              </span>
             </Link>
           ))}
         </div>
       </div>
 
-      {/* GitHub note */}
-      <div className="border border-ocean-dark-border p-6">
-        <p className="text-ocean-light/60 text-sm leading-relaxed">
-          Tài liệu đang trong quá trình hoàn thiện cùng với quá trình phát triển dự án.
-          Xem chi tiết và đóng góp tại{" "}
-          <a href="https://github.com/Bravee9/Bravechat" target="_blank" rel="noreferrer" className="text-ocean-secondary hover:text-ocean-light">
-            GitHub Repository
-          </a>.
+      {/* Platform support */}
+      <div className="bg-[#16161A] border border-[#2B2D30] rounded-[4px] p-6">
+        <h3 className="text-white font-semibold text-sm mb-2">
+          Nền tảng hỗ trợ
+        </h3>
+        <p className="text-[#A8A8B0] text-sm leading-relaxed">
+          Bravechat hiện hoạt động trực tiếp trên trình duyệt Web. Các phiên bản ứng dụng dành riêng cho Windows, macOS, Linux, Android và iOS đang được phát triển theo lộ trình kế tiếp để đồng bộ trải nghiệm trên mọi thiết bị.
         </p>
       </div>
     </DocsLayout>

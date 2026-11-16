@@ -23,7 +23,7 @@ export function HomeRailItem({ isActive, isHovered, onHover }: HomeRailItemProps
       <div
         data-testid="home-rail-pill"
         className={cn(
-          "absolute left-0 w-1 bg-white rounded-r-full transition-all duration-300 pointer-events-none",
+          "absolute left-0 w-1 bg-[#087CFA] rounded-r-full transition-all duration-200 pointer-events-none",
           isActive
             ? "h-10 opacity-100"
             : isHovered
@@ -32,23 +32,24 @@ export function HomeRailItem({ isActive, isHovered, onHover }: HomeRailItemProps
         )}
       />
 
-      <Tooltip content="Tin nhắn trực tiếp" side="right">
+      <Tooltip content="Tin nhắn trực tiếp & Bạn bè" side="right">
         <Link
           href="/channels/@me"
+          scroll={false}
           className={cn(
-            "w-12 h-12 flex items-center justify-center text-sm font-bold transition-all duration-300 ease-out cursor-pointer relative group",
+            "w-11 h-11 flex items-center justify-center text-sm font-bold transition-all duration-200 cursor-pointer relative group rounded-[8px] border",
             isActive
-              ? "bg-ocean-primary text-white rounded-[16px] shadow-ocean-glow"
-              : "bg-ocean-dark-surface text-ocean-light/90 rounded-[24px] hover:rounded-[16px] hover:bg-ocean-primary hover:text-white hover:shadow-ocean-glow border border-ocean-dark-border"
+              ? "bg-[#214283] border-[#087CFA] text-white"
+              : "bg-[#1E1F22] border-[#2B2D30] text-[#E6EDF3] hover:bg-[#2B2D30] hover:border-[#393B40]"
           )}
           aria-label="Trang chủ & Tin nhắn trực tiếp"
         >
           <img
-            src="/bravemath-icon-white-128.png"
-            alt="Bravemath"
-            className="w-6 h-6 object-contain transition-transform duration-300 group-hover:scale-110 drop-shadow-sm select-none"
+            src="/favicon.png"
+            alt="Bravechat"
+            className="w-6 h-6 object-contain transition-transform duration-200 group-hover:scale-105 select-none"
             data-testid="home-discord-icon"
-            data-brand="bravemath"
+            data-brand="bravechat"
           />
         </Link>
       </Tooltip>

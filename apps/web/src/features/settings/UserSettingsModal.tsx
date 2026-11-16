@@ -61,6 +61,8 @@ export function UserSettingsModal({
   const [twoFactorDevCode, setTwoFactorDevCode] = useState("");
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [twoFactorBackupCodes, setTwoFactorBackupCodes] = useState<string[]>([]);
+  const [disabling2FA, setDisabling2FA] = useState(false);
+  const [disable2FAInput, setDisable2FAInput] = useState("");
   const [gmailLoginOtpEnabled, setGmailLoginOtpEnabled] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(Boolean(user.isEmailVerified));
   const [emailVerifyStep, setEmailVerifyStep] = useState<"idle" | "otp">("idle");
@@ -969,19 +971,59 @@ export function UserSettingsModal({
                   {twoFactorEnabled && (
                     <button
                       type="button"
-                      onClick={async () => {
-                        await http.post("/auth/2fa/disable").catch(() => undefined);
-                        setTwoFactorEnabled(false);
-                        setTwoFactorSetupStep("idle");
-                        void loadSecurityInfo();
+                      onClick={() => {
+                        setError("");
+                        setDisabling2FA((v) => !v);
                       }}
                       className="text-xs text-rose-400 hover:underline px-2 py-1 cursor-pointer"
                     >
-                      Tắt 2FA
+                      {disabling2FA ? t.cancel : "Tắt 2FA"}
                     </button>
                   )}
                 </div>
               </div>
+
+              {twoFactorEnabled && disabling2FA && (
+                <div className="p-4 rounded-xl bg-black/40 border border-rose-500/40 space-y-3 animate-fadeIn">
+                  <p className="text-xs font-semibold text-ocean-light">
+                    Xác nhận mật khẩu hiện tại hoặc mã 2FA (6 số) để tắt bảo mật 2 yếu tố:
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      placeholder="Mật khẩu hoặc mã TOTP 6 số"
+                      value={disable2FAInput}
+                      onChange={(e) => setDisable2FAInput(e.target.value)}
+                      className="input-ocean flex-1 text-xs"
+                    />
+                    <button
+                      type="button"
+                      disabled={busy || !disable2FAInput.trim()}
+                      onClick={async () => {
+                        setError("");
+                        setBusy(true);
+                        try {
+                          const val = disable2FAInput.trim();
+                          const payload = /^\d{6}$/.test(val) ? { code: val } : { password: val };
+                          await http.post("/auth/2fa/disable", payload);
+                          setTwoFactorEnabled(false);
+                          setTwoFactorSetupStep("idle");
+                          setDisabling2FA(false);
+                          setDisable2FAInput("");
+                          void loadSecurityInfo();
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "Không thể tắt 2FA.");
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                      className="btn-primary bg-rose-600 hover:bg-rose-500 text-xs px-4"
+                    >
+                      Xác nhận tắt 2FA
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {twoFactorSetupStep === "qr" && (
                 <div className="p-4 rounded-xl bg-black/40 border border-ocean-secondary/40 space-y-3 animate-fadeIn">

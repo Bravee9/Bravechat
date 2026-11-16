@@ -25,11 +25,11 @@ export function CategorySection({
   return (
     <div className="space-y-0.5" data-testid={`category-section-${category.id}`}>
       {/* Category Header */}
-      <div className="flex items-center justify-between px-2 py-1 text-ocean-light/50 text-[11px] font-extrabold uppercase tracking-wider group">
+      <div className="flex items-center justify-between px-2 py-1 text-[#7D7D7D] text-[11px] font-mono font-bold uppercase tracking-wider group">
         <button
           type="button"
           onClick={() => setIsCollapsed((prev) => !prev)}
-          className="flex items-center gap-1 cursor-pointer hover:text-ocean-light/80 text-left"
+          className="flex items-center gap-1.5 cursor-pointer hover:text-[#CDCDCD] text-left"
           data-testid={`category-toggle-${category.id}`}
         >
           <svg
@@ -41,7 +41,12 @@ export function CategorySection({
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
           </svg>
           <span className="truncate">{category.name}</span>
         </button>
@@ -49,7 +54,7 @@ export function CategorySection({
         <button
           type="button"
           onClick={onCreateChannel}
-          className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-white"
+          className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-white font-mono text-sm px-1 cursor-pointer"
           title="Tạo kênh mới trong danh mục này"
         >
           +

@@ -79,6 +79,7 @@ export function loadCurrentUser(force = false): Promise<void> {
  * Stale-while-revalidate: có cache thì hiển thị ngay, chỉ refetch nền khi đã cũ.
  */
 export function loadServerDetail(serverId: string, force = false): Promise<void> {
+  if (!serverId || serverId === "@me") return Promise.resolve();
   const cached = workspaceStore.get().serverDetails[serverId];
   const fetchedAt = detailFetchedAt.get(serverId) ?? 0;
   if (!force && cached && Date.now() - fetchedAt < DETAIL_STALE_MS) {

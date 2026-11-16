@@ -73,16 +73,20 @@ export const MessageList = forwardRef<HTMLDivElement, MessageListProps>(
         className="flex-1 overflow-y-auto px-6 py-6 z-10 custom-scrollbar"
       >
         {/* Welcome Message Header */}
-        <div className="chat-welcome my-4 pb-4 border-b border-ocean-dark-border/40 select-none">
-          <div className="chat-welcome-icon w-16 h-16 rounded-full bg-ocean-primary/20 border border-ocean-primary/40 flex items-center justify-center text-3xl font-extrabold text-ocean-secondary mb-3">
-            #
+        <div className="chat-welcome my-3 p-5 rounded-[6px] bg-[#18181B] border border-[#2B2D30] select-none">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="chat-welcome-icon w-9 h-9 rounded-[6px] bg-[#214283]/60 border border-[#087CFA]/50 flex items-center justify-center text-lg font-mono font-bold text-[#07C3F2]">
+              #
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white">
+                Chào mừng bạn đến với #{channelName}!
+              </h2>
+              <p className="text-xs text-[#A8A8B0] mt-0.5">
+                Đây là điểm bắt đầu của kênh #{channelName}. Nội dung trao đổi trong kênh được phân quyền theo cấu hình máy chủ.
+              </p>
+            </div>
           </div>
-          <h2 className="text-2xl font-bold text-ocean-light mb-1">
-            Chào mừng bạn đến với #{channelName}!
-          </h2>
-          <p className="text-sm text-ocean-light/60">
-            Đây là sự khởi đầu của kênh #{channelName}. Hãy bắt đầu cuộc trò chuyện thú vị!
-          </p>
         </div>
 
         {/* Danh sách tin nhắn */}

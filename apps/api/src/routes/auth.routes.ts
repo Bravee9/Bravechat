@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
+import Redis from 'ioredis'
 import { createHash, createHmac, randomBytes, randomInt } from 'node:crypto'
 import { prisma } from '../config/prisma'
 import { env } from '../config/env'
@@ -9,6 +10,84 @@ import { fail } from '../services/conversation'
 import * as resetMail from '../services/reset-mail'
 import { revokeSessions } from './websocket.routes'
 import { revokeVoiceSessions, rotateVoiceSession } from '../services/voice-security'
+
+let sharedRedisClient: Redis | null = null
+function getSharedRedis(): Redis | null {
+  if ((env as Record<string, unknown>).REDIS_ENABLED !== 'true' || !(env as Record<string, unknown>).REDIS_URL) {
+    return null
+  }
+  if (!sharedRedisClient) {
+    sharedRedisClient = new Redis(String((env as Record<string, unknown>).REDIS_URL), {
+      maxRetriesPerRequest: 2,
+      lazyConnect: true,
+    })
+    sharedRedisClient.on('error', () => {
+      /* fallback to in-memory map on transient error */
+    })
+  }
+  return sharedRedisClient
+}
+
+class SharedStateMap<V> extends Map<string, V> {
+  constructor(
+    private readonly namespace: string,
+    private readonly defaultTtlSeconds?: number
+  ) {
+    super()
+  }
+
+  private redisKey(key: string): string {
+    return `bravechat:auth:${this.namespace}:${key}`
+  }
+
+  async load(key: string): Promise<V | undefined> {
+    const client = getSharedRedis()
+    if (client) {
+      try {
+        const raw = await client.get(this.redisKey(key))
+        if (raw !== null) {
+          const parsed = JSON.parse(raw) as V
+          super.set(key, parsed)
+          return parsed
+        }
+        super.delete(key)
+        return undefined
+      } catch {
+        // Fallback to local memory if Redis is unreachable
+      }
+    }
+    return super.get(key)
+  }
+
+  async save(key: string, value: V, ttlSeconds = this.defaultTtlSeconds): Promise<void> {
+    super.set(key, value)
+    const client = getSharedRedis()
+    if (client) {
+      try {
+        const payload = JSON.stringify(value)
+        if (ttlSeconds && ttlSeconds > 0) {
+          await client.set(this.redisKey(key), payload, 'EX', Math.ceil(ttlSeconds))
+        } else {
+          await client.set(this.redisKey(key), payload)
+        }
+      } catch {
+        // Fallback to local memory
+      }
+    }
+  }
+
+  async remove(key: string): Promise<void> {
+    super.delete(key)
+    const client = getSharedRedis()
+    if (client) {
+      try {
+        await client.del(this.redisKey(key))
+      } catch {
+        // Ignore Redis delete errors
+      }
+    }
+  }
+}
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex')
 const email = z.string().trim().toLowerCase().max(254, 'Email tối đa 254 ký tự.').email('Email không hợp lệ.')
@@ -152,14 +231,27 @@ interface SecurityLogEntry {
   createdAt: string
 }
 
-const loginChallenges = new Map<string, LoginChallenge>()
-const qrSessions = new Map<string, QrLoginSession>()
-const qrShortCodeMap = new Map<string, string>()
-const userSecurityMap = new Map<string, UserSecurityState>()
-const securityLogsMap = new Map<string, SecurityLogEntry[]>()
-const resetOtpMap = new Map<string, { otpHash: string; rawToken: string; expiresAt: number; attempts: number }>()
-const emailVerifyOtpMap = new Map<string, { otpHash: string; expiresAt: number; attempts: number }>()
-const loginFailures = new Map<string, { count: number; lockedUntil: number; updatedAt: number }>()
+const loginChallenges = new SharedStateMap<LoginChallenge>('challenge', 300)
+const qrSessions = new SharedStateMap<QrLoginSession>('qr_session', 120)
+const qrShortCodeMap = new SharedStateMap<string>('qr_shortcode', 120)
+const userSecurityMap = new SharedStateMap<UserSecurityState>('user_security')
+const securityLogsMap = new SharedStateMap<SecurityLogEntry[]>('security_logs')
+const resetOtpMap = new SharedStateMap<{ otpHash: string; rawToken: string; expiresAt: number; attempts: number }>('reset_otp', 900)
+const emailVerifyOtpMap = new SharedStateMap<{ otpHash: string; expiresAt: number; attempts: number }>('verify_otp', 600)
+const loginFailures = new SharedStateMap<{ count: number; lockedUntil: number; updatedAt: number }>('login_failures', 600)
+
+async function loadUserSecurity(userId: string): Promise<UserSecurityState> {
+  let state = await userSecurityMap.load(userId)
+  if (!state) {
+    state = {
+      twoFactorEnabled: false,
+      backupCodes: [],
+      gmailLoginOtpEnabled: false,
+    }
+    await userSecurityMap.save(userId, state)
+  }
+  return state
+}
 
 function getUserSecurity(userId: string): UserSecurityState {
   let state = userSecurityMap.get(userId)
@@ -185,7 +277,7 @@ function recordSecurityLog(
     createdAt: new Date().toISOString(),
   })
   if (list.length > 25) list.length = 25
-  securityLogsMap.set(userId, list)
+  void securityLogsMap.save(userId, list)
 }
 
 async function setSession(
@@ -271,7 +363,7 @@ export async function authRoutes(server: FastifyInstance) {
         .parse(request.body)
 
       const lockKey = `${input.email}|${request.ip}`
-      const lockState = loginFailures.get(lockKey)
+      const lockState = await loginFailures.load(lockKey)
       if (lockState && lockState.lockedUntil > Date.now()) {
         const remainSec = Math.ceil((lockState.lockedUntil - Date.now()) / 1000)
         throw fail(
@@ -283,13 +375,13 @@ export async function authRoutes(server: FastifyInstance) {
       const account = await prisma.user.findUnique({ where: { email: input.email } })
       if (!account || account.isBanned || !(await bcrypt.compare(input.password, account.passwordHash))) {
         if (!input.email.endsWith('.test')) {
-          const prev = loginFailures.get(lockKey) ?? { count: 0, lockedUntil: 0, updatedAt: Date.now() }
+          const prev = lockState ?? { count: 0, lockedUntil: 0, updatedAt: Date.now() }
           const nextCount = Date.now() - prev.updatedAt > 10 * 60000 ? 1 : prev.count + 1
-          loginFailures.set(lockKey, {
+          await loginFailures.save(lockKey, {
             count: nextCount,
             lockedUntil: nextCount >= 5 ? Date.now() + 5 * 60000 : 0,
             updatedAt: Date.now(),
-          })
+          }, 600)
         }
         if (account) {
           recordSecurityLog(account.id, {
@@ -303,8 +395,8 @@ export async function authRoutes(server: FastifyInstance) {
         throw fail(401, 'Email hoặc mật khẩu không chính xác.')
       }
 
-      loginFailures.delete(lockKey)
-      const sec = getUserSecurity(account.id)
+      await loginFailures.remove(lockKey)
+      const sec = await loadUserSecurity(account.id)
       const needsStep2 = Boolean(
         input.requireGmailOtp || sec.twoFactorEnabled || sec.gmailLoginOtpEnabled
       )
@@ -318,7 +410,7 @@ export async function authRoutes(server: FastifyInstance) {
           if (sec.backupCodes.length > 0) methods.push('backup_code')
         }
 
-        loginChallenges.set(digest(challengeToken), {
+        await loginChallenges.save(digest(challengeToken), {
           challengeTokenHash: digest(challengeToken),
           userId: account.id,
           email: account.email,
@@ -331,7 +423,7 @@ export async function authRoutes(server: FastifyInstance) {
           expiresAt: Date.now() + 5 * 60000,
           lastSentAt: Date.now(),
           attempts: 0,
-        })
+        }, 300)
 
         let delivery: 'gmail' | 'resend' | 'development' = 'development'
         if (typeof resetMail.sendVerificationOtpMail === 'function') {
@@ -402,7 +494,7 @@ export async function authRoutes(server: FastifyInstance) {
 
       const challengeToken = randomBytes(32).toString('hex')
       const otpCode = generateNumericOtp(6)
-      loginChallenges.set(digest(challengeToken), {
+      await loginChallenges.save(digest(challengeToken), {
         challengeTokenHash: digest(challengeToken),
         userId: account.id,
         email: account.email,
@@ -415,7 +507,7 @@ export async function authRoutes(server: FastifyInstance) {
         expiresAt: Date.now() + 5 * 60000,
         lastSentAt: Date.now(),
         attempts: 0,
-      })
+      }, 300)
 
       let delivery: 'gmail' | 'resend' | 'development' = 'development'
       if (typeof resetMail.sendVerificationOtpMail === 'function') {
@@ -463,18 +555,18 @@ export async function authRoutes(server: FastifyInstance) {
         .parse(request.body)
 
       const key = digest(input.challengeToken)
-      const challenge = loginChallenges.get(key)
+      const challenge = await loginChallenges.load(key)
       if (!challenge || challenge.expiresAt <= Date.now()) {
-        loginChallenges.delete(key)
+        await loginChallenges.remove(key)
         throw fail(401, 'Phiên xác minh đã hết hạn (5 phút). Vui lòng đăng nhập lại.')
       }
 
       if (challenge.attempts >= 5) {
-        loginChallenges.delete(key)
+        await loginChallenges.remove(key)
         throw fail(429, 'Bạn đã nhập sai mã xác minh quá 5 lần. Phiên xác minh đã bị hủy để bảo vệ tài khoản.')
       }
 
-      const sec = getUserSecurity(challenge.userId)
+      const sec = await loadUserSecurity(challenge.userId)
       const normalizedCode = input.code.trim().toUpperCase()
       const digitsOnly = normalizedCode.replace(/\D/g, '')
 
@@ -496,11 +588,13 @@ export async function authRoutes(server: FastifyInstance) {
       // Check Backup Code
       else if (sec.twoFactorEnabled && sec.backupCodes.includes(normalizedCode)) {
         sec.backupCodes = sec.backupCodes.filter((c) => c !== normalizedCode)
+        await userSecurityMap.save(challenge.userId, sec)
         verifiedMethod = 'totp_2fa'
       }
 
       if (!verifiedMethod) {
         challenge.attempts += 1
+        await loginChallenges.save(key, challenge, Math.max(1, Math.ceil((challenge.expiresAt - Date.now()) / 1000)))
         recordSecurityLog(challenge.userId, {
           event: `Nhập sai mã xác minh bước 2 (Lần ${challenge.attempts}/5)`,
           method: 'gmail_otp',
@@ -514,7 +608,7 @@ export async function authRoutes(server: FastifyInstance) {
         )
       }
 
-      loginChallenges.delete(key)
+      await loginChallenges.remove(key)
       const refresh = randomBytes(48).toString('base64url')
       const { user, session } = await prisma.$transaction(async (tx) => {
         const unchanged = await tx.user.updateMany({
@@ -556,9 +650,9 @@ export async function authRoutes(server: FastifyInstance) {
     async (request) => {
       const input = z.object({ challengeToken: z.string().length(64) }).parse(request.body)
       const key = digest(input.challengeToken)
-      const challenge = loginChallenges.get(key)
+      const challenge = await loginChallenges.load(key)
       if (!challenge || challenge.expiresAt <= Date.now()) {
-        loginChallenges.delete(key)
+        await loginChallenges.remove(key)
         throw fail(401, 'Phiên xác minh đã hết hạn. Vui lòng đăng nhập lại.')
       }
 
@@ -567,6 +661,7 @@ export async function authRoutes(server: FastifyInstance) {
       challenge.expiresAt = Date.now() + 5 * 60000
       challenge.lastSentAt = Date.now()
       challenge.attempts = 0
+      await loginChallenges.save(key, challenge, 300)
 
       let delivery: 'gmail' | 'resend' | 'development' = 'development'
       if (typeof resetMail.sendVerificationOtpMail === 'function') {
@@ -610,8 +705,8 @@ export async function authRoutes(server: FastifyInstance) {
         expiresAt,
         status: 'PENDING',
       }
-      qrSessions.set(qrId, session)
-      qrShortCodeMap.set(shortCode, qrId)
+      await qrSessions.save(qrId, session, 120)
+      await qrShortCodeMap.save(shortCode, qrId, 120)
 
       return {
         statusCode: 200,
@@ -634,20 +729,20 @@ export async function authRoutes(server: FastifyInstance) {
       })
       .parse(request.query)
 
-    const session = qrSessions.get(query.qrId)
+    const session = await qrSessions.load(query.qrId)
     if (!session || session.pollSecretHash !== digest(query.pollSecret)) {
       return { statusCode: 200, data: { status: 'EXPIRED' } }
     }
     if (session.expiresAt <= Date.now() || session.status === 'CONSUMED') {
-      qrSessions.delete(session.qrId)
-      qrShortCodeMap.delete(session.shortCode)
+      await qrSessions.remove(session.qrId)
+      await qrShortCodeMap.remove(session.shortCode)
       return { statusCode: 200, data: { status: 'EXPIRED' } }
     }
 
     if (session.status === 'APPROVED' && session.approvedUserId) {
       session.status = 'CONSUMED'
-      qrSessions.delete(session.qrId)
-      qrShortCodeMap.delete(session.shortCode)
+      await qrSessions.remove(session.qrId)
+      await qrShortCodeMap.remove(session.shortCode)
 
       const refresh = randomBytes(48).toString('base64url')
       const { user, dbSession } = await prisma.$transaction(async (tx) => {
@@ -693,25 +788,29 @@ export async function authRoutes(server: FastifyInstance) {
     }
   })
 
-  function resolveQrSession(rawCode: string): QrLoginSession | null {
+  async function resolveQrSession(rawCode: string): Promise<QrLoginSession | null> {
     const trimmed = rawCode.trim()
     // Check if full URL was pasted
     try {
       if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
         const parsed = new URL(trimmed)
         const param = parsed.searchParams.get('code')
-        if (param && qrSessions.has(param)) return qrSessions.get(param) ?? null
+        if (param) {
+          const found = await qrSessions.load(param)
+          if (found) return found
+        }
       }
     } catch {
       // Not a URL
     }
     const upper = trimmed.toUpperCase()
     const normalizedShort = upper.startsWith('BC-') ? upper : `BC-${upper}`
-    const mappedId = qrShortCodeMap.get(upper) || qrShortCodeMap.get(normalizedShort)
-    if (mappedId && qrSessions.has(mappedId)) {
-      return qrSessions.get(mappedId) ?? null
+    const mappedId = (await qrShortCodeMap.load(upper)) || (await qrShortCodeMap.load(normalizedShort))
+    if (mappedId) {
+      const found = await qrSessions.load(mappedId)
+      if (found) return found
     }
-    return qrSessions.get(trimmed) ?? null
+    return (await qrSessions.load(trimmed)) ?? null
   }
 
   server.post(
@@ -719,7 +818,7 @@ export async function authRoutes(server: FastifyInstance) {
     { preHandler: [server.authenticate] },
     async (request) => {
       const input = z.object({ code: z.string().trim().min(4).max(512) }).parse(request.body)
-      const session = resolveQrSession(input.code)
+      const session = await resolveQrSession(input.code)
       if (!session || session.expiresAt <= Date.now() || session.status === 'CONSUMED' || session.status === 'REJECTED') {
         throw fail(404, 'Mã QR không hợp lệ hoặc đã hết hạn. Hãy tải lại mã QR mới trên màn hình đăng nhập.')
       }
@@ -736,6 +835,11 @@ export async function authRoutes(server: FastifyInstance) {
         displayName: currentUser.displayName,
         avatarUrl: mediaUrl(currentUser.avatarKey),
       }
+      await qrSessions.save(
+        session.qrId,
+        session,
+        Math.max(1, Math.ceil((session.expiresAt - Date.now()) / 1000))
+      )
 
       return {
         statusCode: 200,
@@ -758,13 +862,18 @@ export async function authRoutes(server: FastifyInstance) {
     { preHandler: [server.authenticate] },
     async (request) => {
       const input = z.object({ qrId: z.string().trim().min(4).max(256) }).parse(request.body)
-      const session = resolveQrSession(input.qrId)
+      const session = await resolveQrSession(input.qrId)
       if (!session || session.expiresAt <= Date.now() || session.status === 'CONSUMED') {
         throw fail(400, 'Mã QR đã hết hạn hoặc đã được sử dụng.')
       }
 
       session.status = 'APPROVED'
       session.approvedUserId = request.user.id
+      await qrSessions.save(
+        session.qrId,
+        session,
+        Math.max(1, Math.ceil((session.expiresAt - Date.now()) / 1000))
+      )
 
       return {
         statusCode: 200,
@@ -779,9 +888,14 @@ export async function authRoutes(server: FastifyInstance) {
     { preHandler: [server.authenticate] },
     async (request) => {
       const input = z.object({ qrId: z.string().trim().min(4).max(256) }).parse(request.body)
-      const session = resolveQrSession(input.qrId)
+      const session = await resolveQrSession(input.qrId)
       if (session) {
         session.status = 'REJECTED'
+        await qrSessions.save(
+          session.qrId,
+          session,
+          Math.max(1, Math.ceil((session.expiresAt - Date.now()) / 1000))
+        )
       }
       return { statusCode: 200, data: { rejected: true } }
     }
@@ -930,12 +1044,12 @@ export async function authRoutes(server: FastifyInstance) {
           })
         })
 
-        resetOtpMap.set(user.email, {
+        await resetOtpMap.save(user.email, {
           otpHash: digest(otpCode),
           rawToken: value,
           expiresAt: Date.now() + 15 * 60000,
           attempts: 0,
-        })
+        }, 900)
 
         try {
           const recipientName = user.displayName || user.username
@@ -956,7 +1070,7 @@ export async function authRoutes(server: FastifyInstance) {
             where: { id: token.id },
             data: { usedAt: new Date() },
           })
-          resetOtpMap.delete(user.email)
+          await resetOtpMap.remove(user.email)
           throw error
         }
       }
@@ -986,17 +1100,22 @@ export async function authRoutes(server: FastifyInstance) {
         })
         .parse(request.body)
 
-      const entry = resetOtpMap.get(input.email)
+      const entry = await resetOtpMap.load(input.email)
       if (!entry || entry.expiresAt <= Date.now()) {
-        resetOtpMap.delete(input.email)
+        await resetOtpMap.remove(input.email)
         throw fail(400, 'Mã xác nhận đã hết hạn hoặc không tồn tại. Vui lòng yêu cầu mã mới.')
       }
       if (entry.attempts >= 5) {
-        resetOtpMap.delete(input.email)
+        await resetOtpMap.remove(input.email)
         throw fail(429, 'Bạn đã nhập sai mã khôi phục quá 5 lần. Vui lòng gửi lại yêu cầu mới.')
       }
       if (digest(input.code) !== entry.otpHash) {
         entry.attempts += 1
+        await resetOtpMap.save(
+          input.email,
+          entry,
+          Math.max(1, Math.ceil((entry.expiresAt - Date.now()) / 1000))
+        )
         throw fail(400, `Mã xác nhận 6 chữ số không chính xác (Còn ${5 - entry.attempts} lần thử).`)
       }
 
@@ -1111,8 +1230,8 @@ export async function authRoutes(server: FastifyInstance) {
       where: { id: request.user.id },
       select: { id: true, email: true, isEmailVerified: true },
     })
-    const sec = getUserSecurity(user.id)
-    const logs = securityLogsMap.get(user.id) ?? []
+    const sec = await loadUserSecurity(user.id)
+    const logs = (await securityLogsMap.load(user.id)) ?? []
 
     return {
       statusCode: 200,
@@ -1140,8 +1259,9 @@ export async function authRoutes(server: FastifyInstance) {
           gmailLoginOtpEnabled: z.boolean(),
         })
         .parse(request.body)
-      const sec = getUserSecurity(request.user.id)
+      const sec = await loadUserSecurity(request.user.id)
       sec.gmailLoginOtpEnabled = input.gmailLoginOtpEnabled
+      await userSecurityMap.save(request.user.id, sec)
       recordSecurityLog(request.user.id, {
         event: input.gmailLoginOtpEnabled
           ? 'Bật yêu cầu xác minh Gmail OTP mỗi khi đăng nhập'
@@ -1163,9 +1283,10 @@ export async function authRoutes(server: FastifyInstance) {
       where: { id: request.user.id },
       select: { id: true, email: true, username: true },
     })
-    const sec = getUserSecurity(user.id)
+    const sec = await loadUserSecurity(user.id)
     const secret = generateBase32Secret(16)
     sec.pendingTotpSecret = secret
+    await userSecurityMap.save(user.id, sec)
     const label = encodeURIComponent(`Bravechat:${user.email}`)
     const otpauthUrl = `otpauth://totp/${label}?secret=${secret}&issuer=Bravechat&algorithm=SHA1&digits=6&period=30`
     // Provide current valid TOTP code in development for quick testing
@@ -1185,7 +1306,7 @@ export async function authRoutes(server: FastifyInstance) {
     { preHandler: [server.authenticate], bodyLimit: 16 * 1024 },
     async (request) => {
       const input = z.object({ code: z.string().trim().regex(/^\d{6}$/) }).parse(request.body)
-      const sec = getUserSecurity(request.user.id)
+      const sec = await loadUserSecurity(request.user.id)
       const secret = sec.pendingTotpSecret || sec.totpSecret
       if (!secret) throw fail(400, 'Vui lòng khởi tạo mã QR 2FA trước.')
 
@@ -1199,6 +1320,7 @@ export async function authRoutes(server: FastifyInstance) {
       sec.backupCodes = Array.from({ length: 6 }, () =>
         `${randomBytes(2).toString('hex').toUpperCase()}-${randomBytes(2).toString('hex').toUpperCase()}`
       )
+      await userSecurityMap.save(request.user.id, sec)
 
       recordSecurityLog(request.user.id, {
         event: 'Kích hoạt Xác thực 2 yếu tố (2FA TOTP)',
@@ -1218,21 +1340,63 @@ export async function authRoutes(server: FastifyInstance) {
     }
   )
 
-  server.post('/2fa/disable', { preHandler: [server.authenticate] }, async (request) => {
-    const sec = getUserSecurity(request.user.id)
-    sec.twoFactorEnabled = false
-    sec.totpSecret = undefined
-    sec.pendingTotpSecret = undefined
-    sec.backupCodes = []
-    recordSecurityLog(request.user.id, {
-      event: 'Tắt Xác thực 2 yếu tố (2FA TOTP)',
-      method: 'totp_2fa',
-      status: 'SUCCESS',
-      ipAddress: request.ip,
-      userAgent: request.headers['user-agent']?.slice(0, 120) || 'Web Client',
-    })
-    return { statusCode: 200, data: { twoFactorEnabled: false } }
-  })
+  server.post(
+    '/2fa/disable',
+    { preHandler: [server.authenticate], bodyLimit: 16 * 1024 },
+    async (request) => {
+      const input = z
+        .object({
+          password: z.string().min(1).max(128).optional(),
+          code: z.string().trim().min(6).max(16).optional(),
+        })
+        .parse(request.body ?? {})
+
+      if (!input.password && !input.code) {
+        throw fail(400, 'Vui lòng xác nhận mật khẩu hiện tại hoặc mã 2FA (TOTP/Backup) để tắt 2FA.')
+      }
+
+      const account = await prisma.user.findUniqueOrThrow({ where: { id: request.user.id } })
+      const sec = await loadUserSecurity(request.user.id)
+
+      let verified = false
+      if (input.password && (await bcrypt.compare(input.password, account.passwordHash))) {
+        verified = true
+      } else if (input.code) {
+        const normalizedCode = input.code.trim().toUpperCase()
+        const digitsOnly = normalizedCode.replace(/\D/g, '')
+        if (sec.totpSecret && digitsOnly.length === 6 && verifyTotpCode(sec.totpSecret, digitsOnly)) {
+          verified = true
+        } else if (sec.backupCodes.includes(normalizedCode)) {
+          verified = true
+        }
+      }
+
+      if (!verified) {
+        recordSecurityLog(request.user.id, {
+          event: 'Từ chối yêu cầu tắt 2FA do xác thực lại thất bại',
+          method: 'totp_2fa',
+          status: 'FAILED',
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent']?.slice(0, 120) || 'Web Client',
+        })
+        throw fail(401, 'Mật khẩu hoặc mã xác thực 2FA không chính xác.')
+      }
+
+      sec.twoFactorEnabled = false
+      sec.totpSecret = undefined
+      sec.pendingTotpSecret = undefined
+      sec.backupCodes = []
+      await userSecurityMap.save(request.user.id, sec)
+      recordSecurityLog(request.user.id, {
+        event: 'Tắt Xác thực 2 yếu tố (2FA TOTP) sau khi xác minh lại',
+        method: 'totp_2fa',
+        status: 'SUCCESS',
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent']?.slice(0, 120) || 'Web Client',
+      })
+      return { statusCode: 200, data: { twoFactorEnabled: false } }
+    }
+  )
 
   // ─── EMAIL VERIFICATION VIA GMAIL OTP ──────────────────────────────────────
   server.post(
@@ -1244,11 +1408,11 @@ export async function authRoutes(server: FastifyInstance) {
         select: { id: true, email: true, isEmailVerified: true },
       })
       const otpCode = generateNumericOtp(6)
-      emailVerifyOtpMap.set(user.id, {
+      await emailVerifyOtpMap.save(user.id, {
         otpHash: digest(otpCode),
         expiresAt: Date.now() + 10 * 60000,
         attempts: 0,
-      })
+      }, 600)
 
       let delivery: 'gmail' | 'resend' | 'development' = 'development'
       if (typeof resetMail.sendVerificationOtpMail === 'function') {
@@ -1275,21 +1439,26 @@ export async function authRoutes(server: FastifyInstance) {
     { preHandler: [server.authenticate], bodyLimit: 16 * 1024 },
     async (request) => {
       const input = z.object({ code: z.string().trim().regex(/^\d{6}$/) }).parse(request.body)
-      const entry = emailVerifyOtpMap.get(request.user.id)
+      const entry = await emailVerifyOtpMap.load(request.user.id)
       if (!entry || entry.expiresAt <= Date.now()) {
-        emailVerifyOtpMap.delete(request.user.id)
+        await emailVerifyOtpMap.remove(request.user.id)
         throw fail(400, 'Mã xác minh đã hết hạn. Vui lòng nhấn gửi lại mã mới.')
       }
       if (entry.attempts >= 5) {
-        emailVerifyOtpMap.delete(request.user.id)
+        await emailVerifyOtpMap.remove(request.user.id)
         throw fail(429, 'Bạn đã nhập sai quá 5 lần. Vui lòng yêu cầu mã mới.')
       }
       if (digest(input.code) !== entry.otpHash) {
         entry.attempts += 1
+        await emailVerifyOtpMap.save(
+          request.user.id,
+          entry,
+          Math.max(1, Math.ceil((entry.expiresAt - Date.now()) / 1000))
+        )
         throw fail(400, 'Mã xác minh Gmail không chính xác.')
       }
 
-      emailVerifyOtpMap.delete(request.user.id)
+      await emailVerifyOtpMap.remove(request.user.id)
       const updated = await prisma.user.update({
         where: { id: request.user.id },
         data: { isEmailVerified: true },
@@ -1313,7 +1482,7 @@ export async function authRoutes(server: FastifyInstance) {
   )
 
   // ─── GMAIL SMTP RUNTIME CONFIGURATION & LIVE TEST ──────────────────────────
-  server.get('/gmail-config', async () => {
+  server.get('/gmail-config', { preHandler: [server.authenticate] }, async () => {
     return {
       statusCode: 200,
       data: resetMail.getGmailStatus?.() ?? {
@@ -1326,11 +1495,21 @@ export async function authRoutes(server: FastifyInstance) {
 
   server.post(
     '/gmail-config',
-    { bodyLimit: 16 * 1024, config: { rateLimit: { max: 20, timeWindow: '5 minutes' } } },
+    {
+      preHandler: [server.authenticate],
+      bodyLimit: 16 * 1024,
+      config: { rateLimit: { max: 20, timeWindow: '5 minutes' } },
+    },
     async (request) => {
       if (env.NODE_ENV === 'production') {
         throw fail(403, 'Trong môi trường production, vui lòng cấu hình GMAIL_USER qua biến môi trường.')
       }
+
+      const adminEmail = (env as Record<string, unknown>).GMAIL_CONFIG_ADMIN_EMAIL as string | undefined
+      if (adminEmail && request.user.email.toLowerCase() !== adminEmail.toLowerCase()) {
+        throw fail(403, 'Chỉ quản trị viên mới được phép thay đổi cấu hình máy chủ Gmail SMTP.')
+      }
+
       const input = z
         .object({
           gmailUser: email,
@@ -1338,6 +1517,17 @@ export async function authRoutes(server: FastifyInstance) {
           testRecipient: email.optional(),
         })
         .parse(request.body)
+
+      if (
+        input.testRecipient &&
+        input.testRecipient !== request.user.email.toLowerCase() &&
+        input.testRecipient !== input.gmailUser.toLowerCase()
+      ) {
+        throw fail(
+          403,
+          'Email kiểm tra chỉ được phép gửi tới địa chỉ của tài khoản đang đăng nhập hoặc tài khoản Gmail cấu hình.'
+        )
+      }
 
       await resetMail.saveGmailConfig?.(input.gmailUser, input.gmailAppPassword)
 

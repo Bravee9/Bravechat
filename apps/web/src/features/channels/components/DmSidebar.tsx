@@ -48,7 +48,7 @@ export function DmSidebar() {
   return (
     <aside
       aria-label="Danh sách tin nhắn trực tiếp"
-      className="w-60 bg-ocean-dark-surface border-r border-ocean-dark-border flex flex-col flex-shrink-0 h-full select-none"
+      className="w-60 bg-[#18181B] border-r border-[#2B2D30] flex flex-col flex-shrink-0 h-full select-none"
       data-testid="channel-sidebar"
     >
       <ServerHeader

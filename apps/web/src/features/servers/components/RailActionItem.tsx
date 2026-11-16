@@ -27,7 +27,7 @@ export function RailActionItem({
 }: RailActionItemProps) {
   return (
     <div
-      className="relative group w-full flex justify-center items-center"
+      className="relative group w-full flex justify-center items-center shrink-0"
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       data-testid={`rail-action-${id}`}
@@ -35,7 +35,7 @@ export function RailActionItem({
       {/* Indicator Pill */}
       <div
         className={cn(
-          "absolute left-0 w-1 bg-white rounded-r-full transition-all duration-300 pointer-events-none",
+          "absolute left-0 w-1 bg-[#087CFA] rounded-r-full transition-all duration-200 pointer-events-none",
           isHovered ? "h-5 opacity-100" : "h-0 opacity-0"
         )}
       />
@@ -45,10 +45,10 @@ export function RailActionItem({
           type="button"
           onClick={onClick}
           className={cn(
-            "w-12 h-12 flex items-center justify-center bg-ocean-dark-surface border border-ocean-dark-border rounded-[24px] hover:rounded-[16px] transition-all duration-300 shadow-sm cursor-pointer group",
+            "w-11 h-11 flex items-center justify-center bg-[#1E1F22] border border-[#2B2D30] rounded-[8px] transition-all duration-200 cursor-pointer group",
             variant === "emerald"
-              ? "text-emerald-400 hover:bg-emerald-600 hover:text-white hover:border-emerald-500"
-              : "text-ocean-secondary hover:bg-ocean-primary hover:text-white hover:border-ocean-secondary"
+              ? "text-[#21D789] hover:bg-[#21D789]/15 hover:border-[#21D789]"
+              : "text-[#07C3F2] hover:bg-[#087CFA]/20 hover:border-[#087CFA]"
           )}
           aria-label={ariaLabel}
         >

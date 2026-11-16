@@ -4,7 +4,7 @@
  * ─────────────────────────────────────────────────────────
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -22,22 +22,31 @@
 
 /* ─── CSS CUSTOM PROPERTIES ──────────────────────────────── */
 :root {
-  /* Ocean palette as CSS variables for non-Tailwind usage */
-  --ocean-primary:        #1A659E;
-  --ocean-secondary:      #86B8DE;
-  --ocean-light:          #EAF2F8;
-  --ocean-dark-bg:        #071A2C;
-  --ocean-dark-surface:   #0A233A;
-  --ocean-dark-border:    #173B5C;
-  --ocean-light-bg:       #EAF2F8;
+  /* JetBrains Dark Palette mapped to project CSS variables */
+  --theme-primary:        8 124 250;
+  --theme-primary-hover:  53 116 240;
+  --theme-secondary:      7 195 242;
+  --theme-text:           223 225 229;
+  --theme-bg:             11 11 13;
+  --theme-surface:        22 22 26;
+  --theme-border:         43 45 48;
+  --theme-hover:          39 40 46;
+
+  --ocean-primary:        #087CFA;
+  --ocean-secondary:      #07C3F2;
+  --ocean-light:          #DFE1E5;
+  --ocean-dark-bg:        #0B0B0D;
+  --ocean-dark-surface:   #16161A;
+  --ocean-dark-border:    #2B2D30;
+  --ocean-light-bg:       #F4F4F6;
   --ocean-light-surface:  #FFFFFF;
-  --ocean-light-border:   #C5D9EA;
-  --ocean-light-text:     #0A233A;
+  --ocean-light-border:   #D4D4D8;
+  --ocean-light-text:     #18181B;
 
   /* Scrollbar */
-  --scrollbar-track: #0A233A;
-  --scrollbar-thumb: #173B5C;
-  --scrollbar-thumb-hover: #1A659E;
+  --scrollbar-track: #141417;
+  --scrollbar-thumb: #2B2D30;
+  --scrollbar-thumb-hover: #4E5157;
 }
 
 /* ─── BASE LAYER ─────────────────────────────────────────── */
@@ -73,8 +82,8 @@
     }
   }
 
-  /* Swiss Minimalist: sharp corners everywhere */
-  *:where(:not(.discord-app, .discord-app *)) {
+  /* Swiss Minimalist: sharp corners everywhere except discord-app and figma-landing */
+  *:where(:not(.discord-app, .discord-app *, .figma-landing, .figma-landing *)) {
     border-radius: 0 !important;
   }
 
@@ -129,74 +138,76 @@
   }
 }
 
-/* Workspace palette is scoped so the landing page keeps its own design. */
+/* Workspace palette — JetBrains IDE New UI / Fleet Dark Theme */
 .discord-app {
-  --theme-primary: 88 101 242;
-  --theme-primary-hover: 71 82 196;
-  --theme-secondary: 181 186 193;
-  --theme-text: 219 222 225;
-  --theme-bg: 49 51 56;
-  --theme-surface: 43 45 49;
-  --theme-border: 35 36 40;
-  --theme-hover: 64 66 73;
-  --ocean-primary: #5865f2;
-  --ocean-secondary: #b5bac1;
-  --ocean-dark-bg: #313338;
-  --ocean-dark-surface: #2b2d31;
-  --ocean-dark-border: #232428;
+  --theme-primary: 8 124 250;
+  --theme-primary-hover: 53 116 240;
+  --theme-secondary: 7 195 242;
+  --theme-text: 223 225 229;
+  --theme-bg: 24 24 27;
+  --theme-surface: 30 31 34;
+  --theme-border: 43 45 48;
+  --theme-hover: 43 45 48;
+  --ocean-primary: #087CFA;
+  --ocean-secondary: #07C3F2;
+  --ocean-dark-bg: #18181B;
+  --ocean-dark-surface: #1E1F22;
+  --ocean-dark-border: #2B2D30;
   --scrollbar-track: transparent;
-  --scrollbar-thumb: #1e1f22;
-  --scrollbar-thumb-hover: #111214;
-  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  line-height: 1.375;
+  --scrollbar-thumb: #2B2D30;
+  --scrollbar-thumb-hover: #393B40;
+  font-family: "Inter", "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
+  line-height: 1.4;
   color-scheme: dark;
 }
-.discord-app ::selection { background: #5865f270; }
-.discord-app ::-webkit-scrollbar { width: 8px; }
-.discord-app ::-webkit-scrollbar-thumb { border-radius: 4px; }
+.discord-app ::selection { background: rgba(8, 124, 250, 0.35); color: #ffffff; }
+.discord-app ::-webkit-scrollbar { width: 6px; height: 6px; }
+.discord-app ::-webkit-scrollbar-thumb { border-radius: 3px; }
 .discord-app :is(button, input, textarea, h1, h2, h3, h4) { font-family: inherit; }
 .discord-app :is(.btn-primary, .btn-secondary) {
   border-radius: 4px;
   text-transform: none;
   letter-spacing: normal;
-  font-weight: 500;
-  padding: 10px 16px;
+  font-weight: 600;
+  padding: 8px 14px;
 }
 .discord-app :is(.shadow-ocean-glow, .hover\:shadow-ocean-glow:hover) { box-shadow: none; }
-.discord-app [data-testid="server-rail"] { background: #1e1f22; border: 0; }
-.discord-app [data-testid="channel-sidebar"] { border: 0; }
-.discord-app [data-testid="member-list"] { background: #2b2d31; border: 0; }
+.discord-app [data-testid="server-rail"] { background: #141417; border-right: 1px solid #2B2D30; }
+.discord-app [data-testid="channel-sidebar"] { background: #1E1F22; border-right: 1px solid #2B2D30; }
+.discord-app [data-testid="member-list"] { background: #1E1F22; border-left: 1px solid #2B2D30; }
 .discord-app [data-testid="chat-header"],
 .discord-app [data-testid="server-header-btn"] {
-  height: 48px;
-  box-shadow: 0 1px 0 #0003, 0 1.5px 0 #0001, 0 2px 0 #0001;
+  height: 44px;
+  box-shadow: none;
+  border-bottom: 1px solid #2B2D30;
 }
-.discord-app [data-testid="chat-header"] { background: #313338; padding-inline: 16px; backdrop-filter: none; }
-.discord-app [data-testid="chat-header"] h1 { color: #f2f3f5; font-weight: 600; }
-.discord-app [data-testid="change-username-btn"] { border: 0; background: none; }
-.discord-app [data-testid="workflow-dialog"] { background: #313338; border-radius: 8px; }
-.discord-app [data-testid="ws-connection-badge"] { border: 0; background: none; }
-.discord-app [data-testid="friends-tab-btn"] { border: 0; }
-.discord-app [data-testid="friends-tab-btn"][aria-current="page"] { background: #404249; }
-.discord-app [data-testid="chat-input-container"] { padding: 0 16px 24px; }
-.discord-app [data-testid="chat-input-container"] form { background: #383a40; border: 0; border-radius: 8px; box-shadow: none; }
-.discord-app [data-testid="chat-input-field"] { font-size: 15px; min-width: 0; padding-block: 13px; }
-.discord-app [data-testid="chat-input-field"]::placeholder { color: #949ba4; }
+.discord-app [data-testid="chat-header"] { background: #1E1F22; padding-inline: 16px; backdrop-filter: none; }
+.discord-app [data-testid="chat-header"] h1 { color: #F2F2F3; font-weight: 600; font-size: 13px; }
+.discord-app [data-testid="change-username-btn"] { border: 1px solid #2B2D30; background: #141417; border-radius: 4px; }
+.discord-app [data-testid="workflow-dialog"] { background: #1E1F22; border: 1px solid #393B40; border-radius: 6px; }
+.discord-app [data-testid="ws-connection-badge"] { border: 1px solid #2B2D30; background: #141417; border-radius: 4px; }
+.discord-app [data-testid="friends-tab-btn"] { border: 0; border-radius: 4px; }
+.discord-app [data-testid="friends-tab-btn"][aria-current="page"] { background: #2B2D30; color: #ffffff; }
+.discord-app [data-testid="chat-input-container"] { padding: 0 16px 16px; }
+.discord-app [data-testid="chat-input-container"] form { background: #141417; border: 1px solid #393B40; border-radius: 6px; box-shadow: none; }
+.discord-app [data-testid="chat-input-container"] form:focus-within { border-color: #087CFA; box-shadow: 0 0 0 2px rgba(8, 124, 250, 0.2); }
+.discord-app [data-testid="chat-input-field"] { font-size: 13.5px; min-width: 0; padding-block: 10px; }
+.discord-app [data-testid="chat-input-field"]::placeholder { color: #7D7D7D; }
 .discord-app [data-testid="message-list"] { padding-inline: 0; }
 .discord-app .chat-welcome { padding: 0 16px 12px; margin-top: 16px; border: 0; }
-.discord-app .chat-welcome h2 { font-size: 30px; color: #f2f3f5; }
-.discord-app .chat-welcome-icon { background: #41434a; color: #dbdee1; border: 0; }
-.discord-app .message-row { padding: 3px 48px 3px 16px; border-radius: 0; }
-.discord-app .message-row:hover { background: #2e3035; }
-.discord-app .message-avatar { background: #5865f2; color: white; border: 0; }
-.discord-app .message-content { color: #dbdee1; font-size: 15px; line-height: 1.375; }
-.discord-app .message-author { color: #f2f3f5; font-size: 15px; font-weight: 500; }
-.discord-app .profile-dock { left: 72px; width: 240px; background: #232428; border: 0; }
-.discord-app [data-testid="user-profile-bar"] { background: #232428; border: 0; padding-inline: 8px; }
-.discord-app [data-testid="user-profile-bar"] [class*="border-[#051424]"] { border-color: #232428; }
-.discord-app [role="tooltip"] { background: #111214; border-color: #111214; color: #f2f3f5; }
+.discord-app .chat-welcome h2 { font-size: 22px; color: #F2F2F3; }
+.discord-app .chat-welcome-icon { background: #2B2D30; color: #07C3F2; border: 1px solid #393B40; border-radius: 6px; }
+.discord-app .message-row { padding: 6px 24px 6px 16px; border-radius: 0; border-bottom: 1px solid rgba(43, 45, 48, 0.35); }
+.discord-app .message-row:hover { background: #202226; }
+.discord-app .message-avatar { background: #2B2D30; color: #DFE1E5; border: 1px solid #393B40; border-radius: 6px; width: 32px; height: 32px; font-size: 11px; font-family: "JetBrains Mono", monospace; }
+.discord-app .message-content { color: #DFE1E5; font-size: 13.5px; line-height: 1.5; }
+.discord-app .message-author { color: #F2F2F3; font-size: 13px; font-weight: 600; }
+.discord-app .profile-dock { left: 60px; width: 256px; background: #141417; border-top: 1px solid #2B2D30; border-right: 1px solid #2B2D30; }
+.discord-app [data-testid="user-profile-bar"] { background: #141417; border-top: 1px solid #2B2D30; height: 48px; padding-inline: 10px; }
+.discord-app [data-testid="user-profile-bar"] [class*="border-[#051424]"] { border-color: #141417; }
+.discord-app [role="tooltip"] { background: #141417; border-color: #393B40; color: #F2F2F3; font-size: 11px; border-radius: 4px; }
 .discord-app [role="tooltip"] > div { border-color: transparent; }
-.discord-app .input-ocean { border-radius: 4px; background: #1e1f22; }
+.discord-app .input-ocean { border-radius: 4px; background: #141417; border-color: #393B40; }
 @media (max-width: 1000px) {
   .discord-app [data-testid="member-list"] { display: none; }
   .discord-app [data-testid="change-username-btn"] { display: none; }

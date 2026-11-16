@@ -23,20 +23,20 @@ const config: Config = {
       // Nền tối là navy (không đen tuyền) để giảm chói; chữ là EAF2F8 thay vì trắng.
       colors: {
         ocean: {
-          // CSS variables let the workspace use Discord colors without changing public pages.
-          primary:       "rgb(var(--theme-primary, 26 101 158) / <alpha-value>)",
-          secondary:     "rgb(var(--theme-secondary, 134 184 222) / <alpha-value>)",
-          light:         "rgb(var(--theme-text, 234 242 248) / <alpha-value>)",
-          "dark-bg":     "rgb(var(--theme-bg, 7 26 44) / <alpha-value>)",
-          "dark-surface":"rgb(var(--theme-surface, 10 35 58) / <alpha-value>)",
-          "dark-border": "rgb(var(--theme-border, 23 59 92) / <alpha-value>)",
-          "light-bg":    "#EAF2F8",  // OceanBlueLightBg — nền body sáng
-          "light-surface":"#FFFFFF", // Card sáng
-          "light-border":"#C5D9EA",  // Viền sáng
-          "light-text":  "#0A233A",  // OceanBlueLightText — chữ chính nền sáng
-          hover:         "rgb(var(--theme-primary-hover, 21 86 138) / <alpha-value>)",
-          "dark-hover":  "rgb(var(--theme-hover, 15 45 74) / <alpha-value>)",
-          deep:          "#0E3D60",  // OceanBlueDark — mảng tối, gradient
+          // CSS variables mapped to JetBrains Dark Theme
+          primary:       "rgb(var(--theme-primary, 8 124 250) / <alpha-value>)",
+          secondary:     "rgb(var(--theme-secondary, 7 195 242) / <alpha-value>)",
+          light:         "rgb(var(--theme-text, 223 225 229) / <alpha-value>)",
+          "dark-bg":     "rgb(var(--theme-bg, 11 11 13) / <alpha-value>)",
+          "dark-surface":"rgb(var(--theme-surface, 22 22 26) / <alpha-value>)",
+          "dark-border": "rgb(var(--theme-border, 43 45 48) / <alpha-value>)",
+          "light-bg":    "#F4F4F6",
+          "light-surface":"#FFFFFF",
+          "light-border":"#D4D4D8",
+          "light-text":  "#18181B",
+          hover:         "rgb(var(--theme-primary-hover, 53 116 240) / <alpha-value>)",
+          "dark-hover":  "rgb(var(--theme-hover, 39 40 46) / <alpha-value>)",
+          deep:          "#16161A",
         },
       },
 
