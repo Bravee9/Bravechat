@@ -1,242 +1,115 @@
-// ============================================================
-// apps/api/src/routes/websocket.routes.ts
-// WebSocket route xử lý chat thời gian thực (Real-time Messaging)
-// ============================================================
-
 import type { FastifyInstance } from 'fastify'
 import type { WebSocket } from 'ws'
+import Redis from 'ioredis'
+import { randomUUID } from 'node:crypto'
 import { prisma } from '../config/prisma'
+import { env } from '../config/env'
 
-interface ClientSession {
-  channelId?: string
-  user?: {
-    id?: string
-    username?: string
-    avatar?: string
-  }
+interface Session { userId: string; sid: string; expires: number; username: string; channelId?: string; channelServerId?: string; servers: Set<string> }
+const rooms = { channel: new Map<string, Set<WebSocket>>(), server: new Map<string, Set<WebSocket>>(), user: new Map<string, Set<WebSocket>>() }
+const sessions = new Map<WebSocket, Session>()
+const instance = randomUUID()
+let publisher: Redis | undefined
+let subscriber: Redis | undefined
+function join(kind: keyof typeof rooms, id: string, socket: WebSocket) {
+  if (!rooms[kind].has(id)) rooms[kind].set(id, new Set())
+  rooms[kind].get(id)!.add(socket)
 }
-
-// In-memory rooms: channelId -> Set<WebSocket>
-const channelRooms = new Map<string, Set<WebSocket>>()
-// Metadata per connection
-const clientSessions = new Map<WebSocket, ClientSession>()
-// In-memory fallback message cache (50 messages per channel)
-const memoryMessageStore = new Map<string, any[]>()
-
-function broadcastToChannel(channelId: string, payload: any, senderSocket?: WebSocket) {
-  const sockets = channelRooms.get(channelId)
-  if (!sockets) return
-
-  const messageStr = JSON.stringify(payload)
-  for (const client of sockets) {
-    if (client.readyState === 1 /* OPEN */) {
-      if (!senderSocket || client !== senderSocket || payload.echoBack) {
-        client.send(messageStr)
-      }
-    }
-  }
+function leave(kind: keyof typeof rooms, id: string | undefined, socket: WebSocket) {
+  if (!id) return
+  const room = rooms[kind].get(id); room?.delete(socket)
+  if (!room?.size) rooms[kind].delete(id)
 }
-
-function leaveCurrentChannel(socket: WebSocket) {
-  const session = clientSessions.get(socket)
-  if (!session || !session.channelId) return
-
-  const room = channelRooms.get(session.channelId)
-  if (room) {
-    room.delete(socket)
-    if (room.size === 0) {
-      channelRooms.delete(session.channelId)
-    }
-  }
-  session.channelId = undefined
+function broadcast(kind: keyof typeof rooms, id: string, payload: any, except?: WebSocket) {
+  for (const socket of rooms[kind].get(id) ?? []) if (socket.readyState === 1 && socket !== except) socket.send(JSON.stringify(payload))
 }
-
+function relay(event: any) { if (publisher?.status === 'ready') void publisher.publish('bravechat:realtime', JSON.stringify({ origin: instance, ...event })).catch(() => undefined) }
+function publish(kind: keyof typeof rooms, id: string, payload: any, except?: WebSocket) {
+  broadcast(kind, id, payload, except); relay({ kind, id, payload })
+}
+export const publishUserEvent = (userId: string, payload: any) => publish('user', userId, payload)
+export const publishChannelEvent = (channelId: string, payload: any) => publish('channel', channelId, { ...payload, channelId })
+export function publishChannelMessage(channelId: string, message: any, serverId?: string) {
+  publishChannelEvent(channelId, { type: 'message_create', message })
+  if (serverId) publish('server', serverId, { type: 'message_create', serverId, channelKey: channelId, message })
+}
+export function revokeServerMembership(serverId: string, userId: string, local = false) {
+  for (const [socket, session] of sessions) if (session.userId === userId) {
+    leave('server', serverId, socket); session.servers.delete(serverId)
+    if (session.channelServerId === serverId) socket.close(1008, 'Membership revoked')
+  }
+  if (!local) relay({ action: 'membership_revoked', serverId, userId })
+}
+export function revokeSessions(userId: string, sid?: string, local = false) {
+  for (const [socket, session] of sessions) if (session.userId === userId && (!sid || sid === session.sid)) socket.close(1008, 'Session expired')
+  if (!local) relay({ action: 'session_revoked', userId, sid })
+}
+function ensureRedis(server: FastifyInstance) {
+  if (env.REDIS_ENABLED !== 'true' || publisher) return
+  publisher = new Redis(env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 })
+  subscriber = new Redis(env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 })
+  publisher.on('error', (error) => server.log.warn(error, 'Realtime publisher unavailable'))
+  subscriber.on('error', (error) => server.log.warn(error, 'Realtime subscriber unavailable'))
+  void publisher.connect().catch(() => undefined)
+  void subscriber.connect().then(() => subscriber!.subscribe('bravechat:realtime')).catch(() => undefined)
+  subscriber.on('message', (_topic, raw) => {
+    try {
+      const event = JSON.parse(raw)
+      if (event.origin === instance) return
+      if (event.action === 'membership_revoked') revokeServerMembership(event.serverId, event.userId, true)
+      else if (event.action === 'session_revoked') revokeSessions(event.userId, event.sid, true)
+      else if (event.kind in rooms) broadcast(event.kind, event.id, event.payload)
+    } catch (error) { server.log.warn(error, 'Invalid realtime payload') }
+  })
+  server.addHook('onClose', async () => { publisher?.disconnect(); subscriber?.disconnect(); publisher = undefined; subscriber = undefined })
+}
 export async function websocketRoutes(server: FastifyInstance) {
-  server.get('/ws', { websocket: true }, (socket: WebSocket, req) => {
-    clientSessions.set(socket, {})
-    server.log.info('🔌 WebSocket client connected')
-
-    // Gửi event chào mừng và xác nhận kết nối
-    socket.send(
-      JSON.stringify({
-        type: 'connected',
-        message: 'Kết nối WebSocket tới Bravechat API thành công!',
-        timestamp: new Date().toISOString(),
-      })
-    )
-
-    socket.on('message', async (raw: any) => {
-      try {
+  ensureRedis(server)
+  server.get('/ws', { websocket: true, preValidation: server.authenticate }, (socket: WebSocket, request) => {
+    const claims = request.user as typeof request.user & { exp: number }
+    const session: Session = { userId: claims.id, username: claims.username, sid: claims.sid, expires: claims.exp * 1000, servers: new Set() }
+    // User room lấy từ JWT đã kiểm tra DB; client không được tự chọn người nhận DM.
+    sessions.set(socket, session); join('user', session.userId, socket)
+    socket.send(JSON.stringify({ type: 'connected', userId: session.userId }))
+    let alive = true; let queued = 0; let sequence = Promise.resolve()
+    const heartbeat = setInterval(() => { if (!alive || session.expires <= Date.now()) return socket.terminate(); alive = false; socket.ping() }, 30000)
+    socket.on('pong', () => { alive = true })
+    socket.on('message', (raw) => {
+      if (++queued > 30) return socket.close(1008, 'Too many events')
+      // Xử lý tuần tự để một join chậm không ghi đè kênh được chọn sau đó.
+      sequence = sequence.then(async () => {
+        if (socket.readyState !== 1) return
+        const valid = session.expires > Date.now() && await prisma.refreshToken.findFirst({ where: { id: session.sid, userId: session.userId, isRevoked: false, expiresAt: { gt: new Date() }, user: { isBanned: false } }, select: { id: true } })
+        if (!valid) return socket.close(1008, 'Session expired')
         const data = JSON.parse(raw.toString())
-        const session = clientSessions.get(socket) || {}
-
-        switch (data.type) {
-          case 'join_channel': {
-            const channelId = String(data.channelId || 'general')
-            leaveCurrentChannel(socket)
-
-            if (!channelRooms.has(channelId)) {
-              channelRooms.set(channelId, new Set())
-            }
-            channelRooms.get(channelId)!.add(socket)
-
-            session.channelId = channelId
-            session.user = data.user || {
-              id: 'guest',
-              username: 'Khách',
-              avatar: 'KH',
-            }
-            clientSessions.set(socket, session)
-
-            // Lấy lịch sử tin nhắn
-            let history: any[] = []
-            try {
-              // Thử truy vấn Prisma DB nếu có
-              const dbMessages = await prisma.message.findMany({
-                where: { channelId, isDeleted: false },
-                take: 50,
-                orderBy: { createdAt: 'asc' },
-                include: {
-                  author: {
-                    select: { id: true, username: true, displayName: true, avatarKey: true },
-                  },
-                },
-              })
-              if (dbMessages && dbMessages.length > 0) {
-                history = dbMessages.map((m: any) => ({
-                  id: m.id,
-                  channelId: m.channelId,
-                  content: m.content,
-                  time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                  createdAt: m.createdAt,
-                  user: m.author.displayName || m.author.username,
-                  avatar: (m.author.displayName || m.author.username).slice(0, 2).toUpperCase(),
-                }))
-              }
-            } catch (err) {
-              // DB fallback: dùng in-memory store
-              history = memoryMessageStore.get(channelId) || []
-            }
-
-            if (history.length === 0) {
-              history = memoryMessageStore.get(channelId) || []
-            }
-
-            // Gửi initial messages cho client vừa join
-            socket.send(
-              JSON.stringify({
-                type: 'channel_joined',
-                channelId,
-                messages: history,
-              })
-            )
-            break
-          }
-
-          case 'send_message': {
-            const channelId = String(data.channelId || session.channelId || 'general')
-            const content = String(data.content || '').trim()
-            if (!content) return
-
-            const user = data.user || session.user || {
-              id: 'guest',
-              username: 'Ẩn danh',
-              avatar: 'AD',
-            }
-
-            const now = new Date()
-            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            const messageObj = {
-              id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-              channelId,
-              content,
-              time: `Hôm nay lúc ${timeStr}`,
-              createdAt: now.toISOString(),
-              user: user.username,
-              avatar: user.avatar || user.username.slice(0, 2).toUpperCase(),
-              isHighlighted: false,
-            }
-
-            // Lưu vào in-memory store
-            if (!memoryMessageStore.has(channelId)) {
-              memoryMessageStore.set(channelId, [])
-            }
-            const store = memoryMessageStore.get(channelId)!
-            store.push(messageObj)
-            if (store.length > 100) store.shift() // giữ 100 tin gần nhất
-
-            // Thử lưu DB nếu có (background)
-            if (user.id && user.id !== 'guest') {
-              prisma.message.create({
-                data: {
-                  channelId,
-                  authorId: user.id,
-                  content,
-                },
-              }).catch(() => {})
-            }
-
-            // Broadcast ngay lập tức tới tất cả client trong channel (kể cả người gửi)
-            broadcastToChannel(channelId, {
-              type: 'message_create',
-              channelId,
-              message: messageObj,
-              echoBack: true,
-            })
-            break
-          }
-
-          case 'typing_start': {
-            const channelId = data.channelId || session.channelId
-            if (channelId) {
-              broadcastToChannel(
-                channelId,
-                {
-                  type: 'typing_start',
-                  channelId,
-                  username: data.username || session.user?.username || 'Ai đó',
-                },
-                socket
-              )
-            }
-            break
-          }
-
-          case 'typing_stop': {
-            const channelId = data.channelId || session.channelId
-            if (channelId) {
-              broadcastToChannel(
-                channelId,
-                {
-                  type: 'typing_stop',
-                  channelId,
-                  username: data.username || session.user?.username,
-                },
-                socket
-              )
-            }
-            break
-          }
-
-          default:
-            break
+        if (data.type === 'join_server') {
+          const id = String(data.serverId ?? '')
+          const member = await prisma.serverMember.findFirst({ where: { serverId: id, userId: session.userId, isBanned: false }, select: { id: true } })
+          if (!member) return socket.send(JSON.stringify({ type: 'server_unavailable', serverId: id }))
+          join('server', id, socket); session.servers.add(id)
+          socket.send(JSON.stringify({ type: 'server_joined', serverId: id }))
+        } else if (data.type === 'join_channel') {
+          const id = String(data.channelId ?? '')
+          const channel = await prisma.channel.findFirst({ where: { id, server: { members: { some: { userId: session.userId, isBanned: false } } } }, select: { id: true, serverId: true } })
+          if (!channel) return socket.close(1008, 'Not a channel member')
+          leave('channel', session.channelId, socket); join('channel', id, socket)
+          session.channelId = id; session.channelServerId = channel.serverId
+          socket.send(JSON.stringify({ type: 'channel_joined', channelId: id, messages: [] }))
+        } else if (data.type === 'leave_channel') {
+          if (session.channelId === data.channelId) { leave('channel', session.channelId, socket); session.channelId = undefined; session.channelServerId = undefined }
+        } else if (data.type === 'typing_start' || data.type === 'typing_stop') {
+          if (data.channelId !== session.channelId || !session.channelId) return
+          publish('channel', session.channelId, { type: data.type, channelId: session.channelId, username: session.username }, socket)
+        } else if (data.type === 'send_message') {
+          socket.send(JSON.stringify({ type: 'error', message: 'Vui lòng gửi tin qua API để nhận xác nhận lưu.' }))
         }
-      } catch (err) {
-        server.log.error(err, 'Lỗi xử lý WebSocket message')
-      }
+      }).catch((error) => { server.log.warn(error, 'Realtime event failed'); if (socket.readyState === 1) socket.send(JSON.stringify({ type: 'error', message: 'Không thể xử lý cập nhật.' })) }).finally(() => { queued-- })
     })
-
-    socket.on('close', () => {
-      leaveCurrentChannel(socket)
-      clientSessions.delete(socket)
-      server.log.info('🔌 WebSocket client disconnected')
-    })
-
-    socket.on('error', (err: any) => {
-      server.log.error(err, 'WebSocket socket error')
-      leaveCurrentChannel(socket)
-      clientSessions.delete(socket)
-    })
+    const cleanup = () => {
+      clearInterval(heartbeat); sessions.delete(socket); leave('user', session.userId, socket)
+      if (session.channelId) { publish('channel', session.channelId, { type: 'typing_stop', channelId: session.channelId, username: session.username }, socket); leave('channel', session.channelId, socket) }
+      for (const id of session.servers) leave('server', id, socket)
+    }
+    socket.on('close', cleanup); socket.on('error', cleanup)
   })
 }
-

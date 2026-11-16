@@ -1,134 +1,157 @@
-/**
- * components/auth/ForgotPasswordForm.tsx
- * Forgot password form with email input and sent confirmation state
- */
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { http } from "@/services/http";
 import { cn } from "@/lib/utils";
 
+interface ForgotPasswordResponse {
+  delivery: string;
+  emailMasked?: string;
+}
+
 export function ForgotPasswordForm() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [message, setMessage] = useState("");
+  const [sentToEmail, setSentToEmail] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSent, setIsSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
-  function validate(): string {
-    if (!email.trim()) return "Email không được để trống.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Email không hợp lệ.";
-    return "";
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSendEmail(e: React.FormEvent) {
     e.preventDefault();
-    const err = validate();
-    if (err) { setError(err); return; }
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setError("Vui lòng nhập địa chỉ email.");
+      return;
+    }
+
+    setBusy(true);
+    setMessage("");
     setError("");
-    setIsLoading(true);
+
     try {
-      // TODO: Call API POST /auth/forgot-password
-      await new Promise((r) => setTimeout(r, 1200)); // UI demo
-      setIsSent(true);
-    } catch {
-      setError("Không thể kết nối đến máy chủ. Vui lòng thử lại.");
+      await http.post<ForgotPasswordResponse>("/auth/forgot-password", {
+        email: cleanEmail,
+      });
+      setSentToEmail(cleanEmail);
+      setMessage(
+        "Hướng dẫn đặt lại mật khẩu đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư đến (và thư mục spam nếu cần)."
+      );
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Không thể gửi email khôi phục. Vui lòng thử lại sau."
+      );
     } finally {
-      setIsLoading(false);
+      setBusy(false);
     }
   }
 
-  if (isSent) {
-    return (
-      <div
-        id="forgot-password-success"
-        className="flex flex-col items-center gap-6 py-4 text-center animate-fade-in"
-      >
-        {/* Success icon */}
-        <div className="w-16 h-16 bg-ocean-primary/20 border border-ocean-primary/50 flex items-center justify-center">
-          <svg className="w-8 h-8 text-ocean-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="square" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        </div>
-
-        <div>
-          <h3 className="text-ocean-light font-black text-lg tracking-tight">Email đã được gửi</h3>
-          <p className="text-ocean-light/70 text-sm mt-2 leading-relaxed">
-            Nếu địa chỉ <span className="text-ocean-secondary font-bold">{email}</span> tồn tại
-            trong hệ thống, bạn sẽ nhận được email chứa hướng dẫn đặt lại mật khẩu trong vài phút.
-          </p>
-        </div>
-
-        <div className="border border-ocean-dark-border p-4 w-full text-left">
-          <p className="text-ocean-light/60 text-xs font-mono leading-relaxed">
-            Không nhận được email? Kiểm tra thư mục Spam hoặc thử lại sau vài phút.
-          </p>
-        </div>
-
-        <button
-          onClick={() => { setIsSent(false); setEmail(""); }}
-          className="text-ocean-secondary text-sm hover:text-ocean-light transition-colors underline"
-        >
-          Thử địa chỉ email khác
-        </button>
-      </div>
-    );
+  async function handleVerifyRecoveryOtp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sentToEmail || otpCode.trim().length !== 6) return;
+    setVerifyingOtp(true);
+    setError("");
+    try {
+      const res = await http.post<{ token: string }>("/auth/forgot-password/verify-otp", {
+        email: sentToEmail,
+        code: otpCode.trim(),
+      });
+      router.push(`/reset-password?token=${encodeURIComponent(res.token)}`);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Mã xác nhận khôi phục không hợp lệ hoặc đã hết hạn."
+      );
+    } finally {
+      setVerifyingOtp(false);
+    }
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
-      {/* Error */}
+    <div className="space-y-4">
       {error && (
         <div
-          id="forgot-password-error"
-          className="border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm flex items-start gap-2"
           role="alert"
+          className="border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 rounded text-rose-300 text-xs"
         >
-          <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="square" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
           {error}
         </div>
       )}
 
-      {/* Email field */}
-      <div>
-        <label htmlFor="forgot-email" className="input-label">
-          Địa chỉ Email
-        </label>
-        <input
-          id="forgot-email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          autoFocus
-          value={email}
-          onChange={(e) => { setEmail(e.target.value); setError(""); }}
-          placeholder="ten@example.com"
-          className={cn("input-ocean", error && "border-rose-500/50 focus:border-rose-500/70")}
-        />
-        <p className="text-ocean-light/60 text-xs mt-2 leading-relaxed">
-          Nhập địa chỉ email được dùng để đăng ký tài khoản Bravechat.
-        </p>
-      </div>
+      {message && (
+        <div
+          role="status"
+          className="border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2.5 rounded text-emerald-300 text-xs leading-relaxed"
+        >
+          {message}
+        </div>
+      )}
 
-      {/* Submit */}
-      <button
-        id="forgot-password-submit"
-        type="submit"
-        disabled={isLoading}
-        className={cn("btn-primary w-full mt-2", isLoading && "opacity-60 cursor-not-allowed")}
-      >
-        {isLoading ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Đang gửi...
-          </span>
-        ) : (
-          "Gửi hướng dẫn đặt lại mật khẩu"
-        )}
-      </button>
-    </form>
+      <form onSubmit={handleSendEmail} noValidate className="flex flex-col gap-4">
+        <div>
+          <label
+            htmlFor="forgot-email"
+            className="block text-[11px] font-bold uppercase tracking-wider text-ocean-light/70 mb-2"
+          >
+            Email <span className="text-rose-400">*</span>
+          </label>
+          <input
+            id="forgot-email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            autoFocus
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={cn(
+              "w-full rounded bg-[#051424] border border-white/10 text-white placeholder:text-ocean-light/30 px-3 py-2 text-sm transition-colors focus:outline-none focus:border-ocean-secondary",
+              error && "border-rose-500/50"
+            )}
+            placeholder="name@example.com"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={busy || !email.trim()}
+          className="w-full py-2.5 rounded bg-ocean-primary hover:bg-ocean-primary/90 text-white font-medium text-sm transition-colors disabled:opacity-50 cursor-pointer"
+        >
+          {busy ? "Đang gửi..." : "Gửi liên kết"}
+        </button>
+      </form>
+
+      {/* Alternative verification using 6-digit OTP code directly from email */}
+      {sentToEmail && (
+        <form
+          onSubmit={handleVerifyRecoveryOtp}
+          className="pt-4 border-t border-white/10 space-y-3 animate-fade-in"
+        >
+          <label className="block text-[11px] font-bold uppercase tracking-wider text-ocean-light/70">
+            Hoặc nhập mã khôi phục 6 chữ số từ email
+          </label>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="000000"
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+              className="flex-1 rounded bg-[#051424] border border-white/10 text-white text-center font-mono text-base font-bold tracking-widest px-3 py-2 focus:outline-none focus:border-ocean-secondary"
+            />
+            <button
+              type="submit"
+              disabled={verifyingOtp || otpCode.length !== 6}
+              className="px-4 py-2 rounded bg-ocean-secondary/20 hover:bg-ocean-secondary/30 text-ocean-light font-medium text-xs transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {verifyingOtp ? "Đang kiểm tra..." : "Xác nhận mã"}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }

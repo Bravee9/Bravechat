@@ -1,190 +1,204 @@
-/**
- * components/landing/CommunitySection.tsx
- * Social proof & community showcase
- */
 "use client";
 
-import { useRef } from "react";
-import { useInView } from "@/hooks/useInView";
-import { formatCount } from "@/lib/utils";
+import Link from "next/link";
 
-const COMMUNITY_STATS = [
-  { value: 10_500_000, label: "Người dùng hoạt động", suffix: "+" },
-  { value: 520_000, label: "Server đang chạy", suffix: "+" },
-  { value: 2_400_000_000, label: "Tin nhắn mỗi ngày", suffix: "+" },
-  { value: 99.9, label: "Uptime SLA", suffix: "%" },
-];
-
-const TESTIMONIALS = [
-  {
-    id: 1,
-    content:
-      "Bravechat đã thay đổi cách đội ngũ của chúng tôi giao tiếp. Hệ thống nhắn tin thời gian thực hoạt động vô cùng ổn định và nhanh chóng.",
-    author: "Nguyễn Minh Tú",
-    role: "Lead Developer @ TechVN",
-    avatar: "NT",
-  },
-  {
-    id: 2,
-    content:
-      "Giao diện được thiết kế hiện đại, tốc độ phản hồi nhanh. Tính năng quản lý máy chủ mạnh mẽ, phù hợp với quy mô cộng đồng lớn.",
-    author: "Trần Gia Huy",
-    role: "Community Manager",
-    avatar: "GH",
-  },
-  {
-    id: 3,
-    content:
-      "Đã trải nghiệm nhiều nền tảng nhưng Bravechat là sự lựa chọn tối ưu nhất. Độ bảo mật cao, toàn bộ dữ liệu đều được mã hóa an toàn.",
-    author: "Lê Thị Hương",
-    role: "Security Engineer",
-    avatar: "LH",
-  },
-];
+const imgIconArrowDark = "/figma-assets/icon-arrow-dark.svg";
+const imgIconArrowCta = "/figma-assets/icon-arrow-cta.svg";
 
 export function CommunitySection() {
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const isInView = useInView(sectionRef, { threshold: 0.05 });
-
   return (
-    <section
-      id="community"
-      ref={sectionRef}
-      className="relative py-32 px-6 bg-ocean-dark-surface border-t border-b border-ocean-dark-border"
-    >
-      {/* Subtle horizontal lines — Swiss grid */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-[0.03]">
-        {Array.from({ length: 8 }).map((_, i) => (
+    <div id="community" className="w-full">
+      {/* Section 03: Hệ sinh thái Brave (67:211) */}
+      <section
+        id="ecosystem"
+        className="bg-[#0d0d10] border-[#29292f] border-b border-t border-solid w-full"
+        data-node-id="67:211"
+      >
+        <div className="max-w-[1512px] mx-auto grid grid-cols-1 lg:grid-cols-[56%_44%] xl:grid-cols-[846.72px_665.28px] min-h-[680px]">
+          {/* Left Column (67:212) */}
           <div
-            key={i}
-            className="absolute left-0 right-0 h-px bg-ocean-secondary"
-            style={{ top: `${(i + 1) * 12.5}%` }}
-          />
-        ))}
-      </div>
+            className="border-b lg:border-b-0 lg:border-r border-[#2c2c32] border-solid flex flex-col items-start justify-center pl-6 lg:pl-[75.6px] pr-6 lg:pr-[120.96px] py-[80px] lg:py-[100px]"
+            data-node-id="67:212"
+          >
+            <div className="pb-[28px]" data-node-id="67:226">
+              <p
+                className="font-mono font-bold text-[#777782] text-[11px] tracking-[0.88px] whitespace-nowrap"
+                data-node-id="67:214"
+              >
+                03 / HỆ SINH THÁI BRAVE
+              </p>
+            </div>
 
-      <div className="max-w-7xl mx-auto">
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-ocean-dark-border mb-20">
-          {COMMUNITY_STATS.map((stat, i) => (
-            <StatCard
-              key={stat.label}
-              stat={stat}
-              index={i}
-              isVisible={isInView}
-            />
-          ))}
-        </div>
+            <div className="flex flex-col items-start" data-node-id="67:215">
+              <h2
+                className="font-['Inter',sans-serif] font-bold text-[52px] sm:text-[72px] xl:text-[88px] leading-[0.95] xl:leading-[84px] text-white tracking-[-0.065em] xl:tracking-[-5.5px]"
+                data-node-id="67:216"
+              >
+                <span className="block">Dành cho mọi</span>
+                <span className="block">nhóm & cộng đồng.</span>
+              </h2>
+            </div>
 
-        {/* Testimonials */}
-        <div className="max-w-2xl mb-16">
-          <div className="section-tag">
-            <span className="w-1.5 h-1.5 bg-ocean-secondary inline-block" />
-            Từ cộng đồng
+            <div className="py-[40px]" data-node-id="67:227">
+              <p
+                className="font-['Inter',sans-serif] font-normal leading-[29.7px] text-[#b3b3b8] text-[18px] max-w-[580px]"
+                data-node-id="67:219"
+              >
+                Sử dụng ngay trên trình duyệt Web, với lộ trình mở rộng sang ứng dụng riêng trên Windows, macOS, Linux, Android và iOS.
+              </p>
+            </div>
+
+            <Link
+              href="/channels"
+              className="bg-[#f4f4f5] hover:bg-white border border-transparent flex gap-[18px] items-center justify-center min-h-[42px] px-[22px] relative rounded-[2px] shrink-0 transition-colors"
+              data-node-id="67:221"
+            >
+              <span
+                className="font-['Inter',sans-serif] font-bold text-[#08080a] text-[13px] text-center whitespace-nowrap"
+                data-node-id="67:222"
+              >
+                Xem workspace mẫu
+              </span>
+              <img alt="" src={imgIconArrowDark} className="block shrink-0" />
+            </Link>
           </div>
-          <h2 className="text-4xl md:text-5xl font-black text-ocean-light tracking-tight leading-normal py-2">
-            ĐƯỢC TIN TƯỞNG BỞI
-            <br />
-            <span className="text-gradient-ocean">HÀNG TRIỆU NGƯỜI</span>
-          </h2>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-ocean-dark-border">
-          {TESTIMONIALS.map((t, i) => (
-            <TestimonialCard
-              key={t.id}
-              testimonial={t}
-              index={i}
-              isVisible={isInView}
-            />
-          ))}
-        </div>
+          {/* Right Metrics Column (67:228) */}
+          <div
+            className="bg-[#34343a] grid grid-rows-3 gap-y-px"
+            data-node-id="67:228"
+          >
+            {/* Metric 1 (67:229) */}
+            <div
+              className="bg-[#1b1b1f] border-[#3c3c42] border-b border-solid flex flex-col items-start justify-center px-6 lg:px-[75.6px] py-[42px]"
+              data-node-id="67:229"
+            >
+              <p
+                className="font-['Inter',sans-serif] font-bold leading-[72px] text-[#f1f1f3] text-[48px] sm:text-[64px] xl:text-[72px] tracking-[-3.5px] whitespace-nowrap"
+                data-node-id="67:231"
+              >
+                Web & App
+              </p>
+              <div className="pt-[16px]" data-node-id="67:233">
+                <p
+                  className="font-mono font-medium text-[#bbb] text-[12px] uppercase whitespace-nowrap"
+                  data-node-id="67:234"
+                >
+                  Hỗ trợ trình duyệt · Lộ trình Desktop & Mobile
+                </p>
+              </div>
+            </div>
 
-        {/* CTA strip */}
-        <div className="mt-20 flex flex-col md:flex-row items-center justify-between gap-8 border border-ocean-dark-border p-10">
-          <div>
-            <h3 className="text-2xl font-black text-ocean-light tracking-tight">
-              SẴN SÀNG THAM GIA?
-            </h3>
-            <p className="text-ocean-light/80 mt-2">
-              Miễn phí vĩnh viễn. Không cần thẻ tín dụng.
+            {/* Metric 2 (67:237) */}
+            <div
+              className="bg-[#1b1b1f] border-[#3c3c42] border-b border-solid flex flex-col items-start justify-center px-6 lg:px-[75.6px] py-[42px] relative shadow-[inset_4px_0px_0px_0px_#087cfa]"
+              data-node-id="67:237"
+            >
+              <p
+                className="font-['Inter',sans-serif] font-bold leading-[72px] text-[#72a2ff] text-[48px] sm:text-[64px] xl:text-[72px] tracking-[-3.5px] whitespace-nowrap"
+                data-node-id="67:239"
+              >
+                Phân quyền
+              </p>
+              <div className="pt-[16px]" data-node-id="67:240">
+                <p
+                  className="font-mono font-medium text-[12px] text-white uppercase whitespace-nowrap"
+                  data-node-id="67:241"
+                >
+                  Vai trò tùy chỉnh & bảo vệ kênh riêng tư
+                </p>
+              </div>
+            </div>
+
+            {/* Metric 3 (67:243) */}
+            <div
+              className="bg-[#1b1b1f] border-[#3c3c42] border-b border-solid flex flex-col items-start justify-center px-6 lg:px-[75.6px] py-[42px]"
+              data-node-id="67:243"
+            >
+              <p
+                className="font-['Inter',sans-serif] font-bold leading-[72px] text-[#f1f1f3] text-[48px] sm:text-[64px] xl:text-[72px] tracking-[-3.5px] whitespace-nowrap"
+                data-node-id="67:245"
+              >
+                Đồng bộ
+              </p>
+              <div className="pt-[16px]" data-node-id="67:246">
+                <p
+                  className="font-mono font-medium text-[#bbb] text-[12px] uppercase whitespace-nowrap"
+                  data-node-id="67:247"
+                >
+                  Tin nhắn văn bản, phòng thoại & chia sẻ tệp
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 04: Sẵn sàng? (67:249) */}
+      <section
+        className="border-[#2c2c32] border-b border-solid flex flex-col min-h-[540px] items-start justify-center overflow-hidden px-6 lg:px-[75.6px] py-[100px] relative shrink-0 w-full"
+        data-node-id="67:249"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 85% 50%, rgba(23, 38, 83, 1) 0%, rgba(23, 38, 83, 0) 35%), linear-gradient(90deg, rgb(18, 18, 21) 0%, rgb(18, 18, 21) 100%)",
+        }}
+      >
+        <div className="max-w-[1360.813px] mx-auto w-full relative z-10 flex flex-col items-start">
+          <div className="pb-[28px]" data-node-id="67:260">
+            <p
+              className="font-mono font-bold text-[#777782] text-[11px] tracking-[0.88px] whitespace-nowrap"
+              data-node-id="67:252"
+            >
+              04 / SẴN SÀNG?
             </p>
           </div>
-          <div className="flex gap-4">
-            <a href="/register" className="btn-primary text-sm">
-              Tạo tài khoản
-            </a>
-            <a href="#features" className="btn-secondary text-sm">
-              Xem tính năng
-            </a>
+
+          <div className="flex flex-col items-start max-w-[940px]" data-node-id="67:253">
+            <h2
+              className="font-['Inter',sans-serif] font-bold text-[#f2f2f3] text-[48px] sm:text-[68px] xl:text-[88px] leading-[0.95] xl:leading-[83.6px] tracking-[-0.065em] xl:tracking-[-5.72px]"
+              data-node-id="67:254"
+            >
+              <span className="block">Xây dựng điều</span>
+              <span className="block">
+                <span className="text-[#72a2ff]">tuyệt vời</span>
+                <span>{` cùng nhau.`}</span>
+              </span>
+            </h2>
+          </div>
+
+          <div className="pt-[44px]" data-node-id="67:261">
+            <Link
+              href="/channels"
+              className="bg-[#315fc5] hover:bg-[#3b6cd8] border border-[#4c7de7] border-solid flex gap-[18px] items-center justify-center min-h-[42px] px-[30px] relative rounded-[2px] shrink-0 transition-colors"
+              data-node-id="67:255"
+            >
+              <span
+                className="font-['Inter',sans-serif] font-bold text-[13px] text-center text-white whitespace-nowrap"
+                data-node-id="67:256"
+              >
+                Mở Bravechat
+              </span>
+              <img alt="" src={imgIconArrowCta} className="block shrink-0" />
+            </Link>
           </div>
         </div>
-      </div>
-    </section>
-  );
-}
 
-function StatCard({
-  stat,
-  index,
-  isVisible,
-}: {
-  stat: (typeof COMMUNITY_STATS)[0];
-  index: number;
-  isVisible: boolean;
-}) {
-  return (
-    <div
-      className="bg-ocean-dark-bg px-8 py-10 text-center"
-      style={{
-        opacity: isVisible ? 1 : 0,
-        transform: isVisible ? "scale(1)" : "scale(0.95)",
-        transition: `opacity 0.6s ease ${index * 0.1}s, transform 0.6s ease ${index * 0.1}s`,
-      }}
-    >
-      <div className="text-4xl md:text-5xl font-black text-gradient-ocean tracking-tight">
-        {formatCount(stat.value)}
-        {stat.suffix}
-      </div>
-      <div className="text-ocean-light/70 text-xs font-bold uppercase tracking-widest mt-3">
-        {stat.label}
-      </div>
-    </div>
-  );
-}
-
-function TestimonialCard({
-  testimonial,
-  index,
-  isVisible,
-}: {
-  testimonial: (typeof TESTIMONIALS)[0];
-  index: number;
-  isVisible: boolean;
-}) {
-  return (
-    <div
-      className="bg-ocean-dark-bg p-8 flex flex-col justify-between"
-      style={{
-        opacity: isVisible ? 1 : 0,
-        transform: isVisible ? "translateX(0)" : "translateX(-20px)",
-        transition: `opacity 0.6s ease ${index * 0.15}s, transform 0.6s ease ${index * 0.15}s`,
-      }}
-    >
-      {/* Quote mark */}
-      <div className="text-ocean-primary text-5xl font-serif leading-snug mb-4">&ldquo;</div>
-      <p className="text-ocean-light/90 text-sm leading-relaxed flex-1">
-        {testimonial.content}
-      </p>
-      <div className="flex items-center gap-3 mt-8 pt-6 border-t border-ocean-dark-border">
-        <div className="w-10 h-10 bg-ocean-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-          {testimonial.avatar}
+        {/* Rotated Gradient Accent (67:250) */}
+        <div
+          className="absolute flex items-center justify-center right-[-120px] xl:left-[1085.31px] size-[533.376px] top-[-26.69px] pointer-events-none"
+          data-node-id="67:250"
+        >
+          <div className="flex-none rotate-[14deg]">
+            <div
+              className="opacity-[0.28] relative size-[440px]"
+              style={{
+                backgroundImage:
+                  "linear-gradient(145deg, rgb(72, 214, 255) 6.1733%, rgb(69, 108, 255) 50%, rgb(163, 105, 255) 93.827%)",
+              }}
+            />
+          </div>
         </div>
-        <div>
-          <p className="text-ocean-light text-sm font-bold">{testimonial.author}</p>
-          <p className="text-ocean-light/60 text-xs">{testimonial.role}</p>
-        </div>
-      </div>
+      </section>
     </div>
   );
 }

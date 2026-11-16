@@ -10,5 +10,5 @@ export const env = {
    * true → services return data from `services/mock`.
    * Set NEXT_PUBLIC_USE_MOCKS=false once the matching backend endpoint exists.
    */
-  useMocks: process.env.NEXT_PUBLIC_USE_MOCKS !== "false",
+  useMocks: process.env.NEXT_PUBLIC_USE_MOCKS === "true",
 } as const;

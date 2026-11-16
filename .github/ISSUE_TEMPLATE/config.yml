@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability Reporting
+    url: https://github.com/Bravee9/Bravechat/security/policy
+    about: Report security issues privately per project security policy.
+  - name: Technical Discussion
+    url: https://github.com/Bravee9/Bravechat/discussions
+    about: Ask architectural questions and discuss community RFCs.

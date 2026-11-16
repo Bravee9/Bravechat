@@ -23,7 +23,7 @@ export function DirectMessageItem({
       className={cn(
         "flex items-center gap-3 px-2.5 py-2 rounded transition-colors group cursor-pointer relative",
         isActive
-          ? "bg-ocean-primary/20 text-ocean-light border border-ocean-primary/30"
+          ? "bg-ocean-dark-hover text-ocean-light"
           : "text-ocean-light/75 hover:bg-white/5 hover:text-ocean-light"
       )}
     >

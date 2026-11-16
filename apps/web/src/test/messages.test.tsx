@@ -55,7 +55,8 @@ describe("Message Components", () => {
       render(<MessageItem message={mockMessage} isCurrentUser={true} />);
 
       expect(screen.getByText("Bravee9")).toBeInTheDocument();
-      expect(screen.getByText("Bạn")).toBeInTheDocument();
+      // Like Discord, authors use the same layout for incoming and own messages.
+      expect(screen.queryByText("Bạn")).not.toBeInTheDocument();
       expect(screen.getByText("Xin chào thế giới!")).toBeInTheDocument();
       expect(screen.getByText("10:30")).toBeInTheDocument();
 
@@ -109,6 +110,22 @@ describe("Message Components", () => {
       expect(sendBtn).not.toBeDisabled();
       fireEvent.click(sendBtn);
       expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    it("passes selected media files to the upload handler", () => {
+      const onFiles = vi.fn();
+      render(
+        <ChatInput
+          value=""
+          placeholder="Nhắn tin..."
+          onChange={vi.fn()}
+          onSubmit={vi.fn()}
+          onFiles={onFiles}
+        />
+      );
+      const file = new File(["image"], "image.png", { type: "image/png" });
+      fireEvent.change(screen.getByTestId("attachment-file-input"), { target: { files: [file] } });
+      expect(onFiles).toHaveBeenCalledWith([file]);
     });
   });
 });

@@ -6,7 +6,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { CookieBanner } from "@/components/consent/CookieBanner";
-import { Analytics } from "@/components/consent/Analytics";
 import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -73,10 +72,9 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body className="bg-ocean-dark-bg text-ocean-light font-sans antialiased">
+      <body className="bg-ocean-dark-bg text-ocean-light font-sans antialiased" suppressHydrationWarning>
         {children}
         <CookieBanner />
-        <Analytics />
       </body>
     </html>
   );

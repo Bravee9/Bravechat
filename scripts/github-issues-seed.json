@@ -1,0 +1,86 @@
+[
+  {
+    "number": 1,
+    "title": "[CHORE] Establish GitHub CI/CD Pipeline and Repository Governance Templates",
+    "labels": ["chore", "infra", "ci-cd"],
+    "milestone": "v0.7.0",
+    "body": "Establish automated GitHub Actions CI pipeline covering linting, type-checking, automated unit testing, and build validation across all Turborepo workspaces.\n\n### Acceptance Criteria\n- Continuous Integration workflow `.github/workflows/ci.yml` installed.\n- Standardized issue templates and pull request templates configured.\n- Repository governance documents (`CONTRIBUTING.md`, `SECURITY.md`) published."
+  },
+  {
+    "number": 2,
+    "title": "[DOCS] Standardize README.md and Technical Documentation in Formal English",
+    "labels": ["documentation"],
+    "milestone": "v0.7.0",
+    "body": "Rewrite root documentation in professional, technical English adhering strictly to software engineering standards with zero unicode emojis.\n\n### Acceptance Criteria\n- Complete English overhaul of `README.md`.\n- Architecture diagrams and technology stack tables standardized.\n- Verification and setup commands documented."
+  },
+  {
+    "number": 3,
+    "title": "[UI/BRAND] Replace Legacy Discord Icons with White Bravemath Brand Assets",
+    "labels": ["ui-ux", "branding"],
+    "milestone": "v0.7.0",
+    "body": "Replace legacy Discord SVG graphics across the web client with pure white Bravemath brand assets.\n\n### Acceptance Criteria\n- Replace Discord SVG in `HomeRailItem.tsx` with white Bravemath icon.\n- Update application header, loading states, and metadata with official Bravemath branding.\n- Maintain Ocean Swiss Minimalist design integrity."
+  },
+  {
+    "number": 4,
+    "title": "[INFRA] Integrate Self-Hosted MinIO S3 Storage Alongside Cloudflare R2",
+    "labels": ["infra", "storage", "backend"],
+    "milestone": "v0.8.0",
+    "body": "Integrate MinIO as a local/private S3-compatible object store in `docker-compose.yml` to allow zero-dependency local runs and on-premise deployments.\n\n### Acceptance Criteria\n- MinIO container and bucket initialization service added to `docker-compose.yml`.\n- `StorageService` in `apps/api` upgraded to support path-style S3 endpoints.\n- Environment variables documented in `.env.example`."
+  },
+  {
+    "number": 5,
+    "title": "[FEATURE] Implement Large File & Multimedia Upload Pipeline with Progress Tracking",
+    "labels": ["feature", "storage", "frontend", "backend"],
+    "milestone": "v0.8.0",
+    "body": "Implement high-throughput file upload pipeline supporting images, audio, video, and documents with client-side progress bars and presigned URLs.\n\n### Acceptance Criteria\n- Upload route supporting up to 500MB with streaming validation.\n- Client-side upload progress indicator in chat input.\n- Staging attachment preview tray before message dispatch."
+  },
+  {
+    "number": 6,
+    "title": "[FEATURE] Enable Multimedia Attachments in Direct Messages and Rich Media Previews",
+    "labels": ["feature", "messaging", "frontend"],
+    "milestone": "v0.8.0",
+    "body": "Enable attachment dispatch and rendering in Direct Message channels, matching server channel capabilities with rich audio/video/document viewers.\n\n### Acceptance Criteria\n- Unblock `handleFiles` for DM contexts in `ChatView.tsx`.\n- Render image lightboxes, inline audio players, and document download cards.\n- Database attachment mapping validated."
+  },
+  {
+    "number": 7,
+    "title": "[SECURITY] Implement TOTP Two-Factor Authentication (2FA) and Backup Codes",
+    "labels": ["security", "auth", "backend", "frontend"],
+    "milestone": "v0.9.0",
+    "body": "Implement RFC 6238 Time-Based One-Time Password (TOTP) two-factor authentication with QR code pairing and recovery backup codes.\n\n### Acceptance Criteria\n- Prisma schema migration for `twoFactorEnabled`, `twoFactorSecret`, and backup codes.\n- Endpoints for 2FA setup, verification, and challenge during login.\n- UI workflow in user security settings."
+  },
+  {
+    "number": 8,
+    "title": "[SECURITY] Active Device & Session Management via RefreshToken Tracking",
+    "labels": ["security", "auth", "backend", "frontend"],
+    "milestone": "v0.9.0",
+    "body": "Provide visibility into active user sessions and devices with remote revocation capabilities.\n\n### Acceptance Criteria\n- API endpoint `GET /api/auth/sessions` listing active sessions with IP and user-agent metadata.\n- Remote session revocation via `DELETE /api/auth/sessions/:id`.\n- Active session list displayed in Settings > Account."
+  },
+  {
+    "number": 9,
+    "title": "[FEATURE] User Protection, Privacy Controls, and Spam Reporting",
+    "labels": ["feature", "safety", "backend", "frontend"],
+    "milestone": "v0.9.0",
+    "body": "Provide comprehensive privacy controls including DM permissions, blocked user management, and spam report triggers.\n\n### Acceptance Criteria\n- Privacy settings toggles for direct messaging permissions.\n- User blocking and unblocking management view.\n- Report spam action button in direct messages."
+  },
+  {
+    "number": 10,
+    "title": "[UI/UX] Redesign Multi-Layered User Settings Center and Quick Profile Popover",
+    "labels": ["ui-ux", "frontend"],
+    "milestone": "v1.0.0",
+    "body": "Develop a Discord-grade multi-category settings center and interactive quick profile popover styled in Ocean Swiss Minimalist aesthetic.\n\n### Acceptance Criteria\n- Quick profile popover triggered from bottom dock.\n- Full modal settings center with search bar and categorized navigation.\n- Right sidebar member profile panel in Direct Messages."
+  },
+  {
+    "number": 11,
+    "title": "[FEATURE] Multi-Language System (Vietnamese / English) and Appearance Preferences",
+    "labels": ["feature", "i18n", "frontend"],
+    "milestone": "v1.0.0",
+    "body": "Implement dynamic language switching (Vietnamese / English) and display density preferences saved to user profile and local storage.\n\n### Acceptance Criteria\n- Type-safe i18n translation dictionary.\n- Language selector in settings updating UI instantly.\n- Message display density options (Cozy / Compact)."
+  },
+  {
+    "number": 12,
+    "title": "[FEATURE] Brave Nitro Tier System and Upload Quota Enforcement",
+    "labels": ["feature", "billing", "frontend", "backend"],
+    "milestone": "v1.0.0",
+    "body": "Introduce Brave Nitro subscription tier system granting increased file upload quotas (up to 500MB), animated avatars, and profile badges.\n\n### Acceptance Criteria\n- Tier definition and quota validation in API upload layer.\n- Nitro marketing and management tab in User Settings.\n- Visual badges displayed on user cards and message author tags."
+  }
+]

@@ -1,34 +1,51 @@
 "use client";
 
-import React from "react";
+import React, { memo, useState } from "react";
 import Link from "next/link";
 import type { ServerListItem } from "@discord-clone/shared";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import {
+  getDeterministicJetBrainsColor,
+  useServerWorkspaceConfig,
+} from "@/stores/ide-workspace.store";
 
 interface ServerRailItemProps {
   server: ServerListItem;
   isActive: boolean;
-  isHovered: boolean;
-  onHover: (hovered: boolean) => void;
+  /** Tùy chọn: nếu không truyền, item tự quản hover (tránh re-render cả rail). */
+  isHovered?: boolean;
+  onHover?: (hovered: boolean) => void;
 }
 
-export function ServerRailItem({
+function ServerRailItemBase({
   server,
   isActive,
-  isHovered,
-  onHover,
+  isHovered: isHoveredProp,
+  onHover: onHoverProp,
 }: ServerRailItemProps) {
+  const [localHovered, setLocalHovered] = useState(false);
+  const isHovered = isHoveredProp ?? localHovered;
+  const config = useServerWorkspaceConfig(server.id);
+  const badgeColor =
+    config.badgeColor || getDeterministicJetBrainsColor(server.id || server.name);
+
+  const onHover = (hovered: boolean) => {
+    setLocalHovered(hovered);
+    onHoverProp?.(hovered);
+  };
+
   const initials = server.name
-    .split(/\s+/)
+    .split(/[\s-_]+/)
+    .filter(Boolean)
     .slice(0, 2)
     .map((w) => w[0])
     .join("")
-    .toUpperCase();
+    .toUpperCase() || server.name.slice(0, 2).toUpperCase();
 
   return (
     <div
-      className="relative group w-full flex justify-center items-center"
+      className="relative group w-full flex justify-center items-center shrink-0"
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       data-testid={`server-item-${server.id}`}
@@ -37,25 +54,26 @@ export function ServerRailItem({
       <div
         data-testid={`server-pill-${server.id}`}
         className={cn(
-          "absolute left-0 w-1 bg-white rounded-r-full transition-all duration-300 pointer-events-none",
+          "absolute left-0 w-1 rounded-r-full transition-all duration-200 pointer-events-none",
           isActive
-            ? "h-10 opacity-100"
+            ? "h-10 opacity-100 bg-[#087CFA]"
             : isHovered
-            ? "h-5 opacity-100"
+            ? "h-5 opacity-100 bg-[#CDCDCD]"
             : server.hasUnread
-            ? "h-2 opacity-100"
-            : "h-0 opacity-0"
+            ? "h-2 opacity-100 bg-white"
+            : "h-0 opacity-0 bg-white"
         )}
       />
 
       <Tooltip content={server.name} side="right">
         <Link
           href={`/channels/${server.id}`}
+          scroll={false}
           className={cn(
-            "w-12 h-12 flex items-center justify-center font-bold text-sm transition-all duration-300 ease-out cursor-pointer relative",
+            "w-11 h-11 flex items-center justify-center font-mono font-bold text-xs transition-all duration-200 cursor-pointer relative rounded-[8px] border",
             isActive
-              ? "bg-ocean-primary text-white rounded-[16px] shadow-ocean-glow"
-              : "bg-ocean-dark-surface text-ocean-light rounded-[24px] hover:rounded-[16px] hover:bg-ocean-primary hover:text-white hover:shadow-ocean-glow border border-ocean-dark-border"
+              ? "bg-[#214283] border-[#087CFA] text-white ring-1 ring-[#087CFA]/50"
+              : "bg-[#1E1F22] border-[#2B2D30] text-[#E6EDF3] hover:bg-[#2B2D30] hover:border-[#393B40]"
           )}
           aria-label={server.name}
         >
@@ -63,20 +81,22 @@ export function ServerRailItem({
             <img
               src={server.iconUrl}
               alt={server.name}
-              className={cn(
-                "w-full h-full object-cover transition-all duration-300",
-                isActive ? "rounded-[16px]" : "rounded-[24px] hover:rounded-[16px]"
-              )}
+              className="w-full h-full object-cover rounded-[7px]"
             />
           ) : (
-            <span className="font-semibold tracking-wider text-xs">{initials}</span>
+            <span
+              className="w-7 h-7 rounded-[4px] flex items-center justify-center font-mono font-extrabold text-[11px] text-[#0B0B0D] tracking-tight"
+              style={{ backgroundColor: badgeColor }}
+            >
+              {initials}
+            </span>
           )}
 
           {/* Mention Badge */}
           {server.mentionCount > 0 && (
             <div
               data-testid={`server-badge-${server.id}`}
-              className="absolute -bottom-1 -right-1 bg-rose-500 text-white text-[10px] font-black min-w-5 h-5 px-1 flex items-center justify-center rounded-full border-2 border-[#030a0d] shadow-md animate-fade-in pointer-events-none"
+              className="absolute -bottom-1 -right-1 bg-[#FE2857] text-white text-[10px] font-mono font-bold min-w-5 h-5 px-1 flex items-center justify-center rounded-full border-2 border-[#141417] shadow-md pointer-events-none"
             >
               {server.mentionCount > 99 ? "99+" : server.mentionCount}
             </div>
@@ -86,3 +106,5 @@ export function ServerRailItem({
     </div>
   );
 }
+
+export const ServerRailItem = memo(ServerRailItemBase);

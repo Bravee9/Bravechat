@@ -1,6 +1,6 @@
 /**
- * app/changelog/page.tsx
- * Nhật ký thay đổi / Changelog
+ * app/(marketing)/changelog/page.tsx
+ * Nhật ký thay đổi / Changelog — JetBrains Dark Style
  */
 
 import type { Metadata } from "next";
@@ -10,201 +10,146 @@ import { OceanBackground } from "@/components/ui/OceanBackground";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Changelog",
-  description: "Nhật ký thay đổi của Bravechat — lịch sử các bản cập nhật và tính năng mới.",
+  title: "Nhật ký cập nhật",
+  description:
+    "Nhật ký cập nhật của Bravechat — tổng hợp các cải tiến giao diện, tính năng quản trị máy chủ và bảo mật.",
 };
 
 const ENTRIES = [
   {
-    version: "0.3.0",
-    date: "28/09/2026",
-    tag: "alpha",
+    version: "0.4.0",
+    date: "16/11/2026",
+    tag: "Cập nhật lớn",
     changes: {
       added: [
-        "Trang pháp lý đầy đủ: Điều khoản Sử dụng, Chính sách Bảo mật, Cookie Policy (song ngữ Việt/Anh)",
-        "Trang Lộ trình (Roadmap) với 4 giai đoạn phát triển",
-        "Trang Changelog, Status, Docs (API Reference, Architecture, Database Schema)",
-        "Trang Quên mật khẩu với trạng thái xác nhận",
-        "Logo và Favicon mới từ thư mục assets",
+        "Giao diện không gian làm việc theo phong cách JetBrains IDE với bảng màu nhận diện rõ ràng",
+        "Trung tâm quản trị máy chủ tích hợp: chỉnh sửa thông tin máy chủ, quản lý kênh, thành viên và ma trận phân quyền vai trò (RBAC)",
+        "Chế độ Kênh riêng tư (Private Channel) kèm màn hình bảo vệ khi người dùng không đủ quyền truy cập",
+        "Yêu cầu xác minh lại mật khẩu hoặc mã xác thực khi tắt bảo mật hai lớp (2FA)",
       ],
       changed: [
-        "Toàn bộ câu từ trang chủ được viết lại theo phong cách nghiêm túc, chuyên nghiệp",
-        "Xóa hoàn toàn emoji và từ ngữ lóng (slang) khỏi toàn bộ Landing Page",
-        "Nội dung testimonials, features, footer được chuẩn hóa ngôn ngữ",
+        "Đồng bộ bộ nhận diện thương hiệu Bravechat trên thanh điều hướng, chân trang và các trang đăng nhập",
+        "Giữ nguyên vị trí cuộn của thanh danh sách máy chủ khi chuyển đổi giữa các máy chủ ở cuối danh sách",
+        "Viết lại toàn bộ nội dung trang chủ và các trang thông tin theo văn phong ngắn gọn, rõ ràng, hướng tới người dùng",
       ],
-      fixed: [],
+    },
+  },
+  {
+    version: "0.3.0",
+    date: "28/09/2026",
+    tag: "Tính năng",
+    changes: {
+      added: [
+        "Trang Điều khoản dịch vụ, Chính sách bảo mật và Chính sách Cookie hỗ trợ song ngữ Việt - Anh",
+        "Trang Lộ trình phát triển, Trạng thái dịch vụ và Tài liệu hướng dẫn sử dụng",
+        "Luồng khôi phục mật khẩu và xác thực tài khoản qua email",
+      ],
+      changed: [
+        "Cải thiện bố cục phản hồi trên màn hình máy tính và thiết bị di động",
+      ],
     },
   },
   {
     version: "0.2.0",
-    date: "23/09/2026",
-    tag: "alpha",
-    changes: {
-      added: [
-        "Hệ thống thiết kế Ocean Swiss Minimalist hoàn chỉnh (globals.css)",
-        "Landing Page: HeroSection với hiệu ứng typewriter, FeaturesSection, CommunitySection, FooterSection",
-        "Navbar responsive với mobile menu",
-        "Trang đăng nhập (Login) với form validation đầy đủ, hiển thị/ẩn mật khẩu",
-        "Trang đăng ký (Register) với password strength meter, validation toàn diện",
-        "AuthLayout chia đôi màn hình (branding panel + form panel)",
-        "OceanBackground component với animation gradient",
-        "Hook useInView cho scroll animations",
-        "Mock App Preview trong Hero section",
-      ],
-      changed: [],
-      fixed: [],
-    },
-  },
-  {
-    version: "0.1.0",
     date: "21/09/2026",
-    tag: "alpha",
+    tag: "Khởi tạo",
     changes: {
       added: [
-        "Khởi tạo Monorepo với Turborepo + pnpm workspaces",
-        "Next.js 14 (App Router) cho frontend tại apps/web",
-        "Fastify + TypeScript cho backend tại apps/api",
-        "Packages: @bravechat/database (Prisma + PostgreSQL), @bravechat/shared",
-        "Database schema: Users, Servers, Channels, Messages, Roles, Invites",
-        "Docker Compose cho môi trường phát triển (PostgreSQL, Redis)",
-        "Cấu hình TailwindCSS, ESLint, TypeScript",
-        "File .env.example với hướng dẫn cấu hình",
+        "Hệ thống máy chủ, danh mục kênh văn bản, phòng thoại và tin nhắn trực tiếp",
+        "Tính năng gửi tệp đính kèm, trả lời tin nhắn, ghim tin nhắn và biểu cảm",
+        "Hỗ trợ tạo mã mời tham gia máy chủ và quản lý hồ sơ cá nhân",
       ],
       changed: [],
-      fixed: [],
     },
   },
 ];
 
-const TAG_CONFIG: Record<string, { label: string; color: string; border: string }> = {
-  alpha: {
-    label: "Alpha",
-    color: "text-amber-400",
-    border: "border-amber-500/40",
-  },
-  beta: {
-    label: "Beta",
-    color: "text-ocean-secondary",
-    border: "border-ocean-secondary/40",
-  },
-  stable: {
-    label: "Stable",
-    color: "text-emerald-400",
-    border: "border-emerald-500/40",
-  },
-};
-
-const TYPE_CONFIG = {
-  added: { label: "Thêm mới", color: "text-emerald-400", bg: "bg-emerald-500" },
-  changed: { label: "Thay đổi", color: "text-amber-400", bg: "bg-amber-500" },
-  fixed: { label: "Sửa lỗi", color: "text-ocean-secondary", bg: "bg-ocean-secondary" },
-};
-
 export default function ChangelogPage() {
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen bg-[#0B0B0D] text-[#E6EDF3]">
       <OceanBackground />
       <Navbar />
 
-      <main className="relative z-10 max-w-4xl mx-auto px-6 pt-28 pb-20">
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-xs text-ocean-light/60 mb-10 font-mono">
-          <Link href="/" className="hover:text-ocean-secondary transition-colors">Trang chủ</Link>
+      <main className="relative z-10 max-w-4xl mx-auto px-6 pt-12 pb-24">
+        <nav className="flex items-center gap-2 text-xs text-[#7D7D7D] mb-8 font-mono">
+          <Link href="/" className="hover:text-white transition-colors">
+            Trang chủ
+          </Link>
           <span>/</span>
-          <span className="text-ocean-secondary">Changelog</span>
+          <span className="text-[#07C3F2]">Nhật ký cập nhật</span>
         </nav>
 
-        {/* Header */}
-        <div className="border-b border-ocean-dark-border pb-10 mb-16">
-          <div className="section-tag mb-6">
-            <span className="w-1.5 h-1.5 bg-ocean-secondary inline-block" />
-            Sản phẩm · Product
-          </div>
-          <h1 className="text-4xl md:text-5xl font-black text-ocean-light tracking-tighter">
-            CHANGELOG
+        <div className="border-b border-[#2B2D30] pb-10 mb-12">
+          <p className="font-mono text-xs font-semibold text-[#087CFA] uppercase tracking-wider mb-3">
+            PHÁT HÀNH & CẢI TIẾN
+          </p>
+          <h1 className="text-3xl md:text-5xl font-bold text-white tracking-[-0.03em]">
+            Nhật ký cập nhật
           </h1>
-          <p className="text-ocean-secondary text-lg mt-2 font-light italic">Nhật ký Thay đổi</p>
-          <p className="text-ocean-light/70 mt-4 leading-relaxed">
-            Lịch sử toàn bộ các bản cập nhật, tính năng mới và thay đổi của Bravechat. Mỗi mục
-            được phân loại theo phiên bản và ngày phát hành.
+          <p className="text-[#A8A8B0] mt-4 leading-relaxed">
+            Tổng hợp các tính năng mới, cải tiến giao diện và nâng cấp bảo mật qua từng phiên bản.
           </p>
         </div>
 
-        {/* Entries */}
-        <div className="flex flex-col gap-14">
-          {ENTRIES.map((entry, index) => {
-            const tagCfg = TAG_CONFIG[entry.tag] ?? TAG_CONFIG.alpha;
-            return (
-              <article key={entry.version} className="relative">
-                {/* Timeline line */}
-                {index < ENTRIES.length - 1 && (
-                  <div className="absolute left-[1.35rem] top-16 bottom-0 w-px bg-ocean-dark-border -mb-14" />
+        <div className="flex flex-col gap-8">
+          {ENTRIES.map((entry) => (
+            <article
+              key={entry.version}
+              className="bg-[#16161A] border border-[#2B2D30] rounded-[4px] p-6 md:p-8"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-6 border-b border-[#2B2D30]">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-bold text-white font-mono">
+                    v{entry.version}
+                  </h2>
+                  <span className="text-[11px] font-mono font-semibold text-[#07C3F2] bg-[#087CFA]/15 border border-[#087CFA]/40 px-2.5 py-0.5 rounded-[2px]">
+                    {entry.tag}
+                  </span>
+                </div>
+                <span className="text-xs font-mono text-[#7D7D7D]">
+                  {entry.date}
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-6">
+                {entry.changes.added.length > 0 && (
+                  <div>
+                    <p className="text-xs font-mono font-semibold uppercase tracking-wider text-[#21D789] mb-3">
+                      Điểm mới
+                    </p>
+                    <ul className="flex flex-col gap-2 pl-4 border-l border-[#2B2D30]">
+                      {entry.changes.added.map((item) => (
+                        <li
+                          key={item}
+                          className="text-[#E6EDF3] text-sm leading-relaxed"
+                        >
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
 
-                {/* Version header */}
-                <div className="flex items-start gap-4 mb-6">
-                  {/* Timeline dot */}
-                  <div className="w-11 h-11 bg-ocean-dark-surface border border-ocean-dark-border flex items-center justify-center flex-shrink-0 z-10">
-                    <div className="w-2 h-2 bg-ocean-secondary" />
+                {entry.changes.changed.length > 0 && (
+                  <div>
+                    <p className="text-xs font-mono font-semibold uppercase tracking-wider text-[#FDB60D] mb-3">
+                      Cải tiến
+                    </p>
+                    <ul className="flex flex-col gap-2 pl-4 border-l border-[#2B2D30]">
+                      {entry.changes.changed.map((item) => (
+                        <li
+                          key={item}
+                          className="text-[#A8A8B0] text-sm leading-relaxed"
+                        >
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-3 mb-1">
-                      <h2 className="text-2xl font-black text-ocean-light tracking-tight">
-                        v{entry.version}
-                      </h2>
-                      <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 border ${tagCfg.border} ${tagCfg.color}`}>
-                        {tagCfg.label}
-                      </span>
-                    </div>
-                    <p className="text-ocean-light/60 text-xs font-mono">{entry.date}</p>
-                  </div>
-                </div>
-
-                {/* Changes */}
-                <div className="ml-[3.75rem] flex flex-col gap-6">
-                  {(["added", "changed", "fixed"] as const).map((type) => {
-                    const items = entry.changes[type];
-                    if (!items?.length) return null;
-                    const typeCfg = TYPE_CONFIG[type];
-                    return (
-                      <div key={type}>
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className={`w-2 h-2 ${typeCfg.bg}`} />
-                          <span className={`text-xs font-bold uppercase tracking-widest ${typeCfg.color}`}>
-                            {typeCfg.label}
-                          </span>
-                        </div>
-                        <ul className="flex flex-col gap-2 pl-4 border-l border-ocean-dark-border">
-                          {items.map((item) => (
-                            <li key={item} className="text-ocean-light/80 text-sm leading-relaxed">
-                              {item}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-
-        {/* GitHub link */}
-        <div className="mt-16 border border-ocean-dark-border p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div>
-            <p className="text-ocean-light font-bold">Xem toàn bộ lịch sử commit</p>
-            <p className="text-ocean-light/60 text-sm mt-1">Full commit history on GitHub</p>
-          </div>
-          <a
-            href="https://github.com/Bravee9/Bravechat"
-            target="_blank"
-            rel="noreferrer"
-            className="btn-secondary text-xs flex-shrink-0"
-          >
-            GitHub Repository →
-          </a>
+                )}
+              </div>
+            </article>
+          ))}
         </div>
       </main>
 
