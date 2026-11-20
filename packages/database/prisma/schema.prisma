@@ -50,6 +50,7 @@ model User {
   directReactions DirectMessageReaction[]
   channelReads    ChannelReadState[]
   reactions       MessageReaction[]
+  auditLogs       AuditLog[]
 
   @@map("users")
 }
@@ -73,6 +74,7 @@ model Server {
   iconKey           String?           @map("icon_key") // R2 object key
   bannerKey         String?           @map("banner_key") // R2 object key
   splashKey         String?           @map("splash_key") // R2 object key
+  badgeColor        String?           @map("badge_color") @db.VarChar(16)
   isPublic          Boolean           @default(false) @map("is_public")
   verificationLevel VerificationLevel @default(NONE) @map("verification_level")
   ownerId           String            @map("owner_id")
@@ -86,6 +88,7 @@ model Server {
   roles      Role[]
   invites    ServerInvite[]
   categories ChannelCategory[]
+  auditLogs  AuditLog[]
 
   @@map("servers")
 }
@@ -140,8 +143,9 @@ model Role {
   createdAt     DateTime @default(now()) @map("created_at")
 
   // Relations
-  server  Server       @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  members MemberRole[]
+  server             Server                  @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  members            MemberRole[]
+  channelPermissions ChannelRolePermission[]
 
   @@map("roles")
 }
@@ -185,6 +189,7 @@ model Channel {
   type          ChannelType @default(TEXT)
   topic         String?     @db.VarChar(1024)
   position      Int         @default(0)
+  isPrivate     Boolean     @default(false) @map("is_private")
   isNsfw        Boolean     @default(false) @map("is_nsfw")
   slowModeDelay Int         @default(0) @map("slow_mode_delay") // seconds
   bitrate       Int? // for VOICE channels (bps)
@@ -195,11 +200,12 @@ model Channel {
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
   // Relations
-  server     Server             @relation(fields: [serverId], references: [id], onDelete: Cascade)
-  category   ChannelCategory?   @relation(fields: [categoryId], references: [id])
-  messages   Message[]
-  readStates ChannelReadState[]
-  voiceSessions VoiceSession[]
+  server          Server                  @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  category        ChannelCategory?        @relation(fields: [categoryId], references: [id])
+  messages        Message[]
+  readStates      ChannelReadState[]
+  voiceSessions   VoiceSession[]
+  rolePermissions ChannelRolePermission[]
 
   @@map("channels")
 }
@@ -473,4 +479,38 @@ model VoiceSession {
   @@id([channelId, sessionId, epoch])
   @@index([sessionId])
   @@map("voice_sessions")
+}
+
+// ============================================================
+// CHANNEL ROLE PERMISSION & AUDIT LOG
+// Phân quyền kênh riêng tư & nhật ký quản trị
+// ============================================================
+model ChannelRolePermission {
+  channelId String  @map("channel_id")
+  roleId    String  @map("role_id")
+  canView   Boolean @default(true) @map("can_view")
+  canSend   Boolean @default(true) @map("can_send")
+
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, roleId])
+  @@map("channel_role_permissions")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  serverId   String   @map("server_id")
+  actorId    String   @map("actor_id")
+  action     String   @db.VarChar(64)
+  targetType String   @map("target_type") @db.VarChar(32)
+  targetId   String?  @map("target_id")
+  detail     String?  @db.VarChar(500)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  server Server @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  actor  User   @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([serverId, createdAt])
+  @@map("audit_logs")
 }

@@ -14,11 +14,22 @@ const optionalCredential = (schema: z.ZodString) => z.preprocess(
   schema.optional(),
 )
 
+const optionalTrimmed = (schema: z.ZodString) => z.preprocess(
+  (value) => typeof value === 'string' && value.trim() === '' ? undefined : value,
+  schema.optional(),
+)
+
+const optionalBoolean = z.preprocess(
+  (value) => (value === undefined || value === '' ? undefined : value === 'true' || value === true),
+  z.boolean().optional(),
+)
+
 const envSchema = z.object({
   // Server
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(4000),
   HOST: z.string().default('0.0.0.0'),
+  TRUST_PROXY: optionalBoolean,
 
   // Database
   DATABASE_URL: z.string().url(),
@@ -54,8 +65,12 @@ const envSchema = z.object({
 
   // App
   FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+  // Danh sách origin bổ sung được phép gọi API / WebSocket (phân tách bằng dấu phẩy)
+  CORS_ORIGINS: optionalTrimmed(z.string().trim()),
   // URL công khai của chính API — dùng để dựng link /api/media/* cho avatar, banner
   API_PUBLIC_URL: z.string().url().default('http://localhost:4000'),
+  COOKIE_DOMAIN: optionalTrimmed(z.string().trim()),
+  COOKIE_SAME_SITE: z.enum(['auto', 'lax', 'none', 'strict']).default('auto'),
   MAX_FILE_SIZE: z.coerce.number().default(50 * 1024 * 1024), // 50MB
 })
 
@@ -69,6 +84,7 @@ if (!parsed.success) {
 
 export const env = {
   ...parsed.data,
+  TRUST_PROXY: parsed.data.TRUST_PROXY ?? parsed.data.NODE_ENV === 'production',
   STORAGE_ENABLED: Boolean(parsed.data.R2_BUCKET_NAME && parsed.data.R2_ENDPOINT_URL && parsed.data.R2_ACCESS_KEY_ID && parsed.data.R2_SECRET_ACCESS_KEY),
   R2_BUCKET_NAME: parsed.data.R2_BUCKET_NAME ?? 'unconfigured',
   R2_ENDPOINT_URL: parsed.data.R2_ENDPOINT_URL ?? 'http://127.0.0.1:9000',

@@ -15,6 +15,8 @@ import { voiceRoutes } from './voice.routes'
 import { mediaRoutes } from './media.routes'
 import { inviteRoutes } from './invite.routes'
 import { friendRoutes } from './friend.routes'
+import { roleRoutes } from './role.routes'
+import { analyticsRoutes } from './analytics.routes'
 
 export async function registerRoutes(server: FastifyInstance) {
   // Direct WebSocket at /ws
@@ -34,6 +36,8 @@ export async function registerRoutes(server: FastifyInstance) {
 
     // Servers (Guilds): /api/servers/*
     await api.register(serverRoutes, { prefix: '/servers' })
+    await api.register(roleRoutes, { prefix: '/servers' })
+    await api.register(analyticsRoutes, { prefix: '/servers' })
     await api.register(inviteRoutes, { prefix: '/invites' })
 
     // Channels: /api/channels/*

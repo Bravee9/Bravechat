@@ -7,7 +7,7 @@ const bcrypt = apiRequire('bcryptjs');
 const fail = (statusCode, message) => Object.assign(new Error(message), { statusCode });
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 
-async function fixture() {
+async function fixture(envOverrides = {}) {
   const user = { id: 'u', username: 'tester', email: 'tester@example.test', passwordHash: await bcrypt.hash('OldPassword1', 4), isBanned: false };
   const sessions = [];
   const tokenValue = 'a'.repeat(64);
@@ -45,7 +45,7 @@ async function fixture() {
     },
     $transaction: async (callback) => callback(prisma),
   };
-  const env = { JWT_SECRET: 'security-test-secret-at-least-32-characters', JWT_EXPIRES_IN: '15m', FRONTEND_URL: 'http://localhost:3000', MAX_FILE_SIZE: 1024 };
+  const env = { JWT_SECRET: 'security-test-secret-at-least-32-characters', JWT_EXPIRES_IN: '15m', FRONTEND_URL: 'http://localhost:3000', MAX_FILE_SIZE: 1024, ...envOverrides };
   const app = apiRequire('fastify')();
   const r2 = apiRequire('fastify-plugin')(async (server) => { server.decorate('r2', { storage: {} }); });
   await loadModule('plugins/index.ts', { '../config/env': { env }, '../config/prisma': { prisma }, './r2': r2 }).registerPlugins(app);
@@ -243,4 +243,53 @@ test('disabling 2FA requires re-authentication with password or TOTP code', asyn
   });
   assert.equal(validDisable.statusCode, 200);
   assert.equal(validDisable.json().data.twoFactorEnabled, false);
+});
+
+test('cross-site HTTPS deployment sets SameSite=None; Secure cookies and honors CORS_ORIGINS', async (t) => {
+  const f = await fixture({
+    FRONTEND_URL: 'https://bravechat.vercel.app',
+    API_PUBLIC_URL: 'https://bravechat-api.onrender.com',
+    CORS_ORIGINS: 'https://bravechat-preview.vercel.app',
+  });
+  t.after(() => f.app.close());
+
+  const loginRes = await f.app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    headers: { origin: 'https://bravechat-preview.vercel.app' },
+    payload: { email: f.user.email, password: 'OldPassword1' },
+  });
+  assert.equal(loginRes.statusCode, 200);
+  assert.equal(loginRes.headers['access-control-allow-origin'], 'https://bravechat-preview.vercel.app');
+  const tokenCookie = loginRes.cookies.find((c) => c.name === 'token');
+  assert.equal(tokenCookie.sameSite, 'None');
+  assert.equal(tokenCookie.secure, true);
+  assert.equal(tokenCookie.httpOnly, true);
+
+  const blockedRes = await f.app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    headers: { origin: 'https://evil.example' },
+    payload: { email: f.user.email, password: 'OldPassword1' },
+  });
+  assert.equal(blockedRes.statusCode, 403);
+});
+
+test('subdomain HTTPS deployment uses SameSite=Lax; Secure cookies by default', async (t) => {
+  const f = await fixture({
+    FRONTEND_URL: 'https://bravechat.app',
+    API_PUBLIC_URL: 'https://api.bravechat.app',
+  });
+  t.after(() => f.app.close());
+
+  const loginRes = await f.app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    headers: { origin: 'https://bravechat.app' },
+    payload: { email: f.user.email, password: 'OldPassword1' },
+  });
+  assert.equal(loginRes.statusCode, 200);
+  const tokenCookie = loginRes.cookies.find((c) => c.name === 'token');
+  assert.equal(tokenCookie.sameSite, 'Lax');
+  assert.equal(tokenCookie.secure, true);
 });

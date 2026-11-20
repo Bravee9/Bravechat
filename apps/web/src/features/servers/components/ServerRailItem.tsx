@@ -28,7 +28,7 @@ function ServerRailItemBase({
   const isHovered = isHoveredProp ?? localHovered;
   const config = useServerWorkspaceConfig(server.id);
   const badgeColor =
-    config.badgeColor || getDeterministicJetBrainsColor(server.id || server.name);
+    server.badgeColor || config.badgeColor || getDeterministicJetBrainsColor(server.id || server.name);
 
   const onHover = (hovered: boolean) => {
     setLocalHovered(hovered);

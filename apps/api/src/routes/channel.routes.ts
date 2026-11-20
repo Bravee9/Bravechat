@@ -8,18 +8,12 @@ import { verifyUploadedObject } from './upload.routes'
 import { publishChannelMessage, publishUserEvent } from './websocket.routes'
 import { dmInclude, fail, messageInclude, pairFilter, serializeMessage, serializable, friendshipPair } from '../services/conversation'
 import { messageActionRoutes } from './message-action.routes'
+import { canAccessChannel } from '../services/permissions'
 import { randomUUID } from 'node:crypto'
 import { extname } from 'node:path'
 
 const attachmentInput = z.object({ filename: z.string().trim().min(1).max(255), contentType: z.string(), key: z.string() })
 const messageInput = z.object({ content: z.string().trim().max(2000).default(''), attachments: z.array(attachmentInput).max(10).default([]), nonce: z.string().uuid().optional(), replyToId: z.string().min(1).optional() })
-
-async function canAccessChannel(channelId: string, userId: string) {
-  return prisma.channel.findFirst({
-    where: { id: channelId, server: { members: { some: { userId, isBanned: false } } } },
-    select: { id: true, name: true, type: true, serverId: true, userLimit: true },
-  })
-}
 
 const presentMessage = serializeMessage
 

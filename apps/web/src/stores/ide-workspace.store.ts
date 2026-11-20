@@ -66,7 +66,8 @@ export type WorkspaceModalTab =
   | "overview"
   | "channels"
   | "members"
-  | "roles";
+  | "roles"
+  | "analytics";
 
 interface IdeWorkspaceState {
   configs: Record<string, ServerWorkspaceConfig>;

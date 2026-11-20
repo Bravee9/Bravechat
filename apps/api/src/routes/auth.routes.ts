@@ -107,7 +107,53 @@ const userSelect = {
   isEmailVerified: true,
 } as const
 const present = (user: any) => ({ ...user, avatarUrl: mediaUrl(user.avatarKey), bannerUrl: mediaUrl(user.bannerKey) })
-const options = { httpOnly: true, secure: env.FRONTEND_URL.startsWith('https:'), sameSite: 'lax' as const, path: '/' }
+
+function hostMatchesDomain(hostname: string, domain: string): boolean {
+  const cleanDomain = domain.replace(/^\./, '').toLowerCase()
+  const lowerHost = hostname.toLowerCase()
+  return lowerHost === cleanDomain || lowerHost.endsWith(`.${cleanDomain}`)
+}
+
+function isSameSiteDeployment(frontend: URL, api: URL | null, cookieDomain?: string): boolean {
+  if (!api) return true
+  const fHost = frontend.hostname.toLowerCase()
+  const aHost = api.hostname.toLowerCase()
+  if (fHost === aHost) return true
+  if (fHost.endsWith(`.${aHost}`) || aHost.endsWith(`.${fHost}`)) return true
+  if (cookieDomain && hostMatchesDomain(fHost, cookieDomain) && hostMatchesDomain(aHost, cookieDomain)) return true
+  return false
+}
+
+function buildCookieOptions() {
+  const config = env as typeof env & {
+    API_PUBLIC_URL?: string
+    COOKIE_DOMAIN?: string
+    COOKIE_SAME_SITE?: 'auto' | 'lax' | 'none' | 'strict'
+  }
+  const frontendUrl = new URL(config.FRONTEND_URL)
+  const apiUrl = config.API_PUBLIC_URL ? new URL(config.API_PUBLIC_URL) : null
+  const isHttps = frontendUrl.protocol === 'https:' || apiUrl?.protocol === 'https:'
+  const cookieDomain = config.COOKIE_DOMAIN?.trim() || undefined
+  const mode = config.COOKIE_SAME_SITE ?? 'auto'
+
+  let sameSite: 'lax' | 'none' | 'strict'
+  if (mode === 'auto') {
+    const sameSiteDeployment = isSameSiteDeployment(frontendUrl, apiUrl, cookieDomain)
+    sameSite = !sameSiteDeployment && isHttps ? 'none' : 'lax'
+  } else {
+    sameSite = mode
+  }
+
+  return {
+    httpOnly: true,
+    secure: sameSite === 'none' ? true : isHttps,
+    sameSite,
+    path: '/',
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
+  } as const
+}
+
+const options = buildCookieOptions()
 const refreshData = (userId: string, value: string, request: FastifyRequest) => ({
   userId,
   token: digest(value),

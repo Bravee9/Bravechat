@@ -3,9 +3,15 @@
  * Cấu hình site dùng chung cho SEO (metadataBase, sitemap, robots, analytics).
  */
 
-export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://bravechat.app"
-).replace(/\/$/, "");
+const rawSiteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "https://bravechat.app");
+
+export const SITE_URL = rawSiteUrl.replace(/\/$/, "");
 
 export const SITE_NAME = "Bravechat";
 

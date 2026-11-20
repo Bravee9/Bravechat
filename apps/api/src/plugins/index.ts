@@ -90,13 +90,29 @@ async function unblacklistIp(ip: string): Promise<void> {
   }
 }
 
-const normalizeOrigin = (value: string) => value.replace(/\/$/, '')
+const normalizeOrigin = (value: string) => value.trim().replace(/\/$/, '')
+
+function buildAllowedOrigins(): Set<string> {
+  const origins = new Set<string>([normalizeOrigin(env.FRONTEND_URL)])
+  const extra = (env as { CORS_ORIGINS?: string }).CORS_ORIGINS
+  if (extra) {
+    for (const item of extra.split(',')) {
+      const normalized = normalizeOrigin(item)
+      if (normalized) origins.add(normalized)
+    }
+  }
+  return origins
+}
 
 export async function registerPlugins(server: FastifyInstance) {
+  const allowedOrigins = buildAllowedOrigins()
   server.addContentTypeParser('application/webhook+json', { parseAs: 'string' }, (_request, body, done) => done(null, body))
-  // CORS — allow frontend origin
+  // CORS — allow configured frontend origins
   await server.register(cors, {
-    origin: [normalizeOrigin(env.FRONTEND_URL)],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true)
+      callback(null, allowedOrigins.has(normalizeOrigin(origin)))
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   })
@@ -147,7 +163,7 @@ export async function registerPlugins(server: FastifyInstance) {
 
     // 2. CSRF / Origin validation for mutating requests
     const origin = request.headers.origin && normalizeOrigin(request.headers.origin)
-    if (origin && origin !== normalizeOrigin(env.FRONTEND_URL) && (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) || request.headers.upgrade === 'websocket')) {
+    if (origin && !allowedOrigins.has(origin) && (['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) || request.headers.upgrade === 'websocket')) {
       return reply.code(403).send({ statusCode: 403, message: 'Origin không được phép.' })
     }
   })

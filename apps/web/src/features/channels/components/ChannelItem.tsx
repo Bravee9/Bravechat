@@ -15,7 +15,7 @@ interface ChannelItemProps {
 export function ChannelItem({ channel, serverId, isActive }: ChannelItemProps) {
   const isVoice = channel.type === "VOICE" || channel.type === "VIDEO";
   const config = useServerWorkspaceConfig(serverId);
-  const isPrivate = Boolean(config.channelPolicies[channel.id]?.isPrivate);
+  const isPrivate = Boolean(channel.isPrivate || config.channelPolicies[channel.id]?.isPrivate);
 
   return (
     <Link
