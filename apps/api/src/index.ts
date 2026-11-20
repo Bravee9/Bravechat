@@ -11,6 +11,7 @@ import { ZodError } from 'zod'
 import { Prisma } from '@prisma/client'
 
 const server = Fastify({
+  trustProxy: env.TRUST_PROXY,
   logger: {
     redact: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
     transport: {

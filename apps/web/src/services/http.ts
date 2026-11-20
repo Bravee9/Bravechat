@@ -27,13 +27,19 @@ interface RequestOptions extends Omit<RequestInit, "body" | "method"> {
 }
 
 function buildUrl(path: string, query?: Query): string {
-  const url = new URL(env.apiUrl.replace(/\/$/, "") + path);
+  const raw = env.apiUrl.replace(/\/$/, "") + path;
+  const url = /^https?:\/\//i.test(raw)
+    ? new URL(raw)
+    : new URL(
+        raw.startsWith("/") ? raw : `/${raw}`,
+        typeof window !== "undefined" ? window.location.origin : "http://127.0.0.1:3000"
+      );
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined) url.searchParams.set(key, String(value));
     }
   }
-  return url.toString();
+  return /^https?:\/\//i.test(raw) ? url.toString() : `${url.pathname}${url.search}`;
 }
 
 let refreshInFlight: Promise<boolean> | null = null;

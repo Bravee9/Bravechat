@@ -19,6 +19,8 @@ export interface Channel {
   type: ChannelType;
   topic: string | null;
   position: number;
+  isPrivate?: boolean;
+  allowedRoleIds?: string[];
   /** Per-user read state, computed by the API. */
   hasUnread: boolean;
   mentionCount: number;

@@ -2,14 +2,19 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { API_ROUTES } from "@discord-clone/shared";
+import {
+  API_ROUTES,
+  type AuditLogEntry,
+  type RoleSummary,
+  type SearchMessageResult,
+  type ServerAnalytics,
+} from "@discord-clone/shared";
 import { http } from "@/services/http";
 import { serverService } from "@/services/server.service";
 import {
   loadServerDetail,
   loadServers,
   useServerDetail,
-  workspaceStore,
 } from "@/stores/workspace.store";
 import {
   closeWorkspaceModal,
@@ -21,7 +26,6 @@ import {
   usePreviewAsRoleId,
   useServerWorkspaceConfig,
   type PermissionKey,
-  type RoleDefinition,
   type WorkspaceModalTab,
 } from "@/stores/ide-workspace.store";
 import type { Member } from "@/features/members/components/MemberItem";
@@ -66,12 +70,12 @@ const PERMISSION_GROUPS: Array<{
       {
         key: "kick_members",
         label: "Mời ra khỏi máy chủ (Kick)",
-        desc: "Xóa thành viên khỏi danh sách máy chủ (có thể tham gia lại nếu có mã mời mới).",
+        desc: "Xóa thành viên khỏi danh sách máy chủ.",
       },
       {
         key: "ban_members",
         label: "Chặn truy cập (Ban)",
-        desc: "Chặn vĩnh viễn tài khoản truy cập vào máy chủ và thu hồi quyền xem kênh.",
+        desc: "Chặn tài khoản truy cập vào máy chủ và thu hồi quyền xem kênh.",
       },
     ],
   },
@@ -152,11 +156,13 @@ function ServerWorkspaceDialogContent({
 
   // Overview state
   const [serverName, setServerName] = useState(serverDetail?.name ?? "");
-  const [serverDesc, setServerDesc] = useState(config.description ?? "");
-  const [selectedColor, setSelectedColor] = useState(
-    config.badgeColor ?? "#087CFA"
+  const [serverDesc, setServerDesc] = useState(
+    serverDetail?.description ?? config.description ?? ""
   );
-  const [visibility, setVisibility] = useState(config.visibility);
+  const [selectedColor, setSelectedColor] = useState(
+    serverDetail?.badgeColor ?? config.badgeColor ?? "#087CFA"
+  );
+  const [isPublic, setIsPublic] = useState(Boolean(serverDetail?.isPublic));
   const [statusMsg, setStatusMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -164,7 +170,12 @@ function ServerWorkspaceDialogContent({
 
   useEffect(() => {
     if (serverDetail?.name) setServerName(serverDetail.name);
-  }, [serverDetail?.name]);
+    if (serverDetail?.description !== undefined) {
+      setServerDesc(serverDetail.description ?? "");
+    }
+    if (serverDetail?.badgeColor) setSelectedColor(serverDetail.badgeColor);
+    if (serverDetail?.isPublic !== undefined) setIsPublic(serverDetail.isPublic);
+  }, [serverDetail]);
 
   // Channels state
   const [newChannelName, setNewChannelName] = useState("");
@@ -173,44 +184,95 @@ function ServerWorkspaceDialogContent({
   const [newChannelPrivate, setNewChannelPrivate] = useState(false);
 
   // Members state
-  const [members, setMembers] = useState<Member[]>([]);
+  const [members, setMembers] = useState<Array<Member & { roleIds?: string[] }>>([]);
   const [memberSearch, setMemberSearch] = useState("");
   const [memberRoleFilter, setMemberRoleFilter] = useState<string>("ALL");
   const [inviteLink, setInviteLink] = useState("");
 
+  // Roles state (backed by PostgreSQL /api/servers/:id/roles)
+  const [dbRoles, setDbRoles] = useState<RoleSummary[]>([]);
+  const [selectedRoleId, setSelectedRoleId] = useState<string>("");
+  const [newRoleName, setNewRoleName] = useState("");
+
+  // Analytics & Search state
+  const [analytics, setAnalytics] = useState<ServerAnalytics | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchMessageResult[]>([]);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+  const loadRoles = async () => {
+    try {
+      const res = await http.get<{ roles: RoleSummary[] }>(
+        API_ROUTES.servers.roles(serverId)
+      );
+      setDbRoles(res.roles);
+      if (!selectedRoleId && res.roles.length > 0) {
+        setSelectedRoleId(res.roles[0].id);
+      }
+    } catch {
+      // ignore if unauthorized
+    }
+  };
+
+  const loadMembers = async () => {
+    try {
+      const rows = await serverService.getServerMembers(serverId);
+      setMembers(
+        rows.map((r) => ({
+          id: r.id,
+          name: r.displayName || r.username,
+          role: r.role,
+          roleIds: r.roleIds ?? [],
+          status: r.status,
+          customStatus: r.customStatus ?? undefined,
+          avatarUrl: r.avatarUrl,
+        }))
+      );
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
+    void loadRoles();
+    void loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverId]);
+
+  useEffect(() => {
+    if (activeTab !== "analytics") return;
     let active = true;
-    serverService
-      .getServerMembers(serverId)
-      .then((rows) => {
+    setAnalyticsLoading(true);
+    Promise.all([
+      http.get<ServerAnalytics>(API_ROUTES.servers.analytics(serverId)),
+      http
+        .get<{ logs: AuditLogEntry[] }>(API_ROUTES.servers.auditLogs(serverId))
+        .catch(() => ({ logs: [] })),
+    ])
+      .then(([statsRes, logsRes]) => {
         if (!active) return;
-        setMembers(
-          rows.map((r) => ({
-            id: r.id,
-            name: r.displayName || r.username,
-            role: r.role,
-            status: r.status,
-            customStatus: r.customStatus ?? undefined,
-            avatarUrl: r.avatarUrl,
-          }))
-        );
+        setAnalytics(statsRes);
+        setAuditLogs(logsRes.logs);
       })
-      .catch(() => undefined);
+      .catch((err) => {
+        if (active) {
+          setErrorMsg(
+            err instanceof Error ? err.message : "Không thể tải thống kê CSDL."
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setAnalyticsLoading(false);
+      });
     return () => {
       active = false;
     };
-  }, [serverId]);
-
-  // Roles state
-  const [selectedRoleId, setSelectedRoleId] = useState<string>(
-    config.roles[0]?.id ?? "OWNER"
-  );
-  const [newRoleName, setNewRoleName] = useState("");
+  }, [activeTab, serverId]);
 
   const selectedRole = useMemo(
-    () =>
-      config.roles.find((r) => r.id === selectedRoleId) ?? config.roles[0],
-    [config.roles, selectedRoleId]
+    () => dbRoles.find((r) => r.id === selectedRoleId) ?? dbRoles[0],
+    [dbRoles, selectedRoleId]
   );
 
   const handleSaveOverview = async (e: React.FormEvent) => {
@@ -219,22 +281,22 @@ function ServerWorkspaceDialogContent({
     setErrorMsg("");
     setStatusMsg("");
     try {
+      await http.patch(API_ROUTES.servers.detail(serverId), {
+        name: serverName.trim(),
+        description: serverDesc.trim() || null,
+        badgeColor: selectedColor,
+        isPublic,
+      });
       updateServerWorkspaceConfig(serverId, (prev) => ({
         ...prev,
         badgeColor: selectedColor,
         description: serverDesc.trim(),
-        visibility,
       }));
-      if (serverName.trim() && serverName.trim() !== serverDetail?.name) {
-        await http.patch(API_ROUTES.servers.detail(serverId), {
-          name: serverName.trim(),
-        });
-        await Promise.all([loadServerDetail(serverId, true), loadServers(true)]);
-      }
-      setStatusMsg("Đã lưu cấu hình máy chủ.");
+      await Promise.all([loadServerDetail(serverId, true), loadServers(true)]);
+      setStatusMsg("Đã lưu cấu hình máy chủ vào PostgreSQL.");
     } catch (err) {
       setErrorMsg(
-        err instanceof Error ? err.message : "Đã lưu cấu hình giao diện cục bộ."
+        err instanceof Error ? err.message : "Không thể cập nhật máy chủ."
       );
     } finally {
       setBusy(false);
@@ -245,12 +307,7 @@ function ServerWorkspaceDialogContent({
     setBusy(true);
     setErrorMsg("");
     try {
-      await http.delete(API_ROUTES.servers.detail(serverId)).catch(() => {
-        // Fallback nếu không phải owner trên backend: xóa khỏi store phiên hiện tại
-        workspaceStore.set((s) => ({
-          servers: (s.servers ?? []).filter((srv) => srv.id !== serverId),
-        }));
-      });
+      await http.delete(API_ROUTES.servers.detail(serverId));
       await loadServers(true);
       closeWorkspaceModal();
       router.replace("/channels/@me");
@@ -277,239 +334,243 @@ function ServerWorkspaceDialogContent({
     try {
       const categoryId =
         newChannelCategory || serverDetail?.categories[0]?.id || undefined;
-      const { channel } = await http.post<{ channel: { id: string } }>(
-        API_ROUTES.servers.channels(serverId),
-        {
-          name: cleanName,
-          type: newChannelType,
-          categoryId,
-        }
-      );
-      if (newChannelPrivate) {
-        updateServerWorkspaceConfig(serverId, (prev) => ({
-          ...prev,
-          channelPolicies: {
-            ...prev.channelPolicies,
-            [channel.id]: {
-              isPrivate: true,
-              allowedRoleIds: ["OWNER", "ADMIN"],
-            },
-          },
-        }));
-      }
+      const defaultAllowed = dbRoles
+        .filter((r) => ["OWNER", "ADMIN"].includes(r.name.toUpperCase()))
+        .map((r) => r.id);
+
+      await http.post(API_ROUTES.servers.channels(serverId), {
+        name: cleanName,
+        type: newChannelType,
+        categoryId,
+        isPrivate: newChannelPrivate,
+        allowedRoleIds: newChannelPrivate ? defaultAllowed : [],
+      });
       await loadServerDetail(serverId, true);
       setNewChannelName("");
       setNewChannelPrivate(false);
-      setStatusMsg(`Đã tạo kênh #${cleanName}.`);
-    } catch {
-      // Fallback tạo kênh trực tiếp trong store giao diện nếu tài khoản không có quyền backend
-      const fakeId = `local-ch-${Date.now()}`;
-      const fallbackCatId =
-        newChannelCategory || serverDetail?.categories[0]?.id || null;
-      workspaceStore.set((state) => {
-        const current = state.serverDetails[serverId];
-        if (!current) return {};
-        return {
-          serverDetails: {
-            ...state.serverDetails,
-            [serverId]: {
-              ...current,
-              channels: [
-                ...current.channels,
-                {
-                  id: fakeId,
-                  serverId,
-                  name: cleanName,
-                  type: newChannelType,
-                  categoryId: fallbackCatId,
-                  topic: null,
-                  position: current.channels.length,
-                  hasUnread: false,
-                  mentionCount: 0,
-                },
-              ],
-            },
-          },
-        };
-      });
-      if (newChannelPrivate) {
-        updateServerWorkspaceConfig(serverId, (prev) => ({
-          ...prev,
-          channelPolicies: {
-            ...prev.channelPolicies,
-            [fakeId]: {
-              isPrivate: true,
-              allowedRoleIds: ["OWNER", "ADMIN"],
-            },
-          },
-        }));
-      }
-      setNewChannelName("");
-      setNewChannelPrivate(false);
-      setStatusMsg(`Đã thêm kênh #${cleanName} vào không gian làm việc.`);
+      setStatusMsg(`Đã tạo kênh #${cleanName} trong CSDL.`);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Không thể tạo kênh.");
     } finally {
       setBusy(false);
     }
   };
 
-  const handleDeleteChannel = (channelId: string, channelName: string) => {
-    workspaceStore.set((state) => {
-      const current = state.serverDetails[serverId];
-      if (!current) return {};
-      return {
-        serverDetails: {
-          ...state.serverDetails,
-          [serverId]: {
-            ...current,
-            channels: current.channels.filter((ch) => ch.id !== channelId),
-          },
-        },
-      };
-    });
-    setStatusMsg(`Đã xóa kênh #${channelName}.`);
+  const handleDeleteChannel = async (channelId: string, channelName: string) => {
+    setBusy(true);
+    setErrorMsg("");
+    try {
+      await http.delete(API_ROUTES.servers.channelDetail(serverId, channelId));
+      await loadServerDetail(serverId, true);
+      setStatusMsg(`Đã xóa kênh #${channelName}.`);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Không thể xóa kênh.");
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const toggleChannelPrivacy = (channelId: string) => {
-    updateServerWorkspaceConfig(serverId, (prev) => {
-      const current = prev.channelPolicies[channelId] ?? {
-        isPrivate: false,
-        allowedRoleIds: ["OWNER", "ADMIN"],
-      };
-      return {
-        ...prev,
-        channelPolicies: {
-          ...prev.channelPolicies,
-          [channelId]: {
-            ...current,
-            isPrivate: !current.isPrivate,
-          },
-        },
-      };
-    });
+  const toggleChannelPrivacy = async (
+    channelId: string,
+    currentPrivate: boolean,
+    currentAllowed: string[]
+  ) => {
+    setErrorMsg("");
+    try {
+      const nextPrivate = !currentPrivate;
+      await http.patch(API_ROUTES.servers.channelDetail(serverId, channelId), {
+        isPrivate: nextPrivate,
+        allowedRoleIds: currentAllowed,
+      });
+      await loadServerDetail(serverId, true);
+      setStatusMsg(
+        nextPrivate ? "Đã khóa kênh riêng tư." : "Đã mở công khai kênh."
+      );
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Không thể đổi trạng thái kênh."
+      );
+    }
   };
 
-  const toggleChannelAllowedRole = (channelId: string, roleId: string) => {
-    updateServerWorkspaceConfig(serverId, (prev) => {
-      const current = prev.channelPolicies[channelId] ?? {
+  const toggleChannelAllowedRole = async (
+    channelId: string,
+    currentAllowed: string[],
+    roleId: string
+  ) => {
+    setErrorMsg("");
+    const exists = currentAllowed.includes(roleId);
+    const nextRoles = exists
+      ? currentAllowed.filter((r) => r !== roleId)
+      : [...currentAllowed, roleId];
+    try {
+      await http.patch(API_ROUTES.servers.channelDetail(serverId, channelId), {
         isPrivate: true,
-        allowedRoleIds: ["OWNER", "ADMIN"],
-      };
-      const exists = current.allowedRoleIds.includes(roleId);
-      const nextRoles = exists
-        ? current.allowedRoleIds.filter((r) => r !== roleId)
-        : [...current.allowedRoleIds, roleId];
-      return {
-        ...prev,
-        channelPolicies: {
-          ...prev.channelPolicies,
-          [channelId]: {
-            ...current,
-            allowedRoleIds: nextRoles,
-          },
-        },
-      };
-    });
+        allowedRoleIds: nextRoles,
+      });
+      await loadServerDetail(serverId, true);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Không thể cập nhật quyền kênh."
+      );
+    }
   };
 
-  const handleAddRole = (e: React.FormEvent) => {
+  const handleAddRole = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = newRoleName.trim();
     if (!trimmed) return;
-    const id = `ROLE_${Date.now()}`;
-    const randomColor =
-      JETBRAINS_PALETTE[config.roles.length % JETBRAINS_PALETTE.length].hex;
-    const newRole: RoleDefinition = {
-      id,
-      name: trimmed,
-      color: randomColor,
-      isSystem: false,
-      permissions: {
-        manage_server: false,
-        manage_channels: false,
-        manage_roles: false,
-        view_audit_log: false,
-        invite_members: true,
-        kick_members: false,
-        ban_members: false,
-        send_messages: true,
-        attach_files: true,
-        manage_messages: false,
-        pin_messages: false,
-        connect_voice: true,
-        speak_voice: true,
-        share_screen: true,
-        access_private_channels: false,
-      },
-    };
-    updateServerWorkspaceConfig(serverId, (prev) => ({
-      ...prev,
-      roles: [...prev.roles, newRole],
-    }));
-    setSelectedRoleId(id);
-    setNewRoleName("");
-    setStatusMsg(`Đã tạo vai trò "${trimmed}".`);
+    setErrorMsg("");
+    try {
+      const randomColor =
+        JETBRAINS_PALETTE[dbRoles.length % JETBRAINS_PALETTE.length].hex;
+      const res = await http.post<{ role: RoleSummary }>(
+        API_ROUTES.servers.roles(serverId),
+        {
+          name: trimmed,
+          color: randomColor,
+          permissions: {
+            invite_members: true,
+            send_messages: true,
+            attach_files: true,
+            connect_voice: true,
+            speak_voice: true,
+            share_screen: true,
+          },
+        }
+      );
+      await loadRoles();
+      setSelectedRoleId(res.role.id);
+      setNewRoleName("");
+      setStatusMsg(`Đã tạo vai trò "${trimmed}" trong PostgreSQL.`);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Không thể tạo vai trò.");
+    }
   };
 
-  const handleDeleteRole = (roleId: string) => {
-    updateServerWorkspaceConfig(serverId, (prev) => ({
-      ...prev,
-      roles: prev.roles.filter((r) => r.id !== roleId || r.isSystem),
-    }));
-    setSelectedRoleId("OWNER");
+  const handleDeleteRole = async (roleId: string) => {
+    setErrorMsg("");
+    try {
+      await http.delete(API_ROUTES.servers.roleDetail(serverId, roleId));
+      await loadRoles();
+      setSelectedRoleId("");
+      setStatusMsg("Đã xóa vai trò.");
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Không thể xóa vai trò.");
+    }
   };
 
-  const toggleRolePermission = (roleId: string, permKey: PermissionKey) => {
-    updateServerWorkspaceConfig(serverId, (prev) => ({
-      ...prev,
-      roles: prev.roles.map((r) =>
-        r.id === roleId
-          ? {
-              ...r,
-              permissions: {
-                ...r.permissions,
-                [permKey]: !r.permissions[permKey],
-              },
-            }
-          : r
-      ),
-    }));
-  };
-
-  const updateRoleMeta = (
-    roleId: string,
-    patch: Partial<Pick<RoleDefinition, "name" | "color">>
+  const toggleRolePermission = async (
+    role: RoleSummary,
+    permKey: PermissionKey
   ) => {
-    updateServerWorkspaceConfig(serverId, (prev) => ({
-      ...prev,
-      roles: prev.roles.map((r) => (r.id === roleId ? { ...r, ...patch } : r)),
-    }));
+    const nextPerms = {
+      ...role.permissions,
+      [permKey]: !role.permissions[permKey],
+    };
+    setDbRoles((prev) =>
+      prev.map((r) => (r.id === role.id ? { ...r, permissions: nextPerms } : r))
+    );
+    try {
+      await http.patch(API_ROUTES.servers.roleDetail(serverId, role.id), {
+        permissions: nextPerms,
+      });
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Không thể cập nhật quyền."
+      );
+      await loadRoles();
+    }
+  };
+
+  const updateRoleMeta = async (
+    role: RoleSummary,
+    patch: { name?: string; color?: string }
+  ) => {
+    setDbRoles((prev) =>
+      prev.map((r) => (r.id === role.id ? { ...r, ...patch } : r))
+    );
+    try {
+      await http.patch(API_ROUTES.servers.roleDetail(serverId, role.id), patch);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Không thể cập nhật vai trò."
+      );
+    }
+  };
+
+  const handleAssignMemberRole = async (userId: string, roleId: string) => {
+    setErrorMsg("");
+    try {
+      await http.put(API_ROUTES.servers.memberRoles(serverId, userId), {
+        roleIds: [roleId],
+      });
+      await Promise.all([loadMembers(), loadRoles()]);
+      setStatusMsg("Đã cập nhật vai trò thành viên trong CSDL.");
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Không thể gán vai trò."
+      );
+    }
+  };
+
+  const handleKickMember = async (member: Member) => {
+    setErrorMsg("");
+    try {
+      await http.post(API_ROUTES.servers.kickMember(serverId, member.id));
+      await loadMembers();
+      setStatusMsg(`Đã mời ${member.name} rời khỏi máy chủ.`);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Không thể kick thành viên."
+      );
+    }
+  };
+
+  const handleBanMember = async (member: Member) => {
+    setErrorMsg("");
+    try {
+      await http.post(API_ROUTES.servers.banMember(serverId, member.id), {});
+      await loadMembers();
+      setStatusMsg(`Đã chặn ${member.name} khỏi máy chủ.`);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Không thể chặn thành viên."
+      );
+    }
+  };
+
+  const handleSearchMessages = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    try {
+      const res = await http.get<{ results: SearchMessageResult[] }>(
+        API_ROUTES.servers.searchMessages(serverId),
+        { query: { q: searchQuery.trim() } }
+      );
+      setSearchResults(res.results);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Không thể tìm kiếm tin nhắn."
+      );
+    }
   };
 
   const visibleMembers = useMemo(() => {
-    return members
-      .filter((m) => !config.kickedMemberIds.includes(m.id))
-      .filter((m) => !config.bannedMemberIds.includes(m.id))
-      .filter((m) => {
-        const effectiveRole = config.memberRoleOverrides[m.id] ?? m.role;
-        if (memberRoleFilter !== "ALL" && effectiveRole !== memberRoleFilter) {
-          return false;
-        }
-        if (
-          memberSearch.trim() &&
-          !m.name.toLowerCase().includes(memberSearch.trim().toLowerCase())
-        ) {
-          return false;
-        }
-        return true;
-      });
-  }, [
-    members,
-    config.kickedMemberIds,
-    config.bannedMemberIds,
-    config.memberRoleOverrides,
-    memberRoleFilter,
-    memberSearch,
-  ]);
+    return members.filter((m) => {
+      if (memberRoleFilter !== "ALL") {
+        const hasRole = (m.roleIds ?? []).includes(memberRoleFilter);
+        if (!hasRole) return false;
+      }
+      if (
+        memberSearch.trim() &&
+        !m.name.toLowerCase().includes(memberSearch.trim().toLowerCase())
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [members, memberRoleFilter, memberSearch]);
 
   const generateQuickInvite = async () => {
     setErrorMsg("");
@@ -520,9 +581,18 @@ function ServerWorkspaceDialogContent({
       setInviteLink(
         `${window.location.origin}/invite/${encodeURIComponent(invite.code)}`
       );
-    } catch {
-      setInviteLink(`${window.location.origin}/invite/brave-${serverId.slice(0, 6)}`);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Không thể tạo liên kết mời."
+      );
     }
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (!bytes) return "0 B";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
   return (
@@ -533,7 +603,7 @@ function ServerWorkspaceDialogContent({
       aria-label="Cấu hình Máy chủ & Phân quyền"
       data-testid="server-workspace-modal"
     >
-      <div className="w-full max-w-[1040px] h-[86vh] max-h-[760px] bg-[#1E1F22] border border-[#2B2D30] rounded-[6px] shadow-[0_24px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden text-[#E6EDF3]">
+      <div className="w-full max-w-[1060px] h-[86vh] max-h-[780px] bg-[#1E1F22] border border-[#2B2D30] rounded-[6px] shadow-[0_24px_80px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden text-[#E6EDF3]">
         {/* Top IDE Window Header */}
         <div className="h-11 bg-[#18181B] border-b border-[#2B2D30] px-4 flex items-center justify-between select-none shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -550,7 +620,6 @@ function ServerWorkspaceDialogContent({
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Role Simulation Toggle for testing Channel Privacy */}
             <div className="hidden md:flex items-center gap-2 bg-[#141417] border border-[#2B2D30] rounded-[4px] px-2.5 py-1">
               <span className="text-[11px] font-mono text-[#A8A8B0]">
                 Xem thử dưới quyền:
@@ -569,7 +638,7 @@ function ServerWorkspaceDialogContent({
                 <option value="DEFAULT" className="bg-[#18181B] text-white">
                   Mặc định (Toàn quyền)
                 </option>
-                {config.roles.map((r) => (
+                {dbRoles.map((r) => (
                   <option
                     key={r.id}
                     value={r.id}
@@ -625,7 +694,12 @@ function ServerWorkspaceDialogContent({
                       {
                         id: "roles",
                         label: "Vai trò & Phân quyền",
-                        badge: `${config.roles.length}`,
+                        badge: `${dbRoles.length}`,
+                      },
+                      {
+                        id: "analytics",
+                        label: "Thống kê & Truy vấn",
+                        badge: "SQL",
                       },
                     ] as const
                   ).map((item) => {
@@ -663,20 +737,19 @@ function ServerWorkspaceDialogContent({
                 </div>
               </div>
 
-              {/* Quick Info Card */}
               <div className="p-3 rounded-[4px] bg-[#141417] border border-[#2B2D30] space-y-2">
                 <p className="text-[11px] font-mono font-semibold text-[#07C3F2]">
-                  Trạng thái bảo vệ kênh
+                  PostgreSQL Sync
                 </p>
                 <p className="text-[11px] text-[#A8A8B0] leading-relaxed">
-                  Các kênh bật biểu tượng khóa chỉ hiển thị nội dung với những vai trò được cấp quyền.
+                  Mọi thay đổi về máy chủ, kênh riêng tư, vai trò và thành viên được lưu trực tiếp vào cơ sở dữ liệu.
                 </p>
               </div>
             </div>
 
             <div className="pt-3 border-t border-[#2B2D30] flex items-center justify-between text-[11px] font-mono text-[#7D7D7D]">
               <span>ID: {serverId.slice(0, 8)}</span>
-              <span className="text-[#21D789]">● Active</span>
+              <span className="text-[#21D789]">● DB Live</span>
             </div>
           </aside>
 
@@ -706,7 +779,7 @@ function ServerWorkspaceDialogContent({
               </div>
             )}
 
-            {/* TAB 1: OVERVIEW & SERVER CRUD */}
+            {/* TAB 1: OVERVIEW */}
             {activeTab === "overview" && (
               <div className="space-y-8 max-w-2xl">
                 <div>
@@ -748,19 +821,13 @@ function ServerWorkspaceDialogContent({
                       </label>
                       <select
                         id="ide-server-visibility"
-                        value={visibility}
+                        value={isPublic ? "PUBLIC" : "INVITE_ONLY"}
                         onChange={(e) =>
-                          setVisibility(
-                            e.target.value as
-                              | "PRIVATE"
-                              | "INVITE_ONLY"
-                              | "PUBLIC"
-                          )
+                          setIsPublic(e.target.value === "PUBLIC")
                         }
                         className="w-full h-9 px-3 rounded-[4px] bg-[#141417] border border-[#393B40] focus:border-[#087CFA] focus:outline-none text-sm text-white"
                       >
                         <option value="INVITE_ONLY">Chỉ qua mã mời</option>
-                        <option value="PRIVATE">Riêng tư (Khóa)</option>
                         <option value="PUBLIC">Công khai</option>
                       </select>
                     </div>
@@ -783,7 +850,6 @@ function ServerWorkspaceDialogContent({
                     />
                   </div>
 
-                  {/* JetBrains Palette Picker */}
                   <div>
                     <p className="text-xs font-mono uppercase text-[#CDCDCD] mb-2">
                       Màu huy hiệu máy chủ (JetBrains Palette)
@@ -822,13 +888,13 @@ function ServerWorkspaceDialogContent({
                   </div>
                 </form>
 
-                {/* Danger Zone: Delete Server */}
+                {/* Danger Zone */}
                 <div className="pt-6 border-t border-[#2B2D30]">
                   <h3 className="text-sm font-bold text-[#FE2857] mb-1">
                     Vùng nguy hiểm · Xóa máy chủ
                   </h3>
                   <p className="text-xs text-[#A8A8B0] mb-3">
-                    Nhập tên máy chủ ({serverDetail?.name}) để xác nhận xóa máy chủ này khỏi không gian làm việc.
+                    Nhập tên máy chủ ({serverDetail?.name}) để xác nhận xóa vĩnh viễn máy chủ này khỏi PostgreSQL.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2.5">
                     <input
@@ -855,21 +921,18 @@ function ServerWorkspaceDialogContent({
               </div>
             )}
 
-            {/* TAB 2: CHANNELS & PRIVATE CHANNEL ACCESS GUARD */}
+            {/* TAB 2: CHANNELS & PRIVACY */}
             {activeTab === "channels" && (
               <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#2B2D30]">
-                  <div>
-                    <h2 className="text-lg font-bold text-white">
-                      Quản lý Kênh & Quyền riêng tư
-                    </h2>
-                    <p className="text-xs text-[#A8A8B0] mt-1">
-                      Tạo kênh mới, xóa kênh hoặc bật khóa Kênh riêng tư để ngăn lộ nội dung với các vai trò không được phép.
-                    </p>
-                  </div>
+                <div className="pb-4 border-b border-[#2B2D30]">
+                  <h2 className="text-lg font-bold text-white">
+                    Quản lý Kênh & Quyền riêng tư
+                  </h2>
+                  <p className="text-xs text-[#A8A8B0] mt-1">
+                    Tạo kênh mới, xóa kênh hoặc bật khóa Kênh riêng tư lưu trực tiếp trong bảng `channels` và `channel_role_permissions`.
+                  </p>
                 </div>
 
-                {/* Create Channel Form */}
                 <form
                   onSubmit={handleCreateChannel}
                   className="p-4 rounded-[4px] bg-[#18181B] border border-[#2B2D30] space-y-3"
@@ -925,18 +988,15 @@ function ServerWorkspaceDialogContent({
                       className="rounded border-[#393B40] bg-[#141417]"
                     />
                     <span>
-                      Đặt làm <strong>Kênh riêng tư (Private)</strong> — chỉ Owner và Admin được xem mặc định
+                      Đặt làm <strong>Kênh riêng tư (Private)</strong> — chỉ các vai trò được phép mới xem được
                     </span>
                   </label>
                 </form>
 
-                {/* Channels List & Privacy Controls */}
                 <div className="border border-[#2B2D30] rounded-[4px] divide-y divide-[#2B2D30] bg-[#18181B]">
                   {(serverDetail?.channels ?? []).map((ch) => {
-                    const policy = config.channelPolicies[ch.id] ?? {
-                      isPrivate: false,
-                      allowedRoleIds: ["OWNER", "ADMIN"],
-                    };
+                    const isPrivate = Boolean(ch.isPrivate);
+                    const allowedRoles = ch.allowedRoleIds ?? [];
                     return (
                       <div
                         key={ch.id}
@@ -950,7 +1010,7 @@ function ServerWorkspaceDialogContent({
                             <span className="text-sm font-semibold text-white">
                               {ch.name}
                             </span>
-                            {policy.isPrivate ? (
+                            {isPrivate ? (
                               <span className="px-2 py-0.5 rounded-[2px] bg-[#FDB60D]/15 border border-[#FDB60D]/40 text-[#FDB60D] text-[10px] font-mono font-semibold">
                                 🔒 Kênh riêng tư
                               </span>
@@ -964,22 +1024,30 @@ function ServerWorkspaceDialogContent({
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => toggleChannelPrivacy(ch.id)}
+                              onClick={() =>
+                                void toggleChannelPrivacy(
+                                  ch.id,
+                                  isPrivate,
+                                  allowedRoles
+                                )
+                              }
                               data-testid={`toggle-privacy-${ch.id}`}
                               className={`px-3 py-1 rounded-[4px] border text-xs font-medium transition-colors cursor-pointer ${
-                                policy.isPrivate
+                                isPrivate
                                   ? "border-[#FDB60D]/50 bg-[#FDB60D]/15 text-[#FDB60D] hover:bg-[#FDB60D]/25"
                                   : "border-[#393B40] bg-[#1E1F22] text-[#CDCDCD] hover:text-white"
                               }`}
                             >
-                              {policy.isPrivate
+                              {isPrivate
                                 ? "Mở công khai kênh"
                                 : "Khóa kênh riêng tư"}
                             </button>
 
                             <button
                               type="button"
-                              onClick={() => handleDeleteChannel(ch.id, ch.name)}
+                              onClick={() =>
+                                void handleDeleteChannel(ch.id, ch.name)
+                              }
                               className="px-2.5 py-1 rounded-[4px] border border-[#FE2857]/40 text-[#FE2857] hover:bg-[#FE2857] hover:text-white text-xs transition-colors cursor-pointer"
                             >
                               Xóa
@@ -987,21 +1055,23 @@ function ServerWorkspaceDialogContent({
                           </div>
                         </div>
 
-                        {policy.isPrivate && (
+                        {isPrivate && (
                           <div className="pl-6 pt-2 border-t border-[#2B2D30]/60 flex flex-wrap items-center gap-2">
                             <span className="text-[11px] font-mono text-[#A8A8B0] mr-1">
                               Vai trò được phép truy cập:
                             </span>
-                            {config.roles.map((role) => {
-                              const allowed = policy.allowedRoleIds.includes(
-                                role.id
-                              );
+                            {dbRoles.map((role) => {
+                              const allowed = allowedRoles.includes(role.id);
                               return (
                                 <button
                                   key={role.id}
                                   type="button"
                                   onClick={() =>
-                                    toggleChannelAllowedRole(ch.id, role.id)
+                                    void toggleChannelAllowedRole(
+                                      ch.id,
+                                      allowedRoles,
+                                      role.id
+                                    )
                                   }
                                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[3px] border text-[11px] font-mono transition-colors cursor-pointer ${
                                     allowed
@@ -1027,7 +1097,7 @@ function ServerWorkspaceDialogContent({
               </div>
             )}
 
-            {/* TAB 3: MEMBERS & ROLE ASSIGNMENT */}
+            {/* TAB 3: MEMBERS */}
             {activeTab === "members" && (
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#2B2D30]">
@@ -1036,7 +1106,7 @@ function ServerWorkspaceDialogContent({
                       Quản lý Thành viên ({visibleMembers.length})
                     </h2>
                     <p className="text-xs text-[#A8A8B0] mt-1">
-                      Phân quyền vai trò cho từng người dùng, tạo liên kết mời hoặc thu hồi quyền truy cập.
+                      Gán vai trò (`member_roles`), tạo liên kết mời hoặc thu hồi quyền truy cập.
                     </p>
                   </div>
                   <button
@@ -1062,7 +1132,7 @@ function ServerWorkspaceDialogContent({
                       type="button"
                       onClick={() => {
                         void navigator.clipboard?.writeText(inviteLink);
-                        setStatusMsg("Đã sao chép liên kết mời vào bộ nhớ tạm.");
+                        setStatusMsg("Đã sao chép liên kết mời.");
                       }}
                       className="px-3 py-1.5 rounded-[4px] bg-[#2B2D30] hover:bg-[#393B40] text-xs font-mono text-white shrink-0 cursor-pointer"
                     >
@@ -1071,7 +1141,6 @@ function ServerWorkspaceDialogContent({
                   </div>
                 )}
 
-                {/* Search & Filter */}
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px] gap-3">
                   <input
                     type="text"
@@ -1086,7 +1155,7 @@ function ServerWorkspaceDialogContent({
                     className="h-9 px-3 rounded-[4px] bg-[#141417] border border-[#393B40] text-xs text-white"
                   >
                     <option value="ALL">Tất cả vai trò</option>
-                    {config.roles.map((r) => (
+                    {dbRoles.map((r) => (
                       <option key={r.id} value={r.id}>
                         {r.name}
                       </option>
@@ -1094,19 +1163,18 @@ function ServerWorkspaceDialogContent({
                   </select>
                 </div>
 
-                {/* Members Table */}
                 <div className="border border-[#2B2D30] rounded-[4px] divide-y divide-[#2B2D30] bg-[#18181B]">
                   {visibleMembers.length === 0 ? (
                     <div className="p-8 text-center text-xs text-[#7D7D7D]">
-                      Không tìm thấy thành viên phù hợp với bộ lọc.
+                      Không tìm thấy thành viên phù hợp.
                     </div>
                   ) : (
                     visibleMembers.map((member) => {
                       const assignedRoleId =
-                        config.memberRoleOverrides[member.id] ?? member.role;
-                      const roleObj =
-                        config.roles.find((r) => r.id === assignedRoleId) ??
-                        config.roles[config.roles.length - 1];
+                        member.roleIds?.[0] ?? dbRoles[dbRoles.length - 1]?.id ?? "";
+                      const roleObj = dbRoles.find(
+                        (r) => r.id === assignedRoleId
+                      );
 
                       return (
                         <div
@@ -1138,25 +1206,15 @@ function ServerWorkspaceDialogContent({
                             <select
                               aria-label={`Vai trò của ${member.name}`}
                               value={assignedRoleId}
-                              onChange={(e) => {
-                                const nextRole = e.target.value;
-                                updateServerWorkspaceConfig(
-                                  serverId,
-                                  (prev) => ({
-                                    ...prev,
-                                    memberRoleOverrides: {
-                                      ...prev.memberRoleOverrides,
-                                      [member.id]: nextRole,
-                                    },
-                                  })
-                                );
-                                setStatusMsg(
-                                  `Đã cập nhật vai trò của ${member.name}.`
-                                );
-                              }}
+                              onChange={(e) =>
+                                void handleAssignMemberRole(
+                                  member.id,
+                                  e.target.value
+                                )
+                              }
                               className="h-8 px-2.5 rounded-[4px] bg-[#141417] border border-[#393B40] text-xs font-mono text-white"
                             >
-                              {config.roles.map((r) => (
+                              {dbRoles.map((r) => (
                                 <option key={r.id} value={r.id}>
                                   {r.name}
                                 </option>
@@ -1167,42 +1225,14 @@ function ServerWorkspaceDialogContent({
                               <>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    updateServerWorkspaceConfig(
-                                      serverId,
-                                      (prev) => ({
-                                        ...prev,
-                                        kickedMemberIds: [
-                                          ...prev.kickedMemberIds,
-                                          member.id,
-                                        ],
-                                      })
-                                    );
-                                    setStatusMsg(
-                                      `Đã mời ${member.name} rời khỏi máy chủ.`
-                                    );
-                                  }}
+                                  onClick={() => void handleKickMember(member)}
                                   className="px-2.5 py-1 rounded-[4px] border border-[#FDB60D]/40 text-[#FDB60D] hover:bg-[#FDB60D] hover:text-[#0B0B0D] text-xs transition-colors cursor-pointer"
                                 >
                                   Kick
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    updateServerWorkspaceConfig(
-                                      serverId,
-                                      (prev) => ({
-                                        ...prev,
-                                        bannedMemberIds: [
-                                          ...prev.bannedMemberIds,
-                                          member.id,
-                                        ],
-                                      })
-                                    );
-                                    setStatusMsg(
-                                      `Đã chặn ${member.name} khỏi máy chủ.`
-                                    );
-                                  }}
+                                  onClick={() => void handleBanMember(member)}
                                   className="px-2.5 py-1 rounded-[4px] border border-[#FE2857]/40 text-[#FE2857] hover:bg-[#FE2857] hover:text-white text-xs transition-colors cursor-pointer"
                                 >
                                   Ban
@@ -1215,29 +1245,6 @@ function ServerWorkspaceDialogContent({
                     })
                   )}
                 </div>
-
-                {(config.kickedMemberIds.length > 0 ||
-                  config.bannedMemberIds.length > 0) && (
-                  <div className="flex items-center justify-between p-3 rounded-[4px] bg-[#141417] border border-[#2B2D30] text-xs text-[#A8A8B0]">
-                    <span>
-                      Đã hạn chế: {config.kickedMemberIds.length} bị kick ·{" "}
-                      {config.bannedMemberIds.length} bị chặn
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateServerWorkspaceConfig(serverId, (prev) => ({
-                          ...prev,
-                          kickedMemberIds: [],
-                          bannedMemberIds: [],
-                        }))
-                      }
-                      className="text-[#07C3F2] hover:underline font-mono cursor-pointer"
-                    >
-                      Khôi phục danh sách
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 
@@ -1249,12 +1256,11 @@ function ServerWorkspaceDialogContent({
                     Vai trò & Ma trận Phân quyền (RBAC)
                   </h2>
                   <p className="text-xs text-[#A8A8B0] mt-1">
-                    Thiết lập các vai trò trong máy chủ, chọn màu nhận diện từ bảng màu JetBrains và bật/tắt từng quyền hạn cụ thể.
+                    Dữ liệu vai trò và bitmask quyền hạn được lưu trực tiếp trong bảng `roles` trên PostgreSQL.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-[230px_1fr] gap-5">
-                  {/* Left column: Role list + create role */}
                   <div className="space-y-3">
                     <form onSubmit={handleAddRole} className="flex gap-1.5">
                       <input
@@ -1275,7 +1281,7 @@ function ServerWorkspaceDialogContent({
                     </form>
 
                     <div className="border border-[#2B2D30] rounded-[4px] bg-[#18181B] divide-y divide-[#2B2D30]">
-                      {config.roles.map((role) => {
+                      {dbRoles.map((role) => {
                         const active = role.id === selectedRole?.id;
                         return (
                           <button
@@ -1295,18 +1301,15 @@ function ServerWorkspaceDialogContent({
                               />
                               <span className="truncate">{role.name}</span>
                             </div>
-                            {role.isSystem && (
-                              <span className="text-[9px] font-mono uppercase text-[#7D7D7D]">
-                                SYS
-                              </span>
-                            )}
+                            <span className="text-[10px] font-mono text-[#7D7D7D]">
+                              {role.memberCount}
+                            </span>
                           </button>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* Right column: Selected role permissions */}
                   {selectedRole && (
                     <div className="space-y-5 bg-[#18181B] border border-[#2B2D30] rounded-[4px] p-5">
                       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-[#2B2D30]">
@@ -1319,7 +1322,7 @@ function ServerWorkspaceDialogContent({
                             type="text"
                             value={selectedRole.name}
                             onChange={(e) =>
-                              updateRoleMeta(selectedRole.id, {
+                              void updateRoleMeta(selectedRole, {
                                 name: e.target.value,
                               })
                             }
@@ -1327,10 +1330,10 @@ function ServerWorkspaceDialogContent({
                           />
                         </div>
 
-                        {!selectedRole.isSystem && (
+                        {!selectedRole.isManaged && (
                           <button
                             type="button"
-                            onClick={() => handleDeleteRole(selectedRole.id)}
+                            onClick={() => void handleDeleteRole(selectedRole.id)}
                             className="px-2.5 py-1 rounded-[4px] border border-[#FE2857]/40 text-[#FE2857] hover:bg-[#FE2857] hover:text-white text-xs cursor-pointer"
                           >
                             Xóa vai trò
@@ -1338,7 +1341,6 @@ function ServerWorkspaceDialogContent({
                         )}
                       </div>
 
-                      {/* Role Color Picker */}
                       <div>
                         <p className="text-[11px] font-mono uppercase text-[#A8A8B0] mb-2">
                           Màu sắc vai trò
@@ -1349,7 +1351,7 @@ function ServerWorkspaceDialogContent({
                               key={swatch.hex}
                               type="button"
                               onClick={() =>
-                                updateRoleMeta(selectedRole.id, {
+                                void updateRoleMeta(selectedRole, {
                                   color: swatch.hex,
                                 })
                               }
@@ -1365,7 +1367,6 @@ function ServerWorkspaceDialogContent({
                         </div>
                       </div>
 
-                      {/* Granular Permissions Matrix */}
                       <div className="space-y-5 pt-2">
                         {PERMISSION_GROUPS.map((grp) => (
                           <div key={grp.group} className="space-y-2">
@@ -1394,8 +1395,8 @@ function ServerWorkspaceDialogContent({
                                       role="switch"
                                       aria-checked={enabled}
                                       onClick={() =>
-                                        toggleRolePermission(
-                                          selectedRole.id,
+                                        void toggleRolePermission(
+                                          selectedRole,
                                           perm.key
                                         )
                                       }
@@ -1423,6 +1424,204 @@ function ServerWorkspaceDialogContent({
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* TAB 5: ANALYTICS & SQL QUERIES */}
+            {activeTab === "analytics" && (
+              <div className="space-y-6">
+                <div className="pb-4 border-b border-[#2B2D30]">
+                  <h2 className="text-lg font-bold text-white">
+                    Thống kê Máy chủ & Tìm kiếm Tin nhắn (PostgreSQL)
+                  </h2>
+                  <p className="text-xs text-[#A8A8B0] mt-1">
+                    Tổng hợp dữ liệu trực tiếp từ CSDL bằng các truy vấn JOIN, GROUP BY, HAVING, Window Function RANK() và tìm kiếm ILIKE có kiểm tra quyền kênh riêng tư.
+                  </p>
+                </div>
+
+                {analyticsLoading ? (
+                  <p className="text-xs font-mono text-[#7D7D7D]">
+                    Đang thực thi truy vấn thống kê trên PostgreSQL...
+                  </p>
+                ) : analytics ? (
+                  <>
+                    {/* Summary KPIs */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        {
+                          label: "Thành viên",
+                          value: `${analytics.summary.totalMembers} (${analytics.summary.onlineMembers} online)`,
+                          color: "#21D789",
+                        },
+                        {
+                          label: "Kênh (Riêng tư)",
+                          value: `${analytics.summary.totalChannels} (${analytics.summary.privateChannels} 🔒)`,
+                          color: "#FDB60D",
+                        },
+                        {
+                          label: "Tổng tin nhắn",
+                          value: `${analytics.summary.totalMessages}`,
+                          color: "#087CFA",
+                        },
+                        {
+                          label: "Tệp đính kèm",
+                          value: `${analytics.summary.totalAttachments} (${formatBytes(analytics.summary.totalAttachmentBytes)})`,
+                          color: "#AF1DF5",
+                        },
+                      ].map((kpi) => (
+                        <div
+                          key={kpi.label}
+                          className="p-3.5 rounded-[4px] bg-[#18181B] border border-[#2B2D30]"
+                        >
+                          <p className="text-[11px] font-mono text-[#A8A8B0]">
+                            {kpi.label}
+                          </p>
+                          <p
+                            className="text-base font-bold font-mono mt-1"
+                            style={{ color: kpi.color }}
+                          >
+                            {kpi.value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Search Messages */}
+                    <div className="p-4 rounded-[4px] bg-[#18181B] border border-[#2B2D30] space-y-3">
+                      <p className="text-xs font-mono font-semibold text-[#07C3F2]">
+                        Tìm kiếm nội dung tin nhắn (ILIKE + Kiểm tra quyền kênh)
+                      </p>
+                      <form onSubmit={handleSearchMessages} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Nhập từ khóa cần tìm trong tin nhắn..."
+                          className="flex-1 h-9 px-3 rounded-[4px] bg-[#141417] border border-[#393B40] text-xs text-white focus:border-[#087CFA] focus:outline-none"
+                        />
+                        <button
+                          type="submit"
+                          className="h-9 px-4 rounded-[4px] bg-[#087CFA] hover:bg-[#07C3F2] hover:text-[#0B0B0D] text-white text-xs font-semibold cursor-pointer"
+                        >
+                          Tìm kiếm
+                        </button>
+                      </form>
+                      {searchResults.length > 0 && (
+                        <div className="divide-y divide-[#2B2D30] border border-[#2B2D30] rounded-[4px] bg-[#141417] max-h-48 overflow-y-auto">
+                          {searchResults.map((r) => (
+                            <div key={r.id} className="p-2.5 text-xs space-y-1">
+                              <div className="flex items-center justify-between text-[#7D7D7D] font-mono">
+                                <span>
+                                  #{r.channelName} ·{" "}
+                                  <strong className="text-[#E6EDF3]">
+                                    {r.author.displayName || r.author.username}
+                                  </strong>
+                                </span>
+                                <span>
+                                  {new Date(r.createdAt).toLocaleString("vi-VN")}
+                                </span>
+                              </div>
+                              <p className="text-[#CDCDCD]">{r.content}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Two-column breakdown: Channels & Top Contributors */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-[4px] bg-[#18181B] border border-[#2B2D30] space-y-3">
+                        <p className="text-xs font-mono font-semibold text-[#07C3F2]">
+                          Tin nhắn theo từng kênh (LEFT JOIN + GROUP BY)
+                        </p>
+                        <div className="divide-y divide-[#2B2D30] text-xs">
+                          {analytics.messagesByChannel.map((ch) => (
+                            <div
+                              key={ch.channelId}
+                              className="py-2 flex items-center justify-between"
+                            >
+                              <span className="text-[#E6EDF3] font-mono">
+                                #{ch.channelName}{" "}
+                                {ch.isPrivate && (
+                                  <span className="text-[#FDB60D]">🔒</span>
+                                )}
+                              </span>
+                              <span className="font-mono text-[#21D789]">
+                                {ch.messageCount} tin nhắn
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-[4px] bg-[#18181B] border border-[#2B2D30] space-y-3">
+                        <p className="text-xs font-mono font-semibold text-[#07C3F2]">
+                          Top thành viên tích cực (GROUP BY + RANK())
+                        </p>
+                        {analytics.topContributors.length === 0 ? (
+                          <p className="text-xs text-[#7D7D7D]">
+                            Chưa có dữ liệu tin nhắn.
+                          </p>
+                        ) : (
+                          <div className="divide-y divide-[#2B2D30] text-xs">
+                            {analytics.topContributors.map((u) => (
+                              <div
+                                key={u.userId}
+                                className="py-2 flex items-center justify-between"
+                              >
+                                <span className="text-[#E6EDF3]">
+                                  <span className="font-mono text-[#FDB60D] mr-2">
+                                    #{u.rank}
+                                  </span>
+                                  {u.displayName || u.username}
+                                </span>
+                                <span className="font-mono text-[#07C3F2]">
+                                  {u.messageCount} tin nhắn
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Audit Logs */}
+                    <div className="p-4 rounded-[4px] bg-[#18181B] border border-[#2B2D30] space-y-3">
+                      <p className="text-xs font-mono font-semibold text-[#07C3F2]">
+                        Nhật ký quản trị (Bảng audit_logs)
+                      </p>
+                      {auditLogs.length === 0 ? (
+                        <p className="text-xs text-[#7D7D7D]">
+                          Chưa có bản ghi nhật ký quản trị nào.
+                        </p>
+                      ) : (
+                        <div className="divide-y divide-[#2B2D30] text-xs max-h-48 overflow-y-auto">
+                          {auditLogs.map((log) => (
+                            <div
+                              key={log.id}
+                              className="py-2 flex items-center justify-between gap-3"
+                            >
+                              <div className="min-w-0">
+                                <span className="font-mono text-[#21D789] mr-2">
+                                  [{log.action}]
+                                </span>
+                                <span className="text-[#E6EDF3]">
+                                  {log.detail || log.targetType}
+                                </span>
+                                <span className="text-[#7D7D7D] ml-2">
+                                  — bởi {log.actor.displayName || log.actor.username}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-mono text-[#7D7D7D] shrink-0">
+                                {new Date(log.createdAt).toLocaleString("vi-VN")}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : null}
               </div>
             )}
           </div>

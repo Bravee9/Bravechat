@@ -5,3 +5,4 @@ export * from "./domain/message";
 export * from "./api/envelope";
 export * from "./api/routes";
 export * from "./realtime/events";
+export * from "./permissions";
