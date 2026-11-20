@@ -1,6 +1,6 @@
 // ============================================================
 // apps/api/src/plugins/index.ts
-// Register all Fastify plugins
+// Register all Fastify plugins & security layers
 // ============================================================
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
@@ -10,7 +10,6 @@ import multipart from '@fastify/multipart'
 import websocket from '@fastify/websocket'
 import cookie from '@fastify/cookie'
 import rateLimit from '@fastify/rate-limit'
-import { createHash } from 'node:crypto'
 import { env } from '../config/env'
 import r2 from './r2'
 import { prisma } from '../config/prisma'
@@ -111,6 +110,21 @@ function buildAllowedOrigins(): Set<string> {
 export async function registerPlugins(server: FastifyInstance) {
   const allowedOrigins = buildAllowedOrigins()
   server.addContentTypeParser('application/webhook+json', { parseAs: 'string' }, (_request, body, done) => done(null, body))
+
+  // Security headers hook for all API responses
+  server.addHook('onSend', async (_request, reply, payload) => {
+    reply.header('X-Content-Type-Options', 'nosniff')
+    reply.header('X-Frame-Options', 'DENY')
+    reply.header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin')
+    reply.header('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()')
+    reply.header('Cross-Origin-Resource-Policy', 'cross-origin')
+    if (env.NODE_ENV === 'production') {
+      reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    }
+    return payload
+  })
+
   // CORS — allow configured frontend origins
   await server.register(cors, {
     origin: (origin, callback) => {
@@ -150,7 +164,6 @@ export async function registerPlugins(server: FastifyInstance) {
 
   // Early onRequest hook: Layer 7 Botnet Defense & Origin Protection
   server.addHook('onRequest', async (request, reply) => {
-    // Exemption for unban endpoint in non-production environments
     if (env.NODE_ENV !== 'production' && request.url === '/security/unban') {
       return
     }
@@ -172,20 +185,6 @@ export async function registerPlugins(server: FastifyInstance) {
     }
   })
 
-  // Security headers on every response (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS, CSP frame-ancestors)
-  server.addHook('onSend', async (_request, reply, payload) => {
-    reply.header('X-Content-Type-Options', 'nosniff')
-    reply.header('X-Frame-Options', 'DENY')
-    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin')
-    reply.header('X-Permitted-Cross-Domain-Policies', 'none')
-    reply.header('Permissions-Policy', 'geolocation=(), payment=(), usb=()')
-    reply.header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
-    if (env.NODE_ENV === 'production') {
-      reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
-    }
-    return payload
-  })
-
   // Multipart (file upload)
   await server.register(multipart, {
     limits: {
@@ -196,27 +195,20 @@ export async function registerPlugins(server: FastifyInstance) {
   // WebSocket support
   await server.register(websocket, { options: { maxPayload: 16384 } })
 
-  // Rate Limiting — global protection backed by Redis distributed store
-  // Separates authenticated user buckets on shared NAT/Wi-Fi from anonymous IP buckets
+  // Rate Limiting — global protection backed by Redis distributed store.
+  // Authenticated users on shared NAT/Wi-Fi are keyed per session tail + IP so concurrent users on the same network do not ban each other,
+  // while unauthenticated traffic/floods are strictly keyed per IP.
   const redisClient = getRedisClient()
   await server.register(rateLimit, {
     global: true,
-    max: 120, // 120 requests / min per bucket
+    max: 120,
     timeWindow: '1 minute',
     redis: redisClient ?? undefined,
-    ban: 3, // Automatically ban offender if limit is exceeded 3 times
+    ban: 3,
     keyGenerator: (req) => {
-      if (req.url.startsWith('/api/auth/') || req.url === '/health') {
-        return req.ip
-      }
-      const authHeader = req.headers.authorization
-      const cookieToken = req.cookies?.token
-      const rawToken =
-        (authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '') ||
-        (typeof cookieToken === 'string' ? cookieToken.trim() : '')
-      if (rawToken.length > 20) {
-        const tokenFingerprint = createHash('sha256').update(rawToken).digest('hex').slice(0, 16)
-        return `${req.ip}:u:${tokenFingerprint}`
+      const tokenCookie = req.cookies?.token
+      if (tokenCookie && tokenCookie.length > 24 && !req.url.startsWith('/api/auth/login') && !req.url.startsWith('/api/auth/register') && !req.url.startsWith('/api/auth/forgot-password')) {
+        return `${req.ip}:s:${tokenCookie.slice(-16)}`
       }
       return req.ip
     },
@@ -244,13 +236,11 @@ export async function registerPlugins(server: FastifyInstance) {
   server.get('/health', async () => ({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    version: '0.1.0',
     redis: redisClient ? 'connected' : 'disabled',
   }))
 
-  // Testing & Security Administration endpoint
+  // Testing & Security Administration endpoint (disabled in production)
   server.post('/security/unban', async (request, reply) => {
-    // Only permit local requests or requests with valid master secret in development/test
     if (env.NODE_ENV === 'production') {
       return reply.code(404).send()
     }
@@ -265,11 +255,18 @@ export async function registerPlugins(server: FastifyInstance) {
     return { status: 'ok', unbanned: targetIp }
   })
 
-  // Kiểm kết nối Cloudflare R2 khi API đang chạy
+  // Storage health check — hides bucket names and raw SDK stack traces in production
   server.get('/health/storage', async (_request, reply) => {
     try {
-      return { status: 'ok', provider: 'cloudflare-r2', ...(await server.r2.storage.checkConnection()) }
+      const info = await server.r2.storage.checkConnection()
+      if (env.NODE_ENV === 'production') {
+        return { status: 'ok', latencyMs: info.latencyMs }
+      }
+      return { status: 'ok', provider: 'cloudflare-r2', ...info }
     } catch (error) {
+      if (env.NODE_ENV === 'production') {
+        return reply.status(503).send({ status: 'error', message: 'Dịch vụ lưu trữ tạm thời không khả dụng.' })
+      }
       return reply.status(503).send({ status: 'error', provider: 'cloudflare-r2', message: error instanceof Error ? error.message : 'unknown' })
     }
   })
