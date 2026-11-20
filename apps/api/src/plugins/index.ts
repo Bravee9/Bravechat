@@ -10,6 +10,7 @@ import multipart from '@fastify/multipart'
 import websocket from '@fastify/websocket'
 import cookie from '@fastify/cookie'
 import rateLimit from '@fastify/rate-limit'
+import { createHash } from 'node:crypto'
 import { env } from '../config/env'
 import r2 from './r2'
 import { prisma } from '../config/prisma'
@@ -82,8 +83,11 @@ async function unblacklistIp(ip: string): Promise<void> {
   const client = getRedisClient()
   if (client) {
     try {
-      const keys = await client.keys(`*${ip}*`)
-      if (keys.length > 0) await client.del(...keys)
+      await client.del(
+        `bravechat:blacklist:${ip}`,
+        `bravechat:strikes:${ip}`,
+        `fastify-rate-limit-${ip}`
+      )
     } catch {
       // ignore
     }
@@ -168,6 +172,20 @@ export async function registerPlugins(server: FastifyInstance) {
     }
   })
 
+  // Security headers on every response (Anti-Clickjacking, Anti-MIME-Sniffing, HSTS, CSP frame-ancestors)
+  server.addHook('onSend', async (_request, reply, payload) => {
+    reply.header('X-Content-Type-Options', 'nosniff')
+    reply.header('X-Frame-Options', 'DENY')
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin')
+    reply.header('X-Permitted-Cross-Domain-Policies', 'none')
+    reply.header('Permissions-Policy', 'geolocation=(), payment=(), usb=()')
+    reply.header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+    if (env.NODE_ENV === 'production') {
+      reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    }
+    return payload
+  })
+
   // Multipart (file upload)
   await server.register(multipart, {
     limits: {
@@ -179,13 +197,29 @@ export async function registerPlugins(server: FastifyInstance) {
   await server.register(websocket, { options: { maxPayload: 16384 } })
 
   // Rate Limiting — global protection backed by Redis distributed store
+  // Separates authenticated user buckets on shared NAT/Wi-Fi from anonymous IP buckets
   const redisClient = getRedisClient()
   await server.register(rateLimit, {
     global: true,
-    max: 120, // 120 requests / min / IP
+    max: 120, // 120 requests / min per bucket
     timeWindow: '1 minute',
     redis: redisClient ?? undefined,
-    ban: 3, // Automatically ban IP if limit is exceeded 3 times
+    ban: 3, // Automatically ban offender if limit is exceeded 3 times
+    keyGenerator: (req) => {
+      if (req.url.startsWith('/api/auth/') || req.url === '/health') {
+        return req.ip
+      }
+      const authHeader = req.headers.authorization
+      const cookieToken = req.cookies?.token
+      const rawToken =
+        (authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '') ||
+        (typeof cookieToken === 'string' ? cookieToken.trim() : '')
+      if (rawToken.length > 20) {
+        const tokenFingerprint = createHash('sha256').update(rawToken).digest('hex').slice(0, 16)
+        return `${req.ip}:u:${tokenFingerprint}`
+      }
+      return req.ip
+    },
     allowList: (req) => req.url.startsWith('/security/unban'),
     onBanReach: async (req) => {
       await blacklistIp(req.ip, 900, 'Fastify Rate Limit ban threshold reached')

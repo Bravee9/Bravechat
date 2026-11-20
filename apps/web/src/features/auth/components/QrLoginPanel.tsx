@@ -50,11 +50,18 @@ export function QrLoginPanel() {
 
   // Expiration timer check based on expiresAt
   useEffect(() => {
-    if (!qrData || status === "EXPIRED" || status === "REJECTED" || status === "APPROVED") {
+    if (
+      !qrData ||
+      status === "EXPIRED" ||
+      status === "REJECTED" ||
+      status === "APPROVED"
+    ) {
       return;
     }
     const checkTimer = () => {
-      const remain = Math.floor((new Date(qrData.expiresAt).getTime() - Date.now()) / 1000);
+      const remain = Math.floor(
+        (new Date(qrData.expiresAt).getTime() - Date.now()) / 1000
+      );
       if (remain <= 0) {
         setStatus("EXPIRED");
       }
@@ -65,7 +72,12 @@ export function QrLoginPanel() {
 
   // Poll QR status
   useEffect(() => {
-    if (!qrData || status === "EXPIRED" || status === "REJECTED" || status === "APPROVED") {
+    if (
+      !qrData ||
+      status === "EXPIRED" ||
+      status === "REJECTED" ||
+      status === "APPROVED"
+    ) {
       return;
     }
     let active = true;
@@ -93,75 +105,82 @@ export function QrLoginPanel() {
 
   return (
     <div
-      className="flex flex-col items-center justify-center text-center select-none"
+      className="flex flex-col items-center justify-center text-center select-none py-2"
       data-testid="qr-login-panel"
     >
-      {/* State: Scanned, waiting for mobile approval */}
+      {/* State: Scanned, waiting for approval */}
       {status === "SCANNED" && scannedBy ? (
-        <div className="w-full max-w-[220px] flex flex-col items-center space-y-4 py-4 animate-fade-in">
-          <div className="w-20 h-20 rounded-full bg-ocean-primary border-2 border-ocean-secondary flex items-center justify-center text-2xl font-bold text-white shadow-lg overflow-hidden">
+        <div className="w-full max-w-[240px] flex flex-col items-center space-y-4 py-3 animate-fade-in">
+          <div className="w-16 h-16 rounded-full bg-[#2B66E0] ring-2 ring-[#589DF6]/60 flex items-center justify-center text-xl font-bold text-white overflow-hidden">
             {scannedBy.avatarUrl ? (
-              <img src={scannedBy.avatarUrl} alt="" className="w-full h-full object-cover" />
+              <img
+                src={scannedBy.avatarUrl}
+                alt=""
+                className="w-full h-full object-cover"
+              />
             ) : (
-              (scannedBy.displayName?.[0] || scannedBy.username[0] || "B").toUpperCase()
+              (
+                scannedBy.displayName?.[0] ||
+                scannedBy.username[0] ||
+                "B"
+              ).toUpperCase()
             )}
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-ocean-secondary uppercase tracking-wider">
-              Đã quét mã
-            </p>
-            <h4 className="text-base font-bold text-white mt-0.5">
+            <p className="text-xs font-medium text-[#589DF6]">Đã quét mã</p>
+            <h3 className="text-base font-semibold text-white mt-0.5">
               {scannedBy.displayName || scannedBy.username}
-            </h4>
-            <p className="text-xs text-ocean-light/60">@{scannedBy.username}</p>
+            </h3>
+            <p className="text-xs text-[#9CA3AF]">@{scannedBy.username}</p>
           </div>
 
-          <p className="text-xs text-ocean-light/70 leading-relaxed">
-            Vui lòng xác nhận đăng nhập trên thiết bị của bạn để tiếp tục.
+          <p className="text-xs text-[#B4B6BE] leading-relaxed">
+            Xác nhận đăng nhập trên thiết bị đã đăng nhập của bạn để tiếp tục.
           </p>
 
           <button
             type="button"
             onClick={() => void initQrSession()}
-            className="text-xs text-ocean-secondary hover:underline transition-colors cursor-pointer"
+            className="text-xs font-medium text-[#589DF6] hover:text-[#7EB5FF] hover:underline transition-colors cursor-pointer"
           >
             Hủy và tạo mã mới
           </button>
         </div>
       ) : status === "APPROVED" ? (
-        <div className="w-full max-w-[220px] flex flex-col items-center space-y-3 py-8 animate-fade-in">
-          <div className="w-14 h-14 rounded-full bg-ocean-primary/20 border border-ocean-secondary text-ocean-secondary flex items-center justify-center text-xl font-bold">
+        <div className="w-full max-w-[240px] flex flex-col items-center space-y-3 py-6 animate-fade-in">
+          <div className="w-12 h-12 rounded-full bg-[#2B66E0]/20 border border-[#589DF6]/50 text-[#589DF6] flex items-center justify-center">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h4 className="text-base font-bold text-white">Đăng nhập thành công</h4>
-          <p className="text-xs text-ocean-light/70">Đang chuyển tiếp...</p>
+          <h3 className="text-base font-semibold text-white">
+            Đăng nhập thành công
+          </h3>
+          <p className="text-xs text-[#B4B6BE]">Đang chuyển hướng...</p>
         </div>
       ) : (
         <>
-          {/* White QR Code Square */}
-          <div className="relative group">
+          <div className="relative">
             {loading || !qrData ? (
-              <div className="w-[176px] h-[176px] rounded-lg bg-white/5 border border-white/10 flex flex-col items-center justify-center gap-2 animate-pulse">
-                <div className="w-6 h-6 rounded-full border-2 border-ocean-secondary border-t-transparent animate-spin" />
+              <div className="w-[180px] h-[180px] rounded-xl bg-[#1D1E22] border border-white/10 flex flex-col items-center justify-center gap-2 animate-pulse">
+                <div className="w-6 h-6 rounded-full border-2 border-[#589DF6] border-t-transparent animate-spin" />
               </div>
             ) : (
               <div className="relative">
-                <QrCodeSvg value={qrData.qrUrl} size={176} />
+                <QrCodeSvg value={qrData.qrUrl} size={180} />
 
                 {(status === "EXPIRED" || status === "REJECTED") && (
-                  <div className="absolute inset-0 rounded-lg bg-[#051424]/95 flex flex-col items-center justify-center p-3 gap-2 border border-white/10 animate-fade-in">
-                    <span className="text-xs font-medium text-ocean-light/80">
+                  <div className="absolute inset-0 rounded-xl bg-[#1D1E22]/95 flex flex-col items-center justify-center p-3 gap-2.5 border border-white/15 animate-fade-in">
+                    <span className="text-xs font-medium text-[#D1D3DA]">
                       Mã QR đã hết hạn
                     </span>
                     <button
                       type="button"
                       onClick={() => void initQrSession()}
-                      className="text-xs px-3 py-1.5 rounded bg-ocean-primary hover:bg-ocean-primary/90 text-white font-medium transition-colors cursor-pointer"
+                      className="text-xs px-4 py-1.5 rounded-full bg-[#2B66E0] hover:bg-[#3A75EE] text-white font-medium transition-colors cursor-pointer"
                     >
-                      Tải lại mã QR
+                      Tải lại mã
                     </button>
                   </div>
                 )}
@@ -169,12 +188,8 @@ export function QrLoginPanel() {
             )}
           </div>
 
-          {/* Heading and subtext matching Discord */}
-          <h3 className="text-xl font-bold text-white mt-6 tracking-tight">
-            Đăng nhập bằng mã QR
-          </h3>
-          <p className="text-sm text-ocean-light/70 mt-2 max-w-[220px] leading-relaxed">
-            Quét mã này bằng ứng dụng di động để đăng nhập tức thì.
+          <p className="text-xs text-[#B4B6BE] mt-4 max-w-[260px] leading-relaxed">
+            Mở camera hoặc trình duyệt trên thiết bị đã đăng nhập Bravechat để quét mã và phê duyệt.
           </p>
         </>
       )}

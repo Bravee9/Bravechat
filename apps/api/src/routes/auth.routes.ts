@@ -522,7 +522,20 @@ export async function authRoutes(server: FastifyInstance) {
       const input = z.object({ email }).parse(request.body)
       const account = await prisma.user.findUnique({ where: { email: input.email } })
       if (!account || account.isBanned) {
-        throw fail(404, 'Không tìm thấy tài khoản hoạt động với địa chỉ Gmail này.')
+        // Prevent user enumeration: return identical 200 challenge shape with non-resolvable token
+        const dummyChallengeToken = randomBytes(32).toString('hex')
+        return {
+          statusCode: 200,
+          data: {
+            requiresVerification: true,
+            challengeToken: dummyChallengeToken,
+            emailMasked: maskEmail(input.email),
+            methods: ['gmail_otp'],
+            delivery: 'gmail' as const,
+            gmailConfigured: resetMail.getGmailStatus?.().configured ?? false,
+          },
+          message: 'Nếu địa chỉ email hợp lệ, mã xác minh đăng nhập 6 chữ số đã được gửi.',
+        }
       }
 
       const challengeToken = randomBytes(32).toString('hex')

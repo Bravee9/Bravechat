@@ -5,6 +5,9 @@ import Link from "next/link";
 import { http } from "@/services/http";
 import { cn } from "@/lib/utils";
 
+const INPUT_BASE =
+  "w-full h-10 rounded-[4px] bg-[#232428] border border-[#6E7076] hover:border-[#8C8F96] text-white placeholder:text-[#8E9199] px-3 pr-10 text-[13px] transition-colors focus:outline-none focus:border-[#4CA0FF] focus:ring-1 focus:ring-[#4CA0FF]";
+
 export function ResetPasswordForm({ token }: { token: string }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -16,9 +19,12 @@ export function ResetPasswordForm({ token }: { token: string }) {
 
   if (done) {
     return (
-      <div role="status" className="flex flex-col items-center gap-4 text-center text-ocean-light animate-fade-in py-2">
+      <div
+        role="status"
+        className="flex flex-col items-center gap-4 text-center text-[#E5E7EB] animate-fade-in py-2"
+      >
         <style>{`.auth-switch-link { display: none !important; }`}</style>
-        <div className="w-12 h-12 rounded-full bg-ocean-primary/20 text-ocean-secondary flex items-center justify-center border border-ocean-secondary shadow-lg">
+        <div className="w-12 h-12 rounded-full bg-[#2B66E0]/20 text-[#589DF6] flex items-center justify-center border border-[#589DF6]/40">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
           </svg>
@@ -26,9 +32,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
         <p className="text-sm text-white font-medium leading-relaxed max-w-xs">
           Mật khẩu đã được thay đổi thành công. Các phiên đăng nhập cũ đã được đăng xuất an toàn.
         </p>
-        <div className="w-full pt-2">
+        <div className="w-full pt-1">
           <Link
-            className="w-full block text-center py-2.5 rounded bg-ocean-primary hover:bg-ocean-primary/90 text-white font-medium text-sm transition-colors shadow-md"
+            className="w-full h-11 flex items-center justify-center rounded-full bg-[#2B66E0] hover:bg-[#3A75EE] text-white font-medium text-sm transition-colors"
             href="/login"
           >
             Đăng nhập
@@ -40,7 +46,10 @@ export function ResetPasswordForm({ token }: { token: string }) {
 
   if (!token) {
     return (
-      <div role="alert" className="border border-rose-500/30 bg-rose-500/10 p-3.5 rounded text-rose-300 text-xs text-center leading-relaxed">
+      <div
+        role="alert"
+        className="rounded-lg border border-red-400/35 bg-red-500/10 p-3.5 text-red-200 text-xs text-center leading-relaxed"
+      >
         Thiếu mã khôi phục hoặc liên kết không hợp lệ. Vui lòng yêu cầu liên kết mới từ trang quên mật khẩu.
       </div>
     );
@@ -72,11 +81,11 @@ export function ResetPasswordForm({ token }: { token: string }) {
   }
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+    <form className="flex flex-col gap-3.5" onSubmit={handleSubmit} noValidate>
       {error && (
         <div
           role="alert"
-          className="border border-rose-500/30 bg-rose-500/10 px-3.5 py-2.5 rounded text-rose-300 text-xs"
+          className="rounded-lg border border-red-400/35 bg-red-500/10 px-3.5 py-2.5 text-red-200 text-xs"
         >
           {error}
         </div>
@@ -86,7 +95,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <div>
         <label
           htmlFor="reset-password"
-          className="block text-[11px] font-bold uppercase tracking-wider text-ocean-light/70 mb-2"
+          className="block text-xs font-medium text-[#D1D3DA] mb-1.5"
         >
           Mật khẩu mới
         </label>
@@ -96,20 +105,24 @@ export function ResetPasswordForm({ token }: { token: string }) {
             name="password"
             type={showPassword ? "text" : "password"}
             autoComplete="new-password"
+            enterKeyHint="next"
+            autoFocus
             minLength={8}
             maxLength={128}
             required
             value={password}
             onChange={(event) => setPassword(event.target.value)}
+            placeholder="Nhập mật khẩu mới"
             className={cn(
-              "w-full rounded bg-[#051424] border border-white/10 text-white placeholder:text-ocean-light/30 px-3 py-2 pr-10 text-sm transition-colors focus:outline-none focus:border-ocean-secondary",
-              error && "border-rose-500/50"
+              INPUT_BASE,
+              error && "border-red-400/75 focus:border-red-400 focus:ring-red-400/20"
             )}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-ocean-light/50 hover:text-white transition-colors"
+            aria-pressed={showPassword}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md text-[#A8AAB3] hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer"
             aria-label={showPassword ? "Ẩn mật khẩu mới" : "Hiện mật khẩu mới"}
           >
             {showPassword ? (
@@ -124,13 +137,14 @@ export function ResetPasswordForm({ token }: { token: string }) {
             )}
           </button>
         </div>
+        <p className="text-[#9CA3AF] text-[11px] mt-1">Ít nhất 8 ký tự</p>
       </div>
 
       {/* Confirm Password */}
       <div>
         <label
           htmlFor="confirm-password"
-          className="block text-[11px] font-bold uppercase tracking-wider text-ocean-light/70 mb-2"
+          className="block text-xs font-medium text-[#D1D3DA] mb-1.5"
         >
           Nhập lại mật khẩu
         </label>
@@ -140,20 +154,23 @@ export function ResetPasswordForm({ token }: { token: string }) {
             name="confirmPassword"
             type={showConfirm ? "text" : "password"}
             autoComplete="new-password"
+            enterKeyHint="done"
             minLength={8}
             maxLength={128}
             required
             value={confirm}
             onChange={(event) => setConfirm(event.target.value)}
+            placeholder="Nhập lại mật khẩu mới"
             className={cn(
-              "w-full rounded bg-[#051424] border border-white/10 text-white placeholder:text-ocean-light/30 px-3 py-2 pr-10 text-sm transition-colors focus:outline-none focus:border-ocean-secondary",
-              error && "border-rose-500/50"
+              INPUT_BASE,
+              error && "border-red-400/75 focus:border-red-400 focus:ring-red-400/20"
             )}
           />
           <button
             type="button"
             onClick={() => setShowConfirm(!showConfirm)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-ocean-light/50 hover:text-white transition-colors"
+            aria-pressed={showConfirm}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md text-[#A8AAB3] hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer"
             aria-label={showConfirm ? "Ẩn xác nhận mật khẩu" : "Hiện xác nhận mật khẩu"}
           >
             {showConfirm ? (
@@ -173,7 +190,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
       <button
         type="submit"
         disabled={busy || !password || !confirm}
-        className="w-full mt-2 py-2.5 rounded bg-ocean-primary hover:bg-ocean-primary/90 text-white font-medium text-sm transition-colors shadow-md disabled:opacity-50 cursor-pointer"
+        className="w-full h-11 mt-1 rounded-full bg-[#2B66E0] hover:bg-[#3A75EE] text-white font-medium text-sm transition-colors disabled:opacity-50 cursor-pointer"
       >
         {busy ? "Đang lưu..." : "Đặt lại mật khẩu"}
       </button>

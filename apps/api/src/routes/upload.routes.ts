@@ -70,6 +70,8 @@ const presignSchema = z.object({
 
 export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.addHook('preHandler', fastify.authenticate)
+  let activeMultipartBuffers = 0
+  const MAX_CONCURRENT_BUFFER_UPLOADS = 8
 
   async function authorizePurpose(purpose: Purpose, userId: string, ids: { channelId?: string; serverId?: string }) {
     if (purpose === 'attachment') {
@@ -86,6 +88,11 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
    * Trường text (`purpose`, `channelId`, `serverId`) phải đứng TRƯỚC trường `file`.
    */
   fastify.post('/', { config: { rateLimit: { max: 60, timeWindow: '1 minute' } } }, async (request, reply) => {
+    if (activeMultipartBuffers >= MAX_CONCURRENT_BUFFER_UPLOADS) {
+      return reply.status(429).send({ statusCode: 429, message: 'Hệ thống đang xử lý nhiều tệp tải lên cùng lúc. Vui lòng thử lại sau giây lát.' })
+    }
+    activeMultipartBuffers++
+    try {
     let data
     try {
       data = await request.file({ limits: { fileSize: env.MAX_FILE_SIZE, files: 1 } })
@@ -145,6 +152,9 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(502).send({ statusCode: 502, message: 'Không tải được tệp lên kho lưu trữ.' })
     }
     return reply.status(201).send({ statusCode: 201, data: { key, filename, contentType, size: buffer.length, purpose } })
+    } finally {
+      activeMultipartBuffers = Math.max(0, activeMultipartBuffers - 1)
+    }
   })
 
   fastify.post('/presign', async (request, reply) => {

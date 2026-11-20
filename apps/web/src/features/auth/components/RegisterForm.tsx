@@ -1,6 +1,6 @@
 /**
- * components/auth/RegisterForm.tsx
- * Registration form with multi-step validation — Ocean design
+ * features/auth/components/RegisterForm.tsx
+ * Account registration form
  */
 "use client";
 
@@ -37,6 +37,9 @@ const PASSWORD_REQUIREMENTS = [
   },
 ];
 
+const INPUT_BASE =
+  "w-full h-10 rounded-[4px] bg-[#232428] border border-[#6E7076] hover:border-[#8C8F96] text-white placeholder:text-[#8E9199] px-3 text-[13px] transition-colors focus:outline-none focus:border-[#4CA0FF] focus:ring-1 focus:ring-[#4CA0FF]";
+
 export function RegisterForm() {
   const [form, setForm] = useState<FormState>({
     email: "",
@@ -54,46 +57,40 @@ export function RegisterForm() {
   function validate(): FormErrors {
     const errs: FormErrors = {};
 
-    // Email
     if (!form.email.trim()) {
-      errs.email = "Email không được để trống.";
+      errs.email = "Chưa nhập email.";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      errs.email = "Email không hợp lệ.";
+      errs.email = "Email cần có định dạng hợp lệ (ví dụ: ten@domain.com).";
     }
 
-    // Username
     if (!form.username.trim()) {
-      errs.username = "Tên người dùng không được để trống.";
+      errs.username = "Chưa nhập tên người dùng.";
     } else if (form.username.length < 3) {
-      errs.username = "Tên người dùng phải có ít nhất 3 ký tự.";
+      errs.username = "Tên người dùng cần ít nhất 3 ký tự.";
     } else if (form.username.length > 32) {
       errs.username = "Tên người dùng tối đa 32 ký tự.";
     } else if (!/^[a-z0-9._]+$/.test(form.username)) {
       errs.username = "Chỉ dùng chữ thường, số, dấu chấm và gạch dưới.";
     }
 
-    // Display name (optional but max 32)
     if (form.displayName.length > 32) {
       errs.displayName = "Tên hiển thị tối đa 32 ký tự.";
     }
 
-    // Password
     if (!form.password) {
-      errs.password = "Mật khẩu không được để trống.";
+      errs.password = "Chưa nhập mật khẩu.";
     } else if (form.password.length < 8) {
-      errs.password = "Mật khẩu phải có ít nhất 8 ký tự.";
+      errs.password = "Mật khẩu cần ít nhất 8 ký tự.";
     }
 
-    // Confirm password
     if (!form.confirmPassword) {
-      errs.confirmPassword = "Vui lòng xác nhận mật khẩu.";
+      errs.confirmPassword = "Chưa xác nhận mật khẩu.";
     } else if (form.password !== form.confirmPassword) {
-      errs.confirmPassword = "Mật khẩu xác nhận không khớp.";
+      errs.confirmPassword = "Hai mật khẩu chưa trùng khớp.";
     }
 
-    // Terms
     if (!form.agreeToTerms) {
-      errs.agreeToTerms = "Bạn phải đồng ý với điều khoản dịch vụ.";
+      errs.agreeToTerms = "Bạn cần đồng ý với điều khoản để tiếp tục.";
     }
 
     return errs;
@@ -110,29 +107,27 @@ export function RegisterForm() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(
-        `${env.apiUrl}/auth/register`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          signal: AbortSignal.timeout(60000),
-          body: JSON.stringify({
-            email: form.email.trim().toLowerCase(),
-            username: form.username.trim().toLowerCase(),
-            displayName: form.displayName.trim() || form.username,
-            password: form.password,
-          }),
-        }
-      );
+      const res = await fetch(`${env.apiUrl}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        signal: AbortSignal.timeout(60000),
+        body: JSON.stringify({
+          email: form.email.trim().toLowerCase(),
+          username: form.username.trim().toLowerCase(),
+          displayName: form.displayName.trim() || form.username,
+          password: form.password,
+        }),
+      });
 
       if (!res.ok) {
         const data = await res.json();
-        setErrors({ general: data.message ?? "Đăng ký thất bại. Vui lòng thử lại." });
+        setErrors({
+          general: data.message ?? "Đăng ký thất bại. Vui lòng thử lại.",
+        });
         return;
       }
 
-      // Redirect to thank-you page
       window.location.href = "/channels/@me";
     } catch {
       setErrors({ general: "Không thể kết nối đến máy chủ. Vui lòng thử lại." });
@@ -156,16 +151,21 @@ export function RegisterForm() {
     r.test(form.password)
   ).length;
 
-  const strengthColors = ["", "bg-red-500", "bg-amber-500", "bg-yellow-400", "bg-emerald-500"];
+  const strengthColors = [
+    "",
+    "bg-red-500",
+    "bg-amber-500",
+    "bg-yellow-400",
+    "bg-emerald-500",
+  ];
   const strengthLabels = ["", "Yếu", "Trung bình", "Khá", "Mạnh"];
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      {/* General error */}
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3.5">
       {errors.general && (
         <div
           id="register-error-general"
-          className="border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-rose-400 text-sm"
+          className="rounded-lg border border-red-400/35 bg-red-500/10 px-3.5 py-2.5 text-red-200 text-xs"
           role="alert"
         >
           {errors.general}
@@ -174,78 +174,112 @@ export function RegisterForm() {
 
       {/* Email */}
       <div>
-        <label htmlFor="register-email" className="input-label">
-          Email <span className="text-red-500">*</span>
+        <label
+          htmlFor="register-email"
+          className="block text-xs font-medium text-[#D1D3DA] mb-1.5"
+        >
+          Email <span aria-hidden="true" className="text-red-400">*</span>
         </label>
         <input
           id="register-email"
           name="email"
           type="email"
           autoComplete="email"
+          spellCheck={false}
+          autoCapitalize="none"
+          autoCorrect="off"
+          enterKeyHint="next"
           autoFocus
+          required
           value={form.email}
           onChange={handleChange}
-          placeholder="ten@example.com"
-          className={cn("input-ocean", errors.email && "border-rose-500/50 focus:border-rose-500/70")}
+          placeholder="Nhập email"
+          aria-invalid={!!errors.email}
+          className={cn(
+            INPUT_BASE,
+            errors.email && "border-red-400/75 focus:border-red-400 focus:ring-red-400/20"
+          )}
         />
         {errors.email && (
-          <p className="text-rose-400 text-xs mt-1 flex items-center gap-1">
-            <span className="w-1 h-1 bg-rose-400 inline-block" />
-            {errors.email}
-          </p>
+          <p className="text-red-300 text-xs mt-1.5">{errors.email}</p>
         )}
       </div>
 
       {/* Username + Display name row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <div>
-          <label htmlFor="register-username" className="input-label">
-            Tên người dùng <span className="text-red-500">*</span>
+          <label
+            htmlFor="register-username"
+            className="block text-xs font-medium text-[#D1D3DA] mb-1.5"
+          >
+            Tên người dùng <span aria-hidden="true" className="text-red-400">*</span>
           </label>
           <input
             id="register-username"
             name="username"
             type="text"
             autoComplete="username"
+            spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
+            enterKeyHint="next"
+            required
             value={form.username}
             onChange={handleChange}
             placeholder="nguyen_minh"
             maxLength={32}
-            className={cn("input-ocean font-mono", errors.username && "border-rose-500/50 focus:border-rose-500/70")}
+            aria-invalid={!!errors.username}
+            className={cn(
+              INPUT_BASE,
+              "font-mono",
+              errors.username && "border-red-400/75 focus:border-red-400 focus:ring-red-400/20"
+            )}
           />
           {errors.username ? (
-            <p className="text-rose-400 text-xs mt-1">{errors.username}</p>
+            <p className="text-red-300 text-xs mt-1.5">{errors.username}</p>
           ) : (
-            <p className="text-ocean-light/70 text-xs mt-1">
+            <p className="text-[#9CA3AF] text-[11px] mt-1">
               Chỉ a-z, 0-9, dấu . và _
             </p>
           )}
         </div>
 
         <div>
-          <label htmlFor="register-display-name" className="input-label">
+          <label
+            htmlFor="register-display-name"
+            className="block text-xs font-medium text-[#D1D3DA] mb-1.5"
+          >
             Tên hiển thị
           </label>
           <input
             id="register-display-name"
             name="displayName"
             type="text"
+            autoComplete="name"
+            enterKeyHint="next"
             value={form.displayName}
             onChange={handleChange}
             placeholder="Nguyễn Minh"
             maxLength={32}
-            className={cn("input-ocean", errors.displayName && "border-rose-500/50 focus:border-rose-500/70")}
+            aria-invalid={!!errors.displayName}
+            className={cn(
+              INPUT_BASE,
+              errors.displayName && "border-red-400/75 focus:border-red-400 focus:ring-red-400/20"
+            )}
           />
           {errors.displayName && (
-            <p className="text-rose-400 text-xs mt-1">{errors.displayName}</p>
+            <p className="text-red-300 text-xs mt-1.5">{errors.displayName}</p>
           )}
         </div>
       </div>
 
       {/* Password */}
       <div>
-        <label htmlFor="register-password" className="input-label">
-          Mật khẩu <span className="text-red-500">*</span>
+        <label
+          htmlFor="register-password"
+          className="block text-xs font-medium text-[#D1D3DA] mb-1.5"
+        >
+          Mật khẩu <span aria-hidden="true" className="text-red-400">*</span>
         </label>
         <div className="relative">
           <input
@@ -253,26 +287,35 @@ export function RegisterForm() {
             name="password"
             type={showPassword ? "text" : "password"}
             autoComplete="new-password"
+            enterKeyHint="next"
+            required
             value={form.password}
             onChange={handleChange}
             onFocus={() => setShowPasswordHints(true)}
-            placeholder="••••••••"
-            className={cn("input-ocean pr-12", errors.password && "border-rose-500/50 focus:border-rose-500/70")}
+            placeholder="Tạo mật khẩu"
+            aria-invalid={!!errors.password}
+            className={cn(
+              INPUT_BASE,
+              "pr-11",
+              errors.password && "border-red-400/75 focus:border-red-400 focus:ring-red-400/20"
+            )}
           />
           <button
             type="button"
             id="toggle-register-password"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-ocean-light/60 hover:text-ocean-secondary transition-colors"
+            aria-pressed={showPassword}
+            aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md text-[#A8AAB3] hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer"
           >
             {showPassword ? (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="square" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
               </svg>
             ) : (
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="square" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="square" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
             )}
           </button>
@@ -280,49 +323,51 @@ export function RegisterForm() {
 
         {/* Password strength meter */}
         {showPasswordHints && form.password && (
-          <div className="mt-2 animate-fade-in">
+          <div className="mt-2.5 p-3 rounded-lg bg-[#1B1C20] border border-white/[0.08] animate-fade-in">
             <div className="flex gap-1 mb-2">
               {[1, 2, 3, 4].map((i) => (
                 <div
                   key={i}
                   className={cn(
-                    "h-1 flex-1 transition-all duration-300",
+                    "h-1 flex-1 rounded-full transition-all duration-300",
                     i <= passwordStrength
                       ? strengthColors[passwordStrength]
-                      : "bg-ocean-dark-border"
+                      : "bg-white/10"
                   )}
                 />
               ))}
             </div>
-            <p className="text-xs text-ocean-light/60 mb-2">
+            <p className="text-xs text-[#B4B6BE] mb-1.5">
               Độ mạnh:{" "}
-              <span className={cn(
-                "font-bold",
-                passwordStrength <= 1 && "text-rose-400",
-                passwordStrength === 2 && "text-amber-400",
-                passwordStrength === 3 && "text-yellow-400",
-                passwordStrength === 4 && "text-emerald-400",
-              )}>
+              <span
+                className={cn(
+                  "font-semibold",
+                  passwordStrength <= 1 && "text-red-300",
+                  passwordStrength === 2 && "text-amber-300",
+                  passwordStrength === 3 && "text-yellow-300",
+                  passwordStrength === 4 && "text-emerald-300"
+                )}
+              >
                 {strengthLabels[passwordStrength] || "—"}
               </span>
             </p>
-            <ul className="flex flex-col gap-1">
+            <ul className="grid grid-cols-2 gap-1">
               {PASSWORD_REQUIREMENTS.map((req) => (
                 <li
                   key={req.label}
                   className={cn(
-                    "text-xs flex items-center gap-1.5 transition-colors",
+                    "text-[11px] flex items-center gap-1.5 transition-colors",
                     req.test(form.password)
-                      ? "text-emerald-400"
-                      : "text-ocean-light/70"
+                      ? "text-emerald-300"
+                      : "text-[#9CA3AF]"
                   )}
                 >
                   {req.test(form.password) ? (
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="square" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : (
-                    <span className="w-3 h-3 border border-current inline-block" />
+                    <span className="w-2.5 h-2.5 rounded-full border border-current shrink-0 inline-block" />
                   )}
                   {req.label}
                 </li>
@@ -331,35 +376,48 @@ export function RegisterForm() {
           </div>
         )}
 
-        {errors.password && (
-          <p className="text-rose-400 text-xs mt-1">{errors.password}</p>
+        {errors.password ? (
+          <p className="text-red-300 text-xs mt-1.5">{errors.password}</p>
+        ) : (
+          <p className="text-[#9CA3AF] text-[11px] mt-1">
+            Ít nhất 8 ký tự
+          </p>
         )}
       </div>
 
       {/* Confirm Password */}
       <div>
-        <label htmlFor="register-confirm-password" className="input-label">
-          Xác nhận mật khẩu <span className="text-red-500">*</span>
+        <label
+          htmlFor="register-confirm-password"
+          className="block text-xs font-medium text-[#D1D3DA] mb-1.5"
+        >
+          Xác nhận mật khẩu <span aria-hidden="true" className="text-red-400">*</span>
         </label>
         <input
           id="register-confirm-password"
           name="confirmPassword"
           type={showPassword ? "text" : "password"}
           autoComplete="new-password"
+          enterKeyHint="done"
+          required
           value={form.confirmPassword}
           onChange={handleChange}
-          placeholder="••••••••"
-          className={cn("input-ocean", errors.confirmPassword && "border-rose-500/50 focus:border-rose-500/70")}
+          placeholder="Nhập lại mật khẩu"
+          aria-invalid={!!errors.confirmPassword}
+          className={cn(
+            INPUT_BASE,
+            errors.confirmPassword && "border-red-400/75 focus:border-red-400 focus:ring-red-400/20"
+          )}
         />
         {errors.confirmPassword && (
-          <p className="text-rose-400 text-xs mt-1">{errors.confirmPassword}</p>
+          <p className="text-red-300 text-xs mt-1.5">{errors.confirmPassword}</p>
         )}
         {!errors.confirmPassword &&
           form.confirmPassword &&
           form.password === form.confirmPassword && (
-            <p className="text-emerald-400 text-xs mt-1 flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="square" strokeWidth={3} d="M5 13l4 4L19 7" />
+            <p className="text-emerald-300 text-xs mt-1.5 flex items-center gap-1">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
               Mật khẩu khớp
             </p>
@@ -367,12 +425,12 @@ export function RegisterForm() {
       </div>
 
       {/* Terms checkbox */}
-      <div>
+      <div className="pt-0.5">
         <label
           htmlFor="register-terms"
-          className="flex items-start gap-3 cursor-pointer group"
+          className="flex items-start gap-2.5 cursor-pointer group"
         >
-          <div className="relative mt-0.5">
+          <div className="relative mt-0.5 shrink-0">
             <input
               id="register-terms"
               name="agreeToTerms"
@@ -383,39 +441,39 @@ export function RegisterForm() {
             />
             <div
               className={cn(
-                "w-4 h-4 border transition-all duration-200",
+                "w-4 h-4 rounded border transition-colors flex items-center justify-center peer-focus-visible:ring-2 peer-focus-visible:ring-[#4C8BF5]/50",
                 form.agreeToTerms
-                  ? "bg-ocean-primary border-ocean-primary"
-                  : "border-ocean-dark-border group-hover:border-ocean-secondary",
-                errors.agreeToTerms && "border-rose-500/50 focus:border-rose-500/70"
+                  ? "bg-[#2B66E0] border-[#2B66E0]"
+                  : "border-[#5A5D65] bg-[#1D1E22] group-hover:border-[#8E929B]",
+                errors.agreeToTerms && "border-red-400"
               )}
             >
               {form.agreeToTerms && (
                 <svg
-                  className="w-full h-full p-0.5 text-white"
+                  className="w-3 h-3 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path strokeLinecap="square" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               )}
             </div>
           </div>
-          <span className="text-ocean-light/80 text-sm leading-relaxed">
+          <span className="text-[#B4B6BE] text-xs leading-relaxed">
             Tôi đồng ý với{" "}
-            <a href="/terms" className="text-ocean-secondary hover:text-ocean-light underline">
+            <a href="/terms" className="text-[#589DF6] hover:underline">
               Điều khoản dịch vụ
             </a>{" "}
             và{" "}
-            <a href="/privacy" className="text-ocean-secondary hover:text-ocean-light underline">
+            <a href="/privacy" className="text-[#589DF6] hover:underline">
               Chính sách bảo mật
-            </a>{" "}
-            của Bravechat.
+            </a>
+            .
           </span>
         </label>
         {errors.agreeToTerms && (
-          <p className="text-rose-400 text-xs mt-1 ml-7">{errors.agreeToTerms}</p>
+          <p className="text-red-300 text-xs mt-1 ml-6">{errors.agreeToTerms}</p>
         )}
       </div>
 
@@ -424,22 +482,9 @@ export function RegisterForm() {
         id="register-submit"
         type="submit"
         disabled={isLoading}
-        className={cn(
-          "btn-primary w-full mt-2",
-          isLoading && "opacity-60 cursor-not-allowed"
-        )}
+        className="w-full h-11 mt-1 rounded-full bg-[#2B66E0] hover:bg-[#3A75EE] text-white font-medium text-sm transition-colors disabled:opacity-50 cursor-pointer"
       >
-        {isLoading ? (
-          <span className="flex items-center justify-center gap-2">
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Đang tạo tài khoản...
-          </span>
-        ) : (
-          "Tạo tài khoản miễn phí"
-        )}
+        {isLoading ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
       </button>
     </form>
   );

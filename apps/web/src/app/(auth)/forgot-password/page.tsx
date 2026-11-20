@@ -1,5 +1,5 @@
 /**
- * app/forgot-password/page.tsx
+ * app/(auth)/forgot-password/page.tsx
  * Quên mật khẩu / Forgot Password
  */
 
@@ -16,7 +16,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthLayout
       title="Quên mật khẩu"
-      subtitle="Nhập địa chỉ email đã đăng ký và chúng tôi sẽ gửi hướng dẫn đặt lại mật khẩu."
+      subtitle="Nhập email đã đăng ký để nhận liên kết và mã xác nhận đặt lại mật khẩu."
       switchText="Đã nhớ mật khẩu?"
       switchLink="/login"
       switchLabel="Quay lại đăng nhập"

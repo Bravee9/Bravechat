@@ -183,20 +183,18 @@ export function CommunitySection() {
           </div>
         </div>
 
-        {/* Rotated Gradient Accent (67:250) */}
+        {/* Ambient Radial Glow Accent (67:250) */}
         <div
           className="absolute flex items-center justify-center right-[-120px] xl:left-[1085.31px] size-[533.376px] top-[-26.69px] pointer-events-none"
           data-node-id="67:250"
         >
-          <div className="flex-none rotate-[14deg]">
-            <div
-              className="opacity-[0.28] relative size-[440px]"
-              style={{
-                backgroundImage:
-                  "linear-gradient(145deg, rgb(72, 214, 255) 6.1733%, rgb(69, 108, 255) 50%, rgb(163, 105, 255) 93.827%)",
-              }}
-            />
-          </div>
+          <div
+            className="rounded-full blur-[110px] opacity-30 relative size-[460px]"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, rgb(72, 214, 255) 0%, rgb(69, 108, 255) 52%, rgba(163, 105, 255, 0) 80%)",
+            }}
+          />
         </div>
       </section>
     </div>

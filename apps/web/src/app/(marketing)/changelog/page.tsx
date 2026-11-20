@@ -22,7 +22,7 @@ const ENTRIES = [
     tag: "Cập nhật lớn",
     changes: {
       added: [
-        "Giao diện không gian làm việc theo phong cách JetBrains IDE với bảng màu nhận diện rõ ràng",
+        "Giao diện không gian làm việc tối giản, hiện đại với bảng màu nhận diện rõ ràng",
         "Trung tâm quản trị máy chủ tích hợp: chỉnh sửa thông tin máy chủ, quản lý kênh, thành viên và ma trận phân quyền vai trò (RBAC)",
         "Chế độ Kênh riêng tư (Private Channel) kèm màn hình bảo vệ khi người dùng không đủ quyền truy cập",
         "Yêu cầu xác minh lại mật khẩu hoặc mã xác thực khi tắt bảo mật hai lớp (2FA)",

@@ -80,6 +80,7 @@ export function HeroSection() {
                 data-node-id="67:55"
               >
                 <Link
+                  id="hero-cta-register"
                   href="/register"
                   className="bg-[#f4f4f5] hover:bg-white border border-transparent flex gap-[18px] items-center justify-center min-h-[42px] px-[22px] relative rounded-[2px] shrink-0 transition-colors"
                   data-node-id="67:56"
@@ -99,7 +100,20 @@ export function HeroSection() {
                   data-node-id="67:61"
                 >
                   <span data-node-id="67:62">Khám phá Bravechat</span>
-                  <span data-node-id="67:65">↘</span>
+                  <svg
+                    aria-hidden="true"
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M7 7l10 10M17 7v10H7"
+                    />
+                  </svg>
                 </Link>
               </div>
             </div>
@@ -115,15 +129,13 @@ export function HeroSection() {
                 className="absolute flex h-[502.549px] items-center justify-center left-[29.2px] top-[34.93px] w-[591.635px] pointer-events-none"
                 data-node-id="67:69"
               >
-                <div className="-rotate-[5deg] flex-none">
-                  <div
-                    className="blur-[28px] h-[456px] opacity-30 relative w-[554px]"
-                    style={{
-                      backgroundImage:
-                        "linear-gradient(140.542deg, rgb(27, 108, 255) 0%, rgb(87, 220, 255) 48%, rgb(120, 103, 255) 100%)",
-                    }}
-                  />
-                </div>
+                <div
+                  className="rounded-full blur-[96px] h-[440px] opacity-35 relative w-[520px]"
+                  style={{
+                    backgroundImage:
+                      "radial-gradient(circle, rgb(27, 108, 255) 0%, rgb(87, 220, 255) 45%, rgba(120, 103, 255, 0) 75%)",
+                  }}
+                />
               </div>
 
               {/* 3D Hero Emblem Image (67:70) */}
@@ -132,10 +144,10 @@ export function HeroSection() {
                 data-node-id="67:70"
               >
                 <div className="flex-none rotate-[5deg]">
-                  <div className="opacity-[0.82] relative shadow-[0px_20px_100px_0px_rgba(0,0,0,0.67)] size-[280px]">
+                  <div className="opacity-[0.86] relative size-[280px]">
                     <img
                       alt=""
-                      className="absolute inset-0 max-w-none object-contain size-full"
+                      className="absolute inset-0 max-w-none object-contain size-full drop-shadow-[0_24px_48px_rgba(0,0,0,0.75)]"
                       src={imgHeroEmblem}
                     />
                   </div>

@@ -1,12 +1,11 @@
 /**
- * app/login/page.tsx
- * Login page with Discord-style credentials & QR code authentication
+ * app/(auth)/login/page.tsx
+ * Account login page
  */
 
 import type { Metadata } from "next";
 import { AuthLayout } from "@/features/auth/components/AuthLayout";
 import { LoginForm } from "@/features/auth/components/LoginForm";
-import { QrLoginPanel } from "@/features/auth/components/QrLoginPanel";
 
 export const metadata: Metadata = {
   title: "Đăng nhập",
@@ -16,12 +15,8 @@ export const metadata: Metadata = {
 export default function LoginPage() {
   return (
     <AuthLayout
-      title="Chào mừng trở lại!"
-      subtitle="Rất vui được gặp lại bạn!"
-      switchText="Cần tài khoản?"
-      switchLink="/register"
-      switchLabel="Đăng ký"
-      sidePanel={<QrLoginPanel />}
+      title="Đăng nhập vào Bravechat"
+      subtitle="Đăng nhập để truy cập các sản phẩm và dịch vụ của Bravechat."
     >
       <LoginForm />
     </AuthLayout>

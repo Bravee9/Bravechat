@@ -33,7 +33,7 @@ const PHASES = [
     period: "Đang triển khai",
     status: "in-progress" as const,
     items: [
-      { label: "Giao diện không gian làm việc theo phong cách JetBrains IDE", done: true },
+      { label: "Giao diện không gian làm việc tối giản, tập trung hiệu suất cao", done: true },
       { label: "Giữ cố định vị trí cuộn của thanh máy chủ khi chuyển đổi", done: true },
       { label: "Quản trị máy chủ, vai trò (RBAC) và phân quyền chi tiết", done: true },
       { label: "Kênh riêng tư có khóa bảo vệ và kiểm soát quyền truy cập", done: true },

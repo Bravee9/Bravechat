@@ -15,7 +15,12 @@ async function fixture(envOverrides = {}) {
   let gate = async () => {};
   const prisma = {
     user: {
-      findUnique: async () => ({ ...user }), findUniqueOrThrow: async () => ({ ...user }),
+      findUnique: async ({ where }) => {
+        if (where?.email && where.email !== user.email) return null;
+        if (where?.id && where.id !== user.id) return null;
+        return { ...user };
+      },
+      findUniqueOrThrow: async () => ({ ...user }),
       update: async ({ data }) => { Object.assign(user, data); return { ...user }; },
       updateMany: async ({ where, data }) => {
         await gate();
@@ -292,4 +297,34 @@ test('subdomain HTTPS deployment uses SameSite=Lax; Secure cookies by default', 
   const tokenCookie = loginRes.cookies.find((c) => c.name === 'token');
   assert.equal(tokenCookie.sameSite, 'Lax');
   assert.equal(tokenCookie.secure, true);
+});
+
+test('gmail-request prevents user enumeration and responses include hardened security headers', async (t) => {
+  const f = await fixture();
+  t.after(() => f.app.close());
+
+  const unknownRes = await f.app.inject({
+    method: 'POST',
+    url: '/auth/login/gmail-request',
+    payload: { email: 'nonexistent@example.test' },
+  });
+  assert.equal(unknownRes.statusCode, 200);
+  const unknownBody = unknownRes.json();
+  assert.equal(unknownBody.data.requiresVerification, true);
+  assert.equal(typeof unknownBody.data.challengeToken, 'string');
+  assert.equal(unknownBody.data.challengeToken.length, 64);
+
+  // Security headers must be present
+  assert.equal(unknownRes.headers['x-content-type-options'], 'nosniff');
+  assert.equal(unknownRes.headers['x-frame-options'], 'DENY');
+  assert.equal(unknownRes.headers['referrer-policy'], 'strict-origin-when-cross-origin');
+  assert.ok(String(unknownRes.headers['content-security-policy']).includes("frame-ancestors 'none'"));
+
+  // Dummy challenge token must never verify
+  const verifyRes = await f.app.inject({
+    method: 'POST',
+    url: '/auth/login/verify',
+    payload: { challengeToken: unknownBody.data.challengeToken, code: '123456' },
+  });
+  assert.equal(verifyRes.statusCode, 401);
 });

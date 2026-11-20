@@ -1,6 +1,6 @@
 /**
- * app/register/page.tsx
- * Registration page
+ * app/(auth)/register/page.tsx
+ * Account registration page
  */
 
 import type { Metadata } from "next";
@@ -15,11 +15,12 @@ export const metadata: Metadata = {
 export default function RegisterPage() {
   return (
     <AuthLayout
-      title="Tạo tài khoản mới"
-      subtitle="Tham gia cộng đồng Bravechat — miễn phí và không giới hạn."
+      title="Tạo tài khoản Bravechat"
+      subtitle="Đăng ký miễn phí để kết nối cùng nhóm và cộng đồng."
       switchText="Đã có tài khoản?"
       switchLink="/login"
       switchLabel="Đăng nhập"
+      wide
     >
       <RegisterForm />
     </AuthLayout>

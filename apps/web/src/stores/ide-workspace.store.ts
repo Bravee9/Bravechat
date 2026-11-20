@@ -3,7 +3,7 @@
 import { createStore, useStore } from "@/lib/store";
 
 export const JETBRAINS_PALETTE = [
-  { hex: "#087CFA", name: "JetBrains Blue" },
+  { hex: "#087CFA", name: "Cobalt Blue" },
   { hex: "#07C3F2", name: "Cyan" },
   { hex: "#21D789", name: "Emerald" },
   { hex: "#3DEA62", name: "Neon Green" },

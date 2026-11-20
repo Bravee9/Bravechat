@@ -82,9 +82,23 @@
     }
   }
 
-  /* Swiss Minimalist: sharp corners everywhere except discord-app and figma-landing */
-  *:where(:not(.discord-app, .discord-app *, .figma-landing, .figma-landing *)) {
+  /* Swiss Minimalist: sharp corners everywhere except discord-app, figma-landing, and auth-shell */
+  *:where(:not(.discord-app, .discord-app *, .figma-landing, .figma-landing *, .auth-shell, .auth-shell *)) {
     border-radius: 0 !important;
+  }
+
+  /* Dark autofill & post-interaction validation polish inside auth shell */
+  .auth-shell input:-webkit-autofill,
+  .auth-shell input:-webkit-autofill:hover,
+  .auth-shell input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #232428 inset;
+    -webkit-text-fill-color: #FFFFFF;
+    caret-color: #FFFFFF;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
+  .auth-shell input:user-invalid {
+    border-color: rgb(248 113 113 / 0.75);
   }
 
   /* Custom scrollbar — Ocean theme */

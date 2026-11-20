@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { prisma } from '../config/prisma'
 import { env } from '../config/env'
 
-interface Session { userId: string; sid: string; expires: number; username: string; channelId?: string; channelServerId?: string; servers: Set<string> }
+interface Session { userId: string; sid: string; expires: number; username: string; channelId?: string; channelServerId?: string; servers: Set<string>; lastVerifiedAt?: number }
 const rooms = { channel: new Map<string, Set<WebSocket>>(), server: new Map<string, Set<WebSocket>>(), user: new Map<string, Set<WebSocket>>() }
 const sessions = new Map<WebSocket, Session>()
 const instance = randomUUID()
@@ -67,21 +67,29 @@ export async function websocketRoutes(server: FastifyInstance) {
   ensureRedis(server)
   server.get('/ws', { websocket: true, preValidation: server.authenticate }, (socket: WebSocket, request) => {
     const claims = request.user as typeof request.user & { exp: number }
-    const session: Session = { userId: claims.id, username: claims.username, sid: claims.sid, expires: claims.exp * 1000, servers: new Set() }
+    const session: Session = { userId: claims.id, username: claims.username, sid: claims.sid, expires: claims.exp * 1000, servers: new Set(), lastVerifiedAt: Date.now() }
     // User room lấy từ JWT đã kiểm tra DB; client không được tự chọn người nhận DM.
     sessions.set(socket, session); join('user', session.userId, socket)
     socket.send(JSON.stringify({ type: 'connected', userId: session.userId }))
     let alive = true; let queued = 0; let sequence = Promise.resolve()
+    let windowStart = Date.now(); let windowEvents = 0
     const heartbeat = setInterval(() => { if (!alive || session.expires <= Date.now()) return socket.terminate(); alive = false; socket.ping() }, 30000)
     socket.on('pong', () => { alive = true })
     socket.on('message', (raw) => {
-      if (++queued > 30) return socket.close(1008, 'Too many events')
+      const now = Date.now()
+      if (now - windowStart > 10000) { windowStart = now; windowEvents = 0 }
+      if (++windowEvents > 45 || ++queued > 30) return socket.close(1008, 'Too many events')
       // Xử lý tuần tự để một join chậm không ghi đè kênh được chọn sau đó.
       sequence = sequence.then(async () => {
         if (socket.readyState !== 1) return
-        const valid = session.expires > Date.now() && await prisma.refreshToken.findFirst({ where: { id: session.sid, userId: session.userId, isRevoked: false, expiresAt: { gt: new Date() }, user: { isBanned: false } }, select: { id: true } })
-        if (!valid) return socket.close(1008, 'Session expired')
+        if (session.expires <= Date.now()) return socket.close(1008, 'Session expired')
+        if (!session.lastVerifiedAt || Date.now() - session.lastVerifiedAt > 5000) {
+          const valid = await prisma.refreshToken.findFirst({ where: { id: session.sid, userId: session.userId, isRevoked: false, expiresAt: { gt: new Date() }, user: { isBanned: false } }, select: { id: true } })
+          if (!valid) return socket.close(1008, 'Session expired')
+          session.lastVerifiedAt = Date.now()
+        }
         const data = JSON.parse(raw.toString())
+        if (!data || typeof data !== 'object' || Array.isArray(data)) return
         if (data.type === 'join_server') {
           const id = String(data.serverId ?? '')
           const member = await prisma.serverMember.findFirst({ where: { serverId: id, userId: session.userId, isBanned: false }, select: { id: true } })

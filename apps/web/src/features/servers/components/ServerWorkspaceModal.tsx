@@ -787,7 +787,7 @@ function ServerWorkspaceDialogContent({
                     Tổng quan máy chủ
                   </h2>
                   <p className="text-xs text-[#A8A8B0] mt-1">
-                    Chỉnh sửa thông tin nhận diện, bảng màu JetBrains và phạm vi truy cập của máy chủ.
+                    Chỉnh sửa thông tin nhận diện, bảng màu huy hiệu và phạm vi truy cập của máy chủ.
                   </p>
                 </div>
 
@@ -852,7 +852,7 @@ function ServerWorkspaceDialogContent({
 
                   <div>
                     <p className="text-xs font-mono uppercase text-[#CDCDCD] mb-2">
-                      Màu huy hiệu máy chủ (JetBrains Palette)
+                      Màu huy hiệu máy chủ
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {JETBRAINS_PALETTE.map((swatch) => (
