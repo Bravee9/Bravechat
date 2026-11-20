@@ -1,6 +1,6 @@
 /**
  * app/(marketing)/docs/page.tsx
- * Trang chủ Tài liệu hướng dẫn — JetBrains Dark Style
+ * Trang chủ Tài liệu hướng dẫn
  */
 
 import type { Metadata } from "next";
@@ -10,7 +10,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Tài liệu hướng dẫn",
   description:
-    "Hướng dẫn sử dụng Bravechat — cách tạo máy chủ, quản lý kênh riêng tư, phân quyền thành viên và tích hợp tự động hóa.",
+    "Hướng dẫn sử dụng Bravechat — cách tạo máy chủ, quản lý kênh riêng tư, phân quyền thành viên và bảo vệ tài khoản.",
 };
 
 const QUICK_START_STEPS = [
@@ -50,17 +50,17 @@ const DOC_CARDS = [
   },
   {
     href: "/docs/api-reference",
-    badge: "TÍCH HỢP",
-    title: "Giao tiếp & Tích hợp",
+    badge: "BẢO MẬT TÀI KHOẢN",
+    title: "Bảo mật Tài khoản & Tích hợp",
     description:
-      "Chuẩn kết nối cho ứng dụng khách, thông báo tự động và quản lý tài nguyên máy chủ qua giao diện lập trình.",
+      "Các phương thức đăng nhập an toàn (Mật khẩu, Mã OTP Email, 2FA TOTP, Mã QR) và kiểm soát thiết bị.",
   },
   {
     href: "/docs/database-schema",
     badge: "AN TOÀN DỮ LIỆU",
-    title: "Cấu trúc Dữ liệu & Bảo mật",
+    title: "Quyền riêng tư & An toàn Dữ liệu",
     description:
-      "Mô hình thông tin người dùng, máy chủ, kênh, tin nhắn và các nguyên tắc bảo vệ quyền riêng tư.",
+      "Nguyên tắc bảo vệ thông tin cá nhân, cô lập kênh riêng tư và kiểm định an toàn tệp đính kèm.",
   },
 ];
 

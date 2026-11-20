@@ -1,52 +1,43 @@
 /**
  * app/(marketing)/docs/database-schema/page.tsx
- * Cấu trúc Dữ liệu & Bảo mật — JetBrains Dark Style
+ * Quyền riêng tư & An toàn Dữ liệu
  */
 
 import type { Metadata } from "next";
 import { DocsLayout } from "@/components/marketing/docs/DocsLayout";
 
 export const metadata: Metadata = {
-  title: "Cấu trúc Dữ liệu & Bảo mật",
+  title: "Quyền riêng tư & An toàn Dữ liệu",
   description:
-    "Mô hình tổ chức dữ liệu tài khoản, máy chủ, kênh, vai trò và tin nhắn trên Bravechat.",
+    "Cách Bravechat bảo vệ thông tin tài khoản, không gian máy chủ, kênh riêng tư và tệp đính kèm của người dùng.",
 };
 
-const ENTITIES = [
+const DATA_PILLARS = [
   {
-    name: "Tài khoản người dùng (Users)",
-    desc: "Lưu trữ thông tin định danh và trạng thái bảo mật cá nhân.",
+    name: "Bảo vệ Thông tin Tài khoản",
+    desc: "Dữ liệu định danh được tối giản hóa và bảo vệ bằng nhiều lớp xác thực.",
     fields: [
-      ["Tên người dùng & Tên hiển thị", "Định danh duy nhất dùng để kết bạn và hiển thị trong máy chủ"],
-      ["Email & Xác thực 2FA", "Dùng để đăng nhập, khôi phục mật khẩu và bảo vệ phiên làm việc"],
-      ["Trạng thái hoạt động", "Trực tuyến, Tạm vắng, Không làm phiền hoặc Ẩn"],
+      ["Mật khẩu & Khóa xác thực", "Mật khẩu luôn được băm một chiều; mã xác nhận một lần (OTP) chỉ có hiệu lực trong thời gian ngắn."],
+      ["Nhật ký Bảo mật cá nhân", "Ghi nhận lịch sử đăng nhập, đổi mật khẩu và thiết lập 2FA để bạn chủ động kiểm soát tài khoản."],
+      ["Trạng thái hiển thị", "Tùy chỉnh trạng thái Trực tuyến, Tạm vắng, Không làm phiền hoặc Ẩn theo nhu cầu cá nhân."],
     ],
   },
   {
-    name: "Máy chủ & Vai trò (Servers & Roles)",
-    desc: "Định nghĩa không gian chung, danh sách thành viên và ma trận phân quyền.",
+    name: "Cô lập Không gian Máy chủ & Kênh riêng tư",
+    desc: "Nội dung của từng máy chủ và kênh riêng tư được tách biệt theo danh sách thành viên.",
     fields: [
-      ["Thông tin máy chủ", "Tên, mô tả, biểu tượng, mã mời và chủ sở hữu"],
-      ["Vai trò (Roles)", "Tên vai trò, màu nhận diện, thứ tự ưu tiên và danh sách quyền hạn"],
-      ["Thành viên (Members)", "Liên kết người dùng với máy chủ cùng các vai trò được gán"],
+      ["Quyền truy cập máy chủ", "Chỉ những thành viên đã tham gia máy chủ mới có thể xem danh sách kênh và lịch sử trò chuyện."],
+      ["Kênh riêng tư theo vai trò", "Chủ máy chủ và Quản trị viên có thể giới hạn kênh chỉ hiển thị với các vai trò được chỉ định."],
+      ["Thu hồi quyền tức thì", "Khi thành viên rời máy chủ hoặc bị thu hồi vai trò, kết nối thời gian thực tới kênh đó sẽ đóng ngay lập tức."],
     ],
   },
   {
-    name: "Danh mục & Kênh (Categories & Channels)",
-    desc: "Cấu trúc phân nhóm cuộc trò chuyện và kiểm soát quyền hiển thị.",
+    name: "An toàn Tệp đính kèm & Phương tiện",
+    desc: "Mọi tệp tải lên đều được kiểm tra định dạng trước khi lưu trữ và phân phối.",
     fields: [
-      ["Loại kênh", "Kênh văn bản (Text), Kênh thoại (Voice) hoặc Kênh thông báo"],
-      ["Chế độ riêng tư", "Cho phép giới hạn kênh chỉ hiển thị với các vai trò được chọn"],
-      ["Thứ tự & Danh mục", "Vị trí sắp xếp của kênh trong cây thư mục máy chủ"],
-    ],
-  },
-  {
-    name: "Tin nhắn & Tệp đính kèm (Messages & Attachments)",
-    desc: "Nội dung trao đổi trong kênh văn bản và tin nhắn trực tiếp.",
-    fields: [
-      ["Nội dung & Phản hồi", "Văn bản, trích dẫn trả lời, trạng thái ghim và lịch sử chỉnh sửa"],
-      ["Tệp đính kèm", "Hình ảnh, tài liệu được kiểm tra định dạng an toàn trước khi lưu trữ"],
-      ["Thu hồi dữ liệu", "Tin nhắn đã xóa không còn hiển thị với các thành viên khác"],
+      ["Kiểm tra chữ ký tệp (Magic Bytes)", "Đối chiếu định dạng thực tế của hình ảnh và tệp đính kèm, ngăn chặn tệp giả mạo phần mở rộng."],
+      ["Giới hạn dung lượng an toàn", "Bảo vệ hiệu năng trình duyệt và máy chủ trước các tệp tải lên vượt ngưỡng cho phép."],
+      ["Liên kết truy cập có kiểm soát", "Tệp đính kèm trong kênh chỉ được cấp đường dẫn tải cho thành viên có quyền xem kênh."],
     ],
   },
 ];
@@ -54,11 +45,11 @@ const ENTITIES = [
 export default function DatabaseSchemaPage() {
   return (
     <DocsLayout
-      title="Cấu trúc Dữ liệu & Bảo mật"
-      description="Cách thông tin tài khoản, máy chủ, phân quyền và tin nhắn được tổ chức để đảm bảo tính nhất quán và quyền riêng tư."
+      title="Quyền riêng tư & An toàn Dữ liệu"
+      description="Các nguyên tắc bảo vệ tài khoản, kiểm soát quyền truy cập kênh riêng tư và đảm bảo an toàn khi chia sẻ tệp trên Bravechat."
     >
       <div className="flex flex-col gap-8">
-        {ENTITIES.map((entity) => (
+        {DATA_PILLARS.map((entity) => (
           <div
             key={entity.name}
             className="bg-[#16161A] border border-[#2B2D30] rounded-[4px] overflow-hidden"
