@@ -34,6 +34,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma Client
+        run: pnpm --filter @discord-clone/api exec prisma generate --schema=../../packages/database/prisma/schema.prisma
+
       - name: Run ESLint
         run: pnpm lint
 
@@ -58,6 +61,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @discord-clone/api exec prisma generate --schema=../../packages/database/prisma/schema.prisma
 
       - name: Run Web Unit Tests
         run: pnpm --filter @discord-clone/web test
@@ -84,6 +90,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @discord-clone/api exec prisma generate --schema=../../packages/database/prisma/schema.prisma
 
       - name: Build monorepo
         run: pnpm build
