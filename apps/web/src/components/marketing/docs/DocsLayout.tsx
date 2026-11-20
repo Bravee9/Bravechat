@@ -1,6 +1,6 @@
 /**
  * components/marketing/docs/DocsLayout.tsx
- * Shared layout for documentation pages — JetBrains Dark Style
+ * Shared layout for documentation pages
  */
 
 "use client";
@@ -20,15 +20,15 @@ const DOCS_NAV = [
     ],
   },
   {
-    group: "Tích hợp & Tự động hóa",
+    group: "Bảo mật & Xác thực",
     links: [
-      { label: "Giao tiếp & Tích hợp", href: "/docs/api-reference" },
+      { label: "Bảo mật Tài khoản & Tích hợp", href: "/docs/api-reference" },
     ],
   },
   {
     group: "Dữ liệu & Quyền riêng tư",
     links: [
-      { label: "Cấu trúc Dữ liệu & Bảo mật", href: "/docs/database-schema" },
+      { label: "Quyền riêng tư & An toàn Dữ liệu", href: "/docs/database-schema" },
     ],
   },
 ];

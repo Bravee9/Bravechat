@@ -10,19 +10,9 @@
 @tailwind components;
 @tailwind utilities;
 
-.en-only { display: none; }
-.legal-page[lang="en"] .en-only { display: inline; }
-.legal-page[lang="en"] .vi-only { display: none; }
-.legal-english .en-only { display: inline; }
-.legal-english .vi-only { display: none; }
-.legal-english section > :not(.legal-heading):not(.legal-english-content) { display: none; }
-.legal-english-content { display: none; }
-.legal-english .legal-english-content { display: block; }
-.legal-english .legal-english-content { color: rgb(203 213 225); line-height: 1.8; }
-
 /* ─── CSS CUSTOM PROPERTIES ──────────────────────────────── */
 :root {
-  /* JetBrains Dark Palette mapped to project CSS variables */
+  /* Dark Studio Palette mapped to project CSS variables */
   --theme-primary:        8 124 250;
   --theme-primary-hover:  53 116 240;
   --theme-secondary:      7 195 242;
@@ -82,8 +72,8 @@
     }
   }
 
-  /* Swiss Minimalist: sharp corners everywhere except discord-app, figma-landing, and auth-shell */
-  *:where(:not(.discord-app, .discord-app *, .figma-landing, .figma-landing *, .auth-shell, .auth-shell *)) {
+  /* Swiss Minimalist: sharp corners everywhere except discord-app, figma-landing, auth-shell, and legal-page */
+  *:where(:not(.discord-app, .discord-app *, .figma-landing, .figma-landing *, .auth-shell, .auth-shell *, .legal-page, .legal-page *)) {
     border-radius: 0 !important;
   }
 

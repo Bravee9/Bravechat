@@ -45,8 +45,17 @@ export function getGmailStatus() {
   const cfg = loadRuntimeGmail()
   const webhookUrl = (env as { GMAIL_WEBHOOK_URL?: string }).GMAIL_WEBHOOK_URL
   const resendReady = Boolean(env.RESEND_API_KEY)
+  const configured = Boolean(webhookUrl || resendReady || (cfg?.gmailUser && cfg?.gmailAppPassword))
+  // Do not expose internal sender email address or infrastructure provider in production responses
+  if (env.NODE_ENV === 'production') {
+    return {
+      configured,
+      gmailUser: null,
+      provider: configured ? 'configured' : 'unconfigured',
+    }
+  }
   return {
-    configured: Boolean(webhookUrl || resendReady || (cfg?.gmailUser && cfg?.gmailAppPassword)),
+    configured,
     gmailUser: cfg?.gmailUser ? maskEmailAddress(cfg.gmailUser) : null,
     provider: webhookUrl
       ? 'gmail_webhook'
@@ -84,7 +93,7 @@ export async function sendViaGmailSmtp(options: {
   if (!cfg) throw fail(503, 'Dich vu gui email chua duoc cau hinh.')
   const host = env.SMTP_HOST || 'smtp.gmail.com'
   const port = env.SMTP_PORT || 465
-  const fromName = 'Bravechat'
+  const fromName = 'Bravechat Account'
 
   await new Promise<void>((resolvePromise, rejectPromise) => {
     const socket = tls.connect(
@@ -104,7 +113,7 @@ export async function sendViaGmailSmtp(options: {
         rejectPromise(
           fail(
             504,
-            'Không thể kết nối tới Gmail SMTP (cổng 465 có thể bị chặn trên Render Free — hãy cấu hình GMAIL_WEBHOOK_URL hoặc RESEND_API_KEY qua HTTPS).'
+            'Không thể kết nối tới máy chủ gửi thư (cổng SMTP có thể bị chặn — hãy cấu hình GMAIL_WEBHOOK_URL hoặc RESEND_API_KEY qua HTTPS).'
           )
         )
       }
@@ -157,7 +166,7 @@ export async function sendViaGmailSmtp(options: {
       finish(
         fail(
           503,
-          'Không thể kết nối máy chủ Gmail SMTP qua cổng 465 (Render Free chặn cổng SMTP — vui lòng cấu hình GMAIL_WEBHOOK_URL hoặc RESEND_API_KEY để gửi qua HTTPS).'
+          'Không thể kết nối máy chủ gửi thư qua cổng SMTP (vui lòng cấu hình GMAIL_WEBHOOK_URL hoặc RESEND_API_KEY để gửi qua HTTPS).'
         )
       )
     })
@@ -174,9 +183,9 @@ export async function sendViaGmailSmtp(options: {
 
         if (code >= 400) {
           if (code === 535) {
-            return finish(fail(401, 'Xac thuc Gmail that bai. Vui long kiem tra tai khoan va mat khau ung dung.'))
+            return finish(fail(401, 'Xác thực dịch vụ gửi thư thất bại.'))
           }
-          return finish(fail(503, `May chu Gmail SMTP tu choi yeu cau (${code}): ${line}`))
+          return finish(fail(503, `Máy chủ gửi thư từ chối yêu cầu (${code}).`))
         }
 
         if (step === 0 && code === 220) {
@@ -240,16 +249,16 @@ export async function sendViaGmailWebhook(options: {
       subject: options.subject,
       text: options.text,
       html: options.html,
-      senderName: 'Bravechat',
+      senderName: 'Bravechat Account',
     }),
     signal: AbortSignal.timeout(15000),
   })
   if (!response.ok) {
-    throw fail(503, 'Không thể gửi email qua Gmail HTTPS Webhook. Vui lòng kiểm tra lại URL Web App.')
+    throw fail(503, 'Không thể gửi email qua HTTPS Webhook. Vui lòng kiểm tra lại cấu hình.')
   }
   const body = (await response.json().catch(() => ({ ok: true }))) as { ok?: boolean; error?: string }
   if (body && body.ok === false) {
-    throw fail(503, body.error || 'Gmail HTTPS Webhook từ chối gửi thư.')
+    throw fail(503, body.error || 'Dịch vụ HTTPS Webhook từ chối gửi thư.')
   }
 }
 
@@ -259,7 +268,7 @@ async function sendViaResendHttps(options: {
   text: string
   html: string
 }): Promise<void> {
-  const from = env.RESET_EMAIL_FROM || 'Bravechat <onboarding@resend.dev>'
+  const from = env.RESET_EMAIL_FROM || 'Bravechat Account <onboarding@resend.dev>'
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
@@ -275,7 +284,7 @@ async function sendViaResendHttps(options: {
   if (!response.ok) {
     throw fail(
       503,
-      'Không thể gửi email qua Resend HTTPS API (nếu dùng onboarding@resend.dev chỉ gửi được tới email chủ tài khoản Resend, hoặc cần xác thực domain noreply riêng).'
+      'Không thể gửi email qua Resend HTTPS API.'
     )
   }
 }
@@ -331,105 +340,63 @@ async function deliverEmail(options: {
 }
 
 /**
- * Builds standard Discord-styled transactional email template (Image 4 reference)
+ * Clean, left-aligned editorial transactional email template.
+ * Structured so Gmail automatically extracts the 6-digit one-time code into its top smart-copy card.
  */
-function buildDiscordEmailTemplate(content: {
-  heading: string
-  bodyText: string
-  buttonLabel?: string
-  buttonUrl?: string
+function buildMinimalEditorialEmailTemplate(content: {
+  greeting: string
+  introText: string
   codeBlock?: string
-  footerNote?: string
+  actionText?: string
+  actionLabel?: string
+  actionUrl?: string
+  disclaimerText: string
 }): string {
+  const siteHost = env.FRONTEND_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')
+  const supportUrl = `${env.FRONTEND_URL.replace(/\/$/, '')}/docs`
+
   return `<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bravechat</title>
+  <title>Bravechat Account</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f2f3f5; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f2f3f5; padding: 48px 16px;">
-    <tr>
-      <td align="center">
-        <!-- Brand Header -->
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; margin: 0 auto 24px auto;">
-          <tr>
-            <td align="center">
-              <span style="font-size: 26px; font-weight: 800; color: #0077b6; letter-spacing: -0.5px; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                Brave<span style="color: #00b4d8;">chat</span>
-              </span>
-            </td>
-          </tr>
-        </table>
+<body style="margin: 0; padding: 0; background-color: #ffffff; color: #19191c; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <div style="max-width: 600px; padding: 28px 20px; font-size: 14px; line-height: 22px; color: #19191c;">
+    <p style="margin: 0 0 20px 0;">
+      ${content.greeting}
+    </p>
 
-        <!-- Main Card -->
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; background-color: #ffffff; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin: 0 auto;">
-          <tr>
-            <td style="padding: 40px 48px;">
-              <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #2e3338; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                ${content.heading}
-              </h2>
-              <p style="margin: 0 0 24px 0; font-size: 15px; line-height: 24px; color: #4f5660; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                ${content.bodyText}
-              </p>
+    <p style="margin: 0 0 16px 0;">
+      ${content.introText}
+    </p>
 
-              ${
-                content.codeBlock
-                  ? `<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 24px 0;">
-                      <tr>
-                        <td align="center" style="background-color: #f2f3f5; border-radius: 4px; padding: 18px;">
-                          <span style="font-family: Consolas, Monaco, monospace; font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #0077b6;">
-                            ${content.codeBlock}
-                          </span>
-                        </td>
-                      </tr>
-                    </table>`
-                  : ''
-              }
+    ${
+      content.codeBlock
+        ? `<p style="margin: 8px 0 24px 0; font-size: 24px; line-height: 32px; font-weight: 700; color: #19191c; letter-spacing: 0.5px;">${content.codeBlock}</p>`
+        : ''
+    }
 
-              ${
-                content.buttonUrl && content.buttonLabel
-                  ? `<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 28px 0 32px 0;">
-                      <tr>
-                        <td align="center">
-                          <a href="${content.buttonUrl}" target="_blank" style="background-color: #0077b6; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 4px; font-weight: 600; font-size: 15px; display: inline-block; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                            ${content.buttonLabel}
-                          </a>
-                        </td>
-                      </tr>
-                    </table>`
-                  : ''
-              }
+    ${
+      content.actionUrl && content.actionLabel
+        ? `<p style="margin: 0 0 20px 0;">
+            ${content.actionText ? `${content.actionText} ` : ''}<a href="${content.actionUrl}" target="_blank" style="color: #1a659e; text-decoration: underline;">${content.actionLabel}</a>.
+          </p>`
+        : ''
+    }
 
-              <!-- Divider -->
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top: 32px; border-top: 1px solid #ebedef;">
-                <tr>
-                  <td style="padding-top: 24px;">
-                    <p style="margin: 0 0 8px 0; font-size: 12px; line-height: 18px; color: #747f8d; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                      ${content.footerNote || `Cần giúp đỡ? <a href="${env.FRONTEND_URL}" style="color: #0077b6; text-decoration: underline;">Hãy liên hệ đội ngũ hỗ trợ của chúng tôi</a> hoặc phản hồi trực tiếp email này.`}
-                    </p>
-                    <p style="margin: 0; font-size: 12px; line-height: 18px; color: #747f8d; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                      Muốn cung cấp phản hồi? Hãy cho chúng tôi biết ý kiến của bạn trên <a href="${env.FRONTEND_URL}" style="color: #0077b6; text-decoration: underline;">trang phản hồi</a>.
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
+    <p style="margin: 0 0 28px 0; color: #19191c;">
+      ${content.disclaimerText} Nếu có bất kỳ câu hỏi nào, vui lòng <a href="${supportUrl}" target="_blank" style="color: #1a659e; text-decoration: underline;">liên hệ đội ngũ hỗ trợ</a>.
+    </p>
 
-        <!-- External Footer -->
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 560px; margin: 20px auto 0 auto;">
-          <tr>
-            <td align="center" style="font-size: 11px; line-height: 16px; color: #99aab5; font-family: 'gg sans', 'Noto Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-              Được gửi bởi Bravechat • <a href="${env.FRONTEND_URL}" style="color: #0077b6; text-decoration: underline;">Tham khảo blog của chúng tôi</a> • @bravechat
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+    <p style="margin: 0; font-style: italic; color: #19191c; line-height: 24px;">
+      Trân trọng,<br>
+      Đội ngũ Bravechat<br>
+      <a href="${env.FRONTEND_URL}" target="_blank" style="color: #1a659e; text-decoration: underline;">${siteHost}</a><br>
+      Communicate, Freely.
+    </p>
+  </div>
 </body>
 </html>`
 }
@@ -437,25 +404,25 @@ function buildDiscordEmailTemplate(content: {
 export async function sendResetMail(email: string, token: string, username?: string, otpCode?: string) {
   const url = new URL('/reset-password', env.FRONTEND_URL)
   url.searchParams.set('token', token)
-  const greeting = username ? `Hey ${username},` : `Hey,`
-  const subject = otpCode
-    ? `Yêu Cầu Đặt Lại Mật Khẩu Bravechat (Mã: ${otpCode})`
-    : 'Yêu Cầu Đặt Lại Mật Khẩu Bravechat'
+  const greeting = username ? `Xin chào ${username}!` : `Xin chào!`
+  const subject = 'Mã xác nhận khôi phục mật khẩu cho tài khoản Bravechat của bạn'
   const text =
     `${greeting}\n\n` +
-    `Bạn có thể đặt lại mật khẩu Bravechat bằng cách nhấn vào liên kết dưới đây hoặc nhập mã khôi phục 6 chữ số trên trang Quên mật khẩu.\n\n` +
-    (otpCode ? `Mã khôi phục 6 chữ số: ${otpCode}\n\n` : '') +
-    `Liên kết đặt lại mật khẩu: ${url.toString()}\n\n` +
-    `Liên kết và mã có hiệu lực trong 15 phút và chỉ sử dụng một lần duy nhất.\n\n` +
-    `Được gửi bởi Bravechat.`
+    `Đây là mã xác nhận dùng một lần (one-time confirmation code) để đặt lại mật khẩu tài khoản Bravechat của bạn:\n\n` +
+    (otpCode ? `${otpCode}\n\n` : '') +
+    `Hoặc đặt lại mật khẩu trực tiếp qua liên kết bảo mật (hiệu lực 15 phút): ${url.toString()}\n\n` +
+    `Nếu bạn không yêu cầu mã này, bạn có thể bỏ qua email này.\n\n` +
+    `Trân trọng,\nĐội ngũ Bravechat\n${env.FRONTEND_URL}`
 
-  const html = buildDiscordEmailTemplate({
-    heading: greeting,
-    bodyText:
-      'Bạn có thể đặt lại mật khẩu Bravechat bằng cách nhấn vào nút bên dưới, hoặc nhập trực tiếp mã khôi phục 6 chữ số vào trang Quên mật khẩu. Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.',
+  const html = buildMinimalEditorialEmailTemplate({
+    greeting,
+    introText:
+      'Đây là mã xác nhận dùng một lần (one-time code) để xác nhận yêu cầu đặt lại mật khẩu cho địa chỉ email của bạn:',
     codeBlock: otpCode,
-    buttonLabel: 'Đặt Lại Mật Khẩu',
-    buttonUrl: url.toString(),
+    actionText: 'Hoặc bạn có thể',
+    actionLabel: 'đặt lại mật khẩu trực tiếp tại liên kết này',
+    actionUrl: url.toString(),
+    disclaimerText: 'Nếu bạn không yêu cầu mã này, bạn có thể bỏ qua email này.',
   })
 
   return deliverEmail({
@@ -474,24 +441,24 @@ export async function sendVerificationOtpMail(
   purpose: 'login' | 'verify_email' = 'login',
   meta?: Record<string, unknown>
 ) {
-  const title =
+  const subject =
     purpose === 'login'
-      ? 'Mã Xác Minh Đăng Nhập Bravechat'
-      : 'Mã Xác Minh Địa Chỉ Email Bravechat'
-  const subject = `${title}: ${otpCode}`
+      ? 'Mã xác nhận đăng nhập cho tài khoản Bravechat của bạn'
+      : 'Mã xác nhận địa chỉ email cho tài khoản Bravechat của bạn'
   const text =
-    `Chào bạn,\n\n` +
-    `Mã xác minh bảo mật tài khoản Bravechat của bạn là: ${otpCode}\n` +
-    `Mã có hiệu lực trong 5 phút. Vui lòng không chia sẻ mã này cho bất kỳ ai.\n\n` +
-    `Được gửi bởi Bravechat.`
+    `Xin chào!\n\n` +
+    `Đây là mã xác nhận dùng một lần (one-time confirmation code) để xác nhận địa chỉ email cá nhân của bạn:\n\n` +
+    `${otpCode}\n\n` +
+    `Mã có hiệu lực trong 5 phút. Nếu bạn không yêu cầu mã này, bạn có thể bỏ qua email này.\n\n` +
+    `Trân trọng,\nĐội ngũ Bravechat\n${env.FRONTEND_URL}`
 
-  const html = buildDiscordEmailTemplate({
-    heading: 'Xác minh bảo mật tài khoản',
-    bodyText:
-      'Sử dụng mã xác minh gồm 6 chữ số dưới đây để tiếp tục. Mã có hiệu lực trong vòng 5 phút và chỉ sử dụng một lần.',
+  const html = buildMinimalEditorialEmailTemplate({
+    greeting: 'Xin chào!',
+    introText:
+      'Đây là mã xác nhận dùng một lần (one-time code) để xác nhận địa chỉ email cá nhân của bạn:',
     codeBlock: otpCode,
-    footerNote:
-      'Nếu bạn không thực hiện thao tác này, hãy kiểm tra và đổi mật khẩu ngay lập tức để bảo vệ tài khoản của bạn.',
+    disclaimerText:
+      'Nếu bạn không yêu cầu mã này, bạn có thể bỏ qua email này.',
   })
 
   return deliverEmail({
@@ -510,7 +477,7 @@ export async function saveGmailConfig(gmailUser: string, gmailAppPassword: strin
   runtimeGmail = {
     gmailUser: cleanUser,
     gmailAppPassword: cleanPassword,
-    senderName: 'Bravechat',
+    senderName: 'Bravechat Account',
   }
   const directory = resolve(__dirname, '../../../../.local')
   await mkdir(directory, { recursive: true })
