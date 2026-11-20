@@ -116,7 +116,7 @@ export function RegisterForm() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(60000),
           body: JSON.stringify({
             email: form.email.trim().toLowerCase(),
             username: form.username.trim().toLowerCase(),

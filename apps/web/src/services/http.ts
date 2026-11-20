@@ -57,7 +57,7 @@ async function request<T>(method: string, path: string, options: RequestOptions 
     method,
     credentials: "include",
     cache: "no-store",
-    signal: init.signal ?? AbortSignal.timeout(15000),
+    signal: init.signal ?? AbortSignal.timeout(60000),
     headers: {
       Accept: "application/json",
       ...(body !== undefined && !multipart ? { "Content-Type": "application/json" } : {}),
@@ -71,7 +71,7 @@ async function request<T>(method: string, path: string, options: RequestOptions 
   if (response.status === 401 && retryAuth && (!path.startsWith("/auth/") || path === "/auth/me")) {
     // 401 cũ có thể về sau khi refresh đã xong; không consume refresh token lần nữa.
     if (sentVersion !== sessionVersion) return request<T>(method, path, options, false);
-    refreshInFlight ??= fetch(buildUrl("/auth/refresh"), { method: "POST", credentials: "include", signal: AbortSignal.timeout(15000), headers: { Accept: "application/json" } })
+    refreshInFlight ??= fetch(buildUrl("/auth/refresh"), { method: "POST", credentials: "include", signal: AbortSignal.timeout(60000), headers: { Accept: "application/json" } })
       .then((refresh) => { if (refresh.ok) sessionVersion++; return refresh.ok; })
       .catch(() => false)
       .finally(() => { refreshInFlight = null; });
