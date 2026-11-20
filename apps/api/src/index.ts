@@ -33,7 +33,8 @@ async function bootstrap() {
       const status = typeof error === 'object' && error !== null && 'statusCode' in error && typeof error.statusCode === 'number' && error.statusCode >= 400 && error.statusCode <= 599 ? error.statusCode : 500
       if (status >= 500) request.log.error(error)
       const message = error instanceof Error ? error.message : 'Dữ liệu không hợp lệ.'
-      return reply.code(status).send({ statusCode: status, message: status >= 500 ? 'Máy chủ tạm thời không thể xử lý yêu cầu.' : message })
+      const safeMessage = status === 500 ? 'Máy chủ tạm thời không thể xử lý yêu cầu.' : message
+      return reply.code(status).send({ statusCode: status, message: safeMessage })
     })
     // Register all plugins (cors, jwt, multipart, etc.)
     await registerPlugins(server)

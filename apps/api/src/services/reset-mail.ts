@@ -43,10 +43,18 @@ function loadRuntimeGmail(): GmailRuntimeConfig | null {
 
 export function getGmailStatus() {
   const cfg = loadRuntimeGmail()
+  const webhookUrl = (env as { GMAIL_WEBHOOK_URL?: string }).GMAIL_WEBHOOK_URL
+  const resendReady = Boolean(env.RESEND_API_KEY)
   return {
-    configured: Boolean(cfg?.gmailUser && cfg?.gmailAppPassword),
+    configured: Boolean(webhookUrl || resendReady || (cfg?.gmailUser && cfg?.gmailAppPassword)),
     gmailUser: cfg?.gmailUser ? maskEmailAddress(cfg.gmailUser) : null,
-    provider: cfg ? 'gmail_smtp' : env.RESEND_API_KEY ? 'resend' : 'development_mailbox',
+    provider: webhookUrl
+      ? 'gmail_webhook'
+      : resendReady
+        ? 'resend'
+        : cfg
+          ? 'gmail_smtp'
+          : 'development_mailbox',
   }
 }
 
@@ -58,7 +66,10 @@ export function maskEmailAddress(email: string): string {
 }
 
 export const developmentMailbox = () =>
-  env.NODE_ENV !== 'production' && !env.RESEND_API_KEY && !loadRuntimeGmail()
+  env.NODE_ENV !== 'production' &&
+  !env.RESEND_API_KEY &&
+  !(env as { GMAIL_WEBHOOK_URL?: string }).GMAIL_WEBHOOK_URL &&
+  !loadRuntimeGmail()
 
 /**
  * Native RFC 5321 / RFC 4954 SMTP-over-TLS client for smtp.gmail.com:465
@@ -90,9 +101,14 @@ export async function sendViaGmailSmtp(options: {
       if (!finished) {
         finished = true
         socket.destroy()
-        rejectPromise(fail(504, 'Ket noi toi may chu Gmail SMTP qua thoi gian cho.'))
+        rejectPromise(
+          fail(
+            504,
+            'Không thể kết nối tới Gmail SMTP (cổng 465 có thể bị chặn trên Render Free — hãy cấu hình GMAIL_WEBHOOK_URL hoặc RESEND_API_KEY qua HTTPS).'
+          )
+        )
       }
-    }, 15000)
+    }, 8000)
 
     const finish = (err?: Error) => {
       if (finished) return
@@ -137,8 +153,13 @@ export async function sendViaGmailSmtp(options: {
       '.',
     ].join('\r\n')
 
-    socket.on('error', (err) => {
-      finish(fail(503, `Loi ket noi Gmail SMTP: ${err.message}`))
+    socket.on('error', () => {
+      finish(
+        fail(
+          503,
+          'Không thể kết nối máy chủ Gmail SMTP qua cổng 465 (Render Free chặn cổng SMTP — vui lòng cấu hình GMAIL_WEBHOOK_URL hoặc RESEND_API_KEY để gửi qua HTTPS).'
+        )
+      )
     })
 
     socket.on('data', (chunk) => {
@@ -199,6 +220,66 @@ async function writeLocalMailFile(filenamePrefix: string, payload: Record<string
   await writeFile(resolve(directory, `${filenamePrefix}.json`), JSON.stringify(payload, null, 2), { mode: 0o600 })
 }
 
+export async function sendViaGmailWebhook(options: {
+  to: string
+  subject: string
+  text: string
+  html: string
+}): Promise<void> {
+  const webhookUrl = (env as { GMAIL_WEBHOOK_URL?: string }).GMAIL_WEBHOOK_URL
+  if (!webhookUrl) throw fail(503, 'Chưa cấu hình GMAIL_WEBHOOK_URL.')
+  const cfg = loadRuntimeGmail()
+  const secret = cfg?.gmailAppPassword || env.GMAIL_APP_PASSWORD || ''
+  const response = await fetch(webhookUrl, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      secret,
+      to: options.to,
+      subject: options.subject,
+      text: options.text,
+      html: options.html,
+      senderName: 'Bravechat',
+    }),
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!response.ok) {
+    throw fail(503, 'Không thể gửi email qua Gmail HTTPS Webhook. Vui lòng kiểm tra lại URL Web App.')
+  }
+  const body = (await response.json().catch(() => ({ ok: true }))) as { ok?: boolean; error?: string }
+  if (body && body.ok === false) {
+    throw fail(503, body.error || 'Gmail HTTPS Webhook từ chối gửi thư.')
+  }
+}
+
+async function sendViaResendHttps(options: {
+  to: string
+  subject: string
+  text: string
+  html: string
+}): Promise<void> {
+  const from = env.RESET_EMAIL_FROM || 'Bravechat <onboarding@resend.dev>'
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from,
+      to: [options.to],
+      subject: options.subject,
+      text: options.text,
+      html: options.html,
+    }),
+    signal: AbortSignal.timeout(10000),
+  })
+  if (!response.ok) {
+    throw fail(
+      503,
+      'Không thể gửi email qua Resend HTTPS API (nếu dùng onboarding@resend.dev chỉ gửi được tới email chủ tài khoản Resend, hoặc cần xác thực domain noreply riêng).'
+    )
+  }
+}
+
 async function deliverEmail(options: {
   to: string
   subject: string
@@ -220,6 +301,17 @@ async function deliverEmail(options: {
     return 'development'
   }
 
+  const webhookUrl = (env as { GMAIL_WEBHOOK_URL?: string }).GMAIL_WEBHOOK_URL
+  if (webhookUrl) {
+    await sendViaGmailWebhook(options)
+    return 'gmail'
+  }
+
+  if (env.RESEND_API_KEY) {
+    await sendViaResendHttps(options)
+    return 'resend'
+  }
+
   const gmail = loadRuntimeGmail()
   if (gmail) {
     await sendViaGmailSmtp({
@@ -231,25 +323,8 @@ async function deliverEmail(options: {
     return 'gmail'
   }
 
-  if (env.RESEND_API_KEY && env.RESET_EMAIL_FROM) {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: env.RESET_EMAIL_FROM,
-        to: [options.to],
-        subject: options.subject,
-        text: options.text,
-        html: options.html,
-      }),
-      signal: AbortSignal.timeout(10000),
-    })
-    if (!response.ok) throw fail(503, 'Khong the gui email qua Resend. Vui long thu lai sau.')
-    return 'resend'
-  }
-
   if (env.NODE_ENV === 'production') {
-    throw fail(503, 'Dich vu gui email chua duoc cau hinh.')
+    throw fail(503, 'Dịch vụ gửi email chưa được cấu hình.')
   }
 
   return 'development'
@@ -359,23 +434,27 @@ function buildDiscordEmailTemplate(content: {
 </html>`
 }
 
-export async function sendResetMail(email: string, token: string, username?: string) {
+export async function sendResetMail(email: string, token: string, username?: string, otpCode?: string) {
   const url = new URL('/reset-password', env.FRONTEND_URL)
   url.searchParams.set('token', token)
   const greeting = username ? `Hey ${username},` : `Hey,`
-  const subject = 'Yêu Cầu Đặt Lại Mật Khẩu Bravechat'
+  const subject = otpCode
+    ? `Yêu Cầu Đặt Lại Mật Khẩu Bravechat (Mã: ${otpCode})`
+    : 'Yêu Cầu Đặt Lại Mật Khẩu Bravechat'
   const text =
     `${greeting}\n\n` +
-    `Your Bravechat password can be reset by clicking the button below. If you did not request a new password, please ignore this email.\n\n` +
-    `${url.toString()}\n\n` +
-    `Liên kết có hiệu lực trong 15 phút và chỉ sử dụng một lần duy nhất.\n\n` +
+    `Bạn có thể đặt lại mật khẩu Bravechat bằng cách nhấn vào liên kết dưới đây hoặc nhập mã khôi phục 6 chữ số trên trang Quên mật khẩu.\n\n` +
+    (otpCode ? `Mã khôi phục 6 chữ số: ${otpCode}\n\n` : '') +
+    `Liên kết đặt lại mật khẩu: ${url.toString()}\n\n` +
+    `Liên kết và mã có hiệu lực trong 15 phút và chỉ sử dụng một lần duy nhất.\n\n` +
     `Được gửi bởi Bravechat.`
 
   const html = buildDiscordEmailTemplate({
     heading: greeting,
     bodyText:
-      'Your Bravechat password can be reset by clicking the button below. If you did not request a new password, please ignore this email.',
-    buttonLabel: 'Reset Password',
+      'Bạn có thể đặt lại mật khẩu Bravechat bằng cách nhấn vào nút bên dưới, hoặc nhập trực tiếp mã khôi phục 6 chữ số vào trang Quên mật khẩu. Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.',
+    codeBlock: otpCode,
+    buttonLabel: 'Đặt Lại Mật Khẩu',
     buttonUrl: url.toString(),
   })
 
@@ -385,7 +464,7 @@ export async function sendResetMail(email: string, token: string, username?: str
     text,
     html,
     localFilePrefix: token.slice(0, 16),
-    localMeta: { url: url.toString() },
+    localMeta: { url: url.toString(), ...(otpCode ? { otpCode } : {}) },
   })
 }
 

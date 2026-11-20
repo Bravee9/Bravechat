@@ -109,7 +109,11 @@ function QrLoginApprovalContent() {
           Thiết bị này chưa đăng nhập vào Bravechat. Để phê duyệt đăng nhập bằng mã QR cho thiết bị khác, bạn cần đăng nhập trên thiết bị này trước.
         </div>
         <Link
-          href="/login"
+          href={
+            initialCode
+              ? `/login?redirect=${encodeURIComponent(`/qr-login?code=${initialCode}`)}`
+              : "/login"
+          }
           className="block w-full py-2.5 rounded bg-ocean-primary hover:bg-ocean-primary/90 text-white font-medium text-center text-sm transition-colors"
         >
           Đi tới trang đăng nhập

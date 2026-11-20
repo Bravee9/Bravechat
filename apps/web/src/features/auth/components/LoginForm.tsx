@@ -99,7 +99,8 @@ export function LoginForm() {
         return;
       }
 
-      window.location.href = "/channels/@me";
+      const nextPath = new URLSearchParams(window.location.search).get("redirect");
+      window.location.href = nextPath && /^\/(?!\/)/.test(nextPath) ? nextPath : "/channels/@me";
     } catch {
       setErrors({ general: "Không thể kết nối đến máy chủ. Vui lòng thử lại." });
     } finally {
@@ -137,7 +138,8 @@ export function LoginForm() {
         return;
       }
 
-      window.location.href = "/channels/@me";
+      const nextPath = new URLSearchParams(window.location.search).get("redirect");
+      window.location.href = nextPath && /^\/(?!\/)/.test(nextPath) ? nextPath : "/channels/@me";
     } catch {
       setErrors({ general: "Không thể kết nối đến máy chủ xác thực." });
     } finally {

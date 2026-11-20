@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import puppeteer from 'puppeteer-core';
 
-const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const SCREENSHOT_DIR = 'C:\\Users\\brave\\.gemini\\antigravity\\brain\\6714fbed-d9c8-4567-985b-b7469f54ed11\\screenshots';
+const CHROME_PATH = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const SCREENSHOT_DIR = path.resolve(process.cwd(), '.local/screenshots/showcase');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -38,10 +38,12 @@ async function run() {
   await page.goto('http://localhost:3000/login', { waitUntil: 'networkidle2' });
 
   // Type credentials and submit
-  console.log('2. Logging in with thenoobsisevil@gmail.com...');
+  const testEmail = process.env.TEST_USER_EMAIL || 'tester@bravechat.test';
+  const testPassword = process.env.TEST_USER_PASSWORD || 'TestPassword2026!';
+  console.log(`2. Logging in with ${testEmail}...`);
   await page.waitForSelector('#login-email', { timeout: 10000 });
-  await page.type('#login-email', 'thenoobsisevil@gmail.com');
-  await page.type('#login-password', 'Password2026!@#');
+  await page.type('#login-email', testEmail);
+  await page.type('#login-password', testPassword);
 
   console.log('3. Submitting login form...');
   await Promise.all([

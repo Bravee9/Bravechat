@@ -38,11 +38,12 @@ const envSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6379'),
   REDIS_ENABLED: z.enum(['true', 'false']).default('false'),
 
-  // Auth & Email Delivery (Gmail SMTP / Resend)
+  // Auth & Email Delivery (Gmail SMTP / Gmail HTTPS Webhook / Resend)
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default('7d'),
-  RESEND_API_KEY: z.string().optional(),
-  RESET_EMAIL_FROM: z.string().optional(),
+  RESEND_API_KEY: optionalCredential(z.string().trim().min(5)),
+  RESET_EMAIL_FROM: z.string().trim().default('Bravechat <onboarding@resend.dev>'),
+  GMAIL_WEBHOOK_URL: optionalTrimmed(z.string().trim().url()),
   GMAIL_USER: optionalCredential(z.string().trim().email()),
   GMAIL_APP_PASSWORD: optionalCredential(z.string().trim().min(8)),
   SMTP_HOST: z.string().default('smtp.gmail.com'),

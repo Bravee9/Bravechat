@@ -7,8 +7,8 @@ import puppeteer from 'puppeteer-core'
 import path from 'node:path'
 import { mkdir } from 'node:fs/promises'
 
-const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-const SCREENSHOT_DIR = 'C:\\Users\\brave\\.gemini\\antigravity\\brain\\6714fbed-d9c8-4567-985b-b7469f54ed11\\screenshots'
+const CHROME_PATH = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+const SCREENSHOT_DIR = path.resolve(process.cwd(), '.local/screenshots/recovery')
 
 async function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms))
@@ -56,7 +56,7 @@ async function main() {
     // ─────────────────────────────────────────────────────────
     // STEP 2: Input email and submit form
     // ─────────────────────────────────────────────────────────
-    const testEmail = 'thenoobsisevil@gmail.com'
+    const testEmail = process.env.TEST_USER_EMAIL || 'tester@bravechat.test'
     console.log(`\n[STEP 2] Entering email: ${testEmail}...`)
     await page.waitForSelector('#forgot-email', { timeout: 10000 })
     await page.type('#forgot-email', testEmail)
@@ -89,7 +89,7 @@ async function main() {
     // ─────────────────────────────────────────────────────────
     // STEP 4: Enter new password and confirm
     // ─────────────────────────────────────────────────────────
-    const newPassword = 'Password2026!@#'
+    const newPassword = process.env.TEST_USER_PASSWORD || 'TestPassword2026!'
     console.log(`\n[STEP 4] Entering new password: "${newPassword}"...`)
     await page.type('#reset-password', newPassword)
     await page.type('#confirm-password', newPassword)

@@ -1048,7 +1048,7 @@ export async function authRoutes(server: FastifyInstance) {
       const input = z.object({ email }).parse(request.body)
       const isDevMailbox = resetMail.developmentMailbox ? resetMail.developmentMailbox() : true
       const gmailReady = resetMail.getGmailStatus?.().configured ?? false
-      if (!isDevMailbox && !gmailReady && (!env.RESEND_API_KEY || !env.RESET_EMAIL_FROM)) {
+      if (!isDevMailbox && !gmailReady && !env.RESEND_API_KEY) {
         throw fail(503, 'Dịch vụ gửi email chưa được cấu hình.')
       }
 
@@ -1086,7 +1086,7 @@ export async function authRoutes(server: FastifyInstance) {
 
         try {
           const recipientName = user.displayName || user.username
-          await resetMail.sendResetMail?.(user.email, value, recipientName)
+          await resetMail.sendResetMail?.(user.email, value, recipientName, otpCode)
           if (env.NODE_ENV !== 'production') {
             devResetUrl = `${env.FRONTEND_URL}/reset-password?token=${value}`
             if (!gmailReady) devOtpCode = otpCode
