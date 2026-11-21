@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '../config/prisma'
 import { mediaUrl } from '../services/storage.service'
-import { revokeServerMembership } from './websocket.routes'
+import { revokeServerChannelAccess, revokeServerMembership } from './websocket.routes'
 import { revokeVoiceSessions } from '../services/voice-security'
 import { unreadActivity, serverActivity, type ChannelActivity } from '../services/read-state'
 import {
@@ -520,6 +520,8 @@ export async function serverRoutes(server: FastifyInstance) {
         )
         return ch
       })
+      invalidateServerPermissionsCache?.(request.params.serverId)
+      revokeServerChannelAccess?.(request.params.serverId, existing.id)
 
       return reply.send({ statusCode: 200, data: { channel: updated } })
     }
@@ -551,6 +553,8 @@ export async function serverRoutes(server: FastifyInstance) {
           `Xóa kênh #${existing.name}`
         )
       })
+      invalidateServerPermissionsCache?.(request.params.serverId)
+      revokeServerChannelAccess?.(request.params.serverId, existing.id)
       return reply.send({ statusCode: 200, data: { channelId: existing.id } })
     }
   )
@@ -559,12 +563,12 @@ export async function serverRoutes(server: FastifyInstance) {
     '/:serverId/invites',
     { config: { rateLimit: { max: 100, timeWindow: '1 hour' } } },
     async (request, reply) => {
-      const membership = await prisma.serverMember.findFirst({
-        where: { serverId: request.params.serverId, userId: request.user.id, isBanned: false },
-        select: { id: true },
-      })
-      if (!membership) {
+      const perms = await getMemberPermissions(request.params.serverId, request.user.id)
+      if (!perms) {
         return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy server hoặc bạn không có quyền truy cập.' })
+      }
+      if (!perms.hasPermission('invite_members')) {
+        return reply.status(403).send({ statusCode: 403, message: 'Bạn không có quyền tạo mã mời cho máy chủ này.' })
       }
       const { randomBytes } = await import('node:crypto')
       const invite = await prisma.serverInvite.create({

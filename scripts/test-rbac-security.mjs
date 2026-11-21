@@ -216,3 +216,63 @@ test('Permission cache never retains negative results and clears immediately upo
   permsService.invalidateServerPermissionsCache('s-cache');
   assert.equal(await permsService.getMemberPermissions('s-cache', 'u1'), null);
 });
+
+test('message-action routes enforce private channel access and allow manage_messages moderators to delete', async (t) => {
+  let canAccess = false;
+  let hasManageMessages = false;
+  let deletedId = null;
+  const prisma = {
+    message: {
+      findFirst: async ({ where }) => ({
+        id: where.id,
+        channelId: 'priv-ch',
+        authorId: 'u-author',
+        content: 'hello',
+        isDeleted: false,
+        channel: { serverId: 's1', server: { ownerId: 'u-owner' } },
+      }),
+      update: async ({ where }) => { deletedId = where.id; return {}; },
+    },
+  };
+  const { messageActionRoutes } = loadRoute('message-action.routes.ts', {
+    '../config/prisma': { prisma },
+    '../services/conversation': {
+      blocked: async () => false,
+      dmInclude: {},
+      fail: (statusCode, message) => Object.assign(new Error(message), { statusCode }),
+      messageInclude: {},
+      pairFilter: () => ({}),
+      serializeMessage: async (_s, row) => row,
+    },
+    './websocket.routes': { publishChannelEvent() {}, publishUserEvent() {} },
+    '../services/permissions': {
+      canAccessChannel: async () => (canAccess ? { id: 'priv-ch', serverId: 's1' } : null),
+      getMemberPermissions: async () => ({
+        hasPermission: (key) => (key === 'manage_messages' ? hasManageMessages : false),
+      }),
+    },
+    zod: apiRequire('zod'),
+  });
+
+  const app = apiRequire('fastify')();
+  t.after(() => app.close());
+  app.addHook('preHandler', async (request) => {
+    request.user = { id: request.headers['x-test-user'] || 'u-mod' };
+  });
+  await app.register(messageActionRoutes, { prefix: '/messages' });
+
+  // 1. Member without private channel access gets 404 when attempting to react or delete
+  const deniedDelete = await app.inject({ method: 'DELETE', url: '/messages/msg-1' });
+  assert.equal(deniedDelete.statusCode, 404);
+
+  // 2. Member with private channel access but without manage_messages gets 403
+  canAccess = true;
+  const unprivDelete = await app.inject({ method: 'DELETE', url: '/messages/msg-1' });
+  assert.equal(unprivDelete.statusCode, 403);
+
+  // 3. Moderator with manage_messages can delete another user's message (200)
+  hasManageMessages = true;
+  const modDelete = await app.inject({ method: 'DELETE', url: '/messages/msg-1' });
+  assert.equal(modDelete.statusCode, 200);
+  assert.equal(deletedId, 'msg-1');
+});

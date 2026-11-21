@@ -14,6 +14,23 @@ export async function unreadActivity(userId: string, serverId?: string) {
     LEFT JOIN messages m ON m.channel_id = c.id AND m.is_deleted = false AND m.author_id <> sm.user_id
       AND m.created_at > COALESCE(r.last_read_at, sm.joined_at)
     WHERE sm.user_id = ${userId} AND sm.is_banned = false ${serverId ? Prisma.sql`AND c.server_id = ${serverId}` : Prisma.empty}
+      AND (
+        c.is_private = false
+        OR sm.is_owner = true
+        OR EXISTS (
+          SELECT 1 FROM member_roles mr
+          JOIN roles ro ON ro.id = mr.role_id
+          WHERE mr.member_id = sm.id
+            AND ((ro.permissions & ${1 << 14}) <> 0)
+        )
+        OR EXISTS (
+          SELECT 1 FROM channel_role_permissions crp
+          JOIN member_roles mr ON mr.role_id = crp.role_id
+          WHERE crp.channel_id = c.id
+            AND crp.can_view = true
+            AND mr.member_id = sm.id
+        )
+      )
     GROUP BY c.id, c.server_id
   `
 }

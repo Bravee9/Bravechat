@@ -84,7 +84,18 @@ test('real Redis: cross-instance realtime and signed voice webhooks', { timeout:
     voiceSession: { upsert: async () => {}, findUnique: async () => ({ epoch: 0 }) },
   };
   prisma.$transaction = async (work) => work(prisma);
-  const dependencies = { ioredis: TestRedis, '../config/env': { env }, '../config/prisma': { prisma }, 'livekit-server-sdk': livekit };
+  const permissionsMock = {
+    canMemberViewPrivateChannel: () => true,
+    getMemberPermissions: async () => ({ isOwner: true, roleIds: [], hasPermission: () => true }),
+  };
+  const dependencies = {
+    ioredis: TestRedis,
+    '../config/env': { env },
+    '../config/prisma': { prisma },
+    'livekit-server-sdk': livekit,
+    './permissions': permissionsMock,
+    '../services/permissions': permissionsMock,
+  };
   // Redis, WebSockets, and webhook signatures are real; the SFU control API
   // remains isolated so this suite does not require microphone/media support.
   class RoomServiceClient { async listRooms() { return []; } async updateParticipant() {} async removeParticipant() {} }

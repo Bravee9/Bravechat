@@ -46,6 +46,7 @@ const envSchema = z.object({
   GMAIL_WEBHOOK_URL: optionalTrimmed(z.string().trim().url()),
   GMAIL_USER: optionalCredential(z.string().trim().email()),
   GMAIL_APP_PASSWORD: optionalCredential(z.string().trim().min(8)),
+  GMAIL_CONFIG_ADMIN_EMAIL: optionalCredential(z.string().trim().email()),
   SMTP_HOST: z.string().default('smtp.gmail.com'),
   SMTP_PORT: z.coerce.number().default(465),
 

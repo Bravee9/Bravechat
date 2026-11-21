@@ -304,12 +304,39 @@ export function canMemberViewPrivateChannel(
   },
   channel: {
     isPrivate?: boolean
-    rolePermissions?: Array<{ roleId: string }>
+    rolePermissions?: Array<{ roleId: string; canView?: boolean }>
   }
 ) {
   if (!channel.isPrivate || perms.isOwner) return true
   if (perms.hasPermission('access_private_channels')) return true
-  return Boolean(channel.rolePermissions?.some((rp) => perms.roleIds.includes(rp.roleId)))
+  return Boolean(
+    channel.rolePermissions?.some(
+      (rp) => (rp.canView ?? true) && perms.roleIds.includes(rp.roleId)
+    )
+  )
+}
+
+export function canMemberSendInPrivateChannel(
+  perms: {
+    isOwner: boolean
+    roleIds: string[]
+    hasPermission: (key: PermissionKey) => boolean
+  },
+  channel: {
+    isPrivate?: boolean
+    rolePermissions?: Array<{ roleId: string; canView?: boolean; canSend?: boolean }>
+  }
+) {
+  if (!channel.isPrivate || perms.isOwner) return true
+  if (perms.hasPermission('access_private_channels')) return true
+  return Boolean(
+    channel.rolePermissions?.some(
+      (rp) =>
+        (rp.canView ?? true) &&
+        (rp.canSend ?? true) &&
+        perms.roleIds.includes(rp.roleId)
+    )
+  )
 }
 
 async function fetchChannelAccessFromDb(channelId: string, userId: string) {
@@ -324,7 +351,7 @@ async function fetchChannelAccessFromDb(channelId: string, userId: string) {
       isPrivate: true,
       rolePermissions: {
         where: { canView: true },
-        select: { roleId: true },
+        select: { roleId: true, canSend: true },
       },
     },
   })
@@ -344,6 +371,9 @@ async function fetchChannelAccessFromDb(channelId: string, userId: string) {
     serverId: channel.serverId,
     userLimit: channel.userLimit,
     isPrivate: channel.isPrivate,
+    canSend:
+      perms.hasPermission('send_messages') &&
+      canMemberSendInPrivateChannel(perms, channel),
   }
 }
 

@@ -4,15 +4,23 @@ import { CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { z } from 'zod'
 import { prisma } from '../config/prisma'
 import { env } from '../config/env'
-import { verifyUploadedObject } from './upload.routes'
+import { ATTACHMENT_TYPES, verifyUploadedObject } from './upload.routes'
 import { publishChannelMessage, publishUserEvent } from './websocket.routes'
-import { dmInclude, fail, messageInclude, pairFilter, serializeMessage, serializable, friendshipPair } from '../services/conversation'
+import { blocked, dmInclude, fail, messageInclude, pairFilter, serializeMessage, serializable, friendshipPair } from '../services/conversation'
 import { messageActionRoutes } from './message-action.routes'
-import { canAccessChannel } from '../services/permissions'
+import { canAccessChannel, getMemberPermissions } from '../services/permissions'
 import { randomUUID } from 'node:crypto'
 import { extname } from 'node:path'
 
-const attachmentInput = z.object({ filename: z.string().trim().min(1).max(255), contentType: z.string(), key: z.string() })
+const attachmentInput = z.object({
+  filename: z.string().trim().min(1).max(255),
+  contentType: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine((val) => ATTACHMENT_TYPES.has(val), 'Loại tệp đính kèm không được hỗ trợ.'),
+  key: z.string().trim().min(1),
+})
 const messageInput = z.object({ content: z.string().trim().max(2000).default(''), attachments: z.array(attachmentInput).max(10).default([]), nonce: z.string().uuid().optional(), replyToId: z.string().min(1).optional() })
 
 const presentMessage = serializeMessage
@@ -61,9 +69,16 @@ export async function channelRoutes(server: FastifyInstance) {
   server.post<{ Params: { channelId: string } }>('/:channelId/messages', async (request, reply) => {
     const channel = await canAccessChannel(request.params.channelId, request.user.id)
     if (!channel) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy channel hoặc bạn không có quyền truy cập.' })
+    const perms = await getMemberPermissions(channel.serverId, request.user.id)
+    if (!perms || !perms.hasPermission('send_messages') || channel.canSend === false) {
+      return reply.status(403).send({ statusCode: 403, message: 'Bạn không có quyền gửi tin nhắn trong kênh này.' })
+    }
     const parsed = messageInput.safeParse(request.body)
     if (!parsed.success || (!parsed.data.content && parsed.data.attachments.length === 0)) {
       return reply.status(400).send({ statusCode: 400, message: 'Tin nhắn cần có nội dung hoặc tệp đính kèm.', details: parsed.success ? undefined : parsed.error.flatten().fieldErrors })
+    }
+    if (parsed.data.attachments.length > 0 && !perms.hasPermission('attach_files')) {
+      return reply.status(403).send({ statusCode: 403, message: 'Bạn không có quyền đính kèm tệp trong kênh này.' })
     }
     const findExisting = () => prisma.message.findFirst({ where: { channelId: channel.id, authorId: request.user.id, nonce: parsed.data.nonce }, include: messageInclude })
     // Kiểm nonce trước xử lý upload để retry không tạo tin hoặc tiêu thụ file pending lần nữa.
@@ -125,7 +140,7 @@ export async function channelRoutes(server: FastifyInstance) {
     }
     await Promise.all(verified.map(({ input }) => server.r2.s3.send(new DeleteObjectCommand({ Bucket: env.R2_BUCKET_NAME, Key: input.key })).catch(() => undefined)))
     const presented = await presentMessage(server, message)
-    publishChannelMessage(channel.id, presented, channel.serverId)
+    publishChannelMessage(channel.id, presented, channel.isPrivate ? undefined : channel.serverId)
     return reply.status(201).send({ statusCode: 201, data: { message: presented } })
   })
 
@@ -161,8 +176,8 @@ export async function messageRoutes(server: FastifyInstance) {
     const input = z.object({
       content: z.string().trim().max(2000).default(''),
       nonce: z.string().uuid().optional(),
-      replyToId: z.string().optional(),
-      attachments: z.array(attachmentInput).max(10).default([]),
+      replyToId: z.string().min(1).optional(),
+      attachments: z.array(attachmentInput).max(1).default([]),
     }).parse(request.body)
 
     if (!input.content && input.attachments.length === 0) {
@@ -171,8 +186,31 @@ export async function messageRoutes(server: FastifyInstance) {
 
     const otherId = request.params.userId
     if (otherId === request.user.id || !await prisma.user.findFirst({ where: { id: otherId, isBanned: false }, select: { id: true } })) throw fail(404, 'Không tìm thấy người dùng.')
+    if (await blocked(request.user.id, otherId)) throw fail(403, 'Không thể gửi tin nhắn cho người dùng này.')
+    if (input.nonce) {
+      const existing = await prisma.directMessage.findUnique({
+        where: { senderId_receiverId_nonce: { senderId: request.user.id, receiverId: otherId, nonce: input.nonce } },
+        include: dmInclude,
+      })
+      if (existing) {
+        if ((existing.content ?? '') !== input.content || existing.replyToId !== (input.replyToId ?? null)) {
+          throw fail(409, 'Mã gửi tin đã được dùng cho nội dung khác.')
+        }
+        return reply.code(200).send({ statusCode: 200, data: { message: await serializeMessage(server, existing) } })
+      }
+    }
+    if (
+      input.replyToId &&
+      !(await prisma.directMessage.findFirst({
+        where: { id: input.replyToId, ...pairFilter(request.user.id, otherId), isDeleted: false },
+        select: { id: true },
+      }))
+    ) {
+      throw fail(400, 'Không tìm thấy tin nhắn được trả lời trong cuộc trò chuyện này.')
+    }
 
     let r2KeyToSave: string | null = null
+    let pendingKeyToClean: string | null = null
     if (input.attachments.length > 0) {
       const firstAttachment = input.attachments[0]
       const verified = await verifyUploadedObject(server, firstAttachment.key, request.user.id, firstAttachment.contentType)
@@ -189,38 +227,52 @@ export async function messageRoutes(server: FastifyInstance) {
           CopySource: `${env.R2_BUCKET_NAME}/${firstAttachment.key.split('/').map(encodeURIComponent).join('/')}`,
         }))
         r2KeyToSave = targetKey
-        await server.r2.s3.send(new DeleteObjectCommand({ Bucket: env.R2_BUCKET_NAME, Key: firstAttachment.key })).catch(() => undefined)
+        pendingKeyToClean = firstAttachment.key
       } catch (err) {
         request.log.error(err, 'Failed to commit DM attachment')
         throw fail(502, 'Không thể hoàn tất lưu tệp đính kèm.')
       }
     }
 
-    const result = await serializable(async (tx) => {
-      if (await tx.friendship.findFirst({ where: { ...friendshipPair(request.user.id, otherId), status: 'BLOCKED' }, select: { id: true } })) throw fail(403, 'Không thể gửi tin nhắn cho người dùng này.')
-      if (input.nonce) {
-        const existing = await tx.directMessage.findUnique({ where: { senderId_receiverId_nonce: { senderId: request.user.id, receiverId: otherId, nonce: input.nonce } }, include: dmInclude })
-        if (existing) {
-          if ((existing.content ?? '') !== input.content || existing.replyToId !== (input.replyToId ?? null)) throw fail(409, 'Mã gửi tin đã được dùng cho nội dung khác.')
-          return { row: existing, created: false }
+    let result
+    try {
+      result = await serializable(async (tx) => {
+        if (await tx.friendship.findFirst({ where: { ...friendshipPair(request.user.id, otherId), status: 'BLOCKED' }, select: { id: true } })) throw fail(403, 'Không thể gửi tin nhắn cho người dùng này.')
+        if (input.nonce) {
+          const existing = await tx.directMessage.findUnique({ where: { senderId_receiverId_nonce: { senderId: request.user.id, receiverId: otherId, nonce: input.nonce } }, include: dmInclude })
+          if (existing) {
+            if ((existing.content ?? '') !== input.content || existing.replyToId !== (input.replyToId ?? null)) throw fail(409, 'Mã gửi tin đã được dùng cho nội dung khác.')
+            return { row: existing, created: false }
+          }
         }
+        if (input.replyToId && !await tx.directMessage.findFirst({ where: { id: input.replyToId, ...pairFilter(request.user.id, otherId), isDeleted: false }, select: { id: true } })) throw fail(400, 'Không tìm thấy tin nhắn được trả lời trong cuộc trò chuyện này.')
+        return {
+          row: await tx.directMessage.create({
+            data: {
+              senderId: request.user.id,
+              receiverId: otherId,
+              content: input.content || null,
+              r2Key: r2KeyToSave,
+              nonce: input.nonce,
+              replyToId: input.replyToId
+            },
+            include: dmInclude
+          }),
+          created: true
+        }
+      })
+    } catch (error) {
+      if (r2KeyToSave) {
+        await server.r2.s3.send(new DeleteObjectCommand({ Bucket: env.R2_BUCKET_NAME, Key: r2KeyToSave })).catch(() => undefined)
       }
-      if (input.replyToId && !await tx.directMessage.findFirst({ where: { id: input.replyToId, ...pairFilter(request.user.id, otherId), isDeleted: false }, select: { id: true } })) throw fail(400, 'Không tìm thấy tin nhắn được trả lời trong cuộc trò chuyện này.')
-      return {
-        row: await tx.directMessage.create({
-          data: {
-            senderId: request.user.id,
-            receiverId: otherId,
-            content: input.content || null,
-            r2Key: r2KeyToSave,
-            nonce: input.nonce,
-            replyToId: input.replyToId
-          },
-          include: dmInclude
-        }),
-        created: true
-      }
-    })
+      throw error
+    }
+    if (pendingKeyToClean) {
+      await server.r2.s3.send(new DeleteObjectCommand({ Bucket: env.R2_BUCKET_NAME, Key: pendingKeyToClean })).catch(() => undefined)
+    }
+    if (!result.created && r2KeyToSave) {
+      await server.r2.s3.send(new DeleteObjectCommand({ Bucket: env.R2_BUCKET_NAME, Key: r2KeyToSave })).catch(() => undefined)
+    }
     const message = await serializeMessage(server, result.row)
     if (result.created) for (const id of [request.user.id, otherId]) publishUserEvent(id, { type: 'dm_create', message, senderId: request.user.id, receiverId: otherId })
     return reply.code(result.created ? 201 : 200).send({ statusCode: result.created ? 201 : 200, data: { message } })

@@ -15,6 +15,21 @@ export async function analyticsRoutes(server: FastifyInstance) {
     }
 
     const serverId = request.params.serverId
+    const canViewAllPrivate = perms.isOwner || perms.hasPermission('access_private_channels')
+    const visibleChannelPredicate = Prisma.sql`(
+      c.is_private = false
+      OR ${canViewAllPrivate} = true
+      OR EXISTS (
+        SELECT 1 FROM channel_role_permissions crp
+        JOIN member_roles mr ON mr.role_id = crp.role_id
+        JOIN server_members sm ON sm.id = mr.member_id
+        WHERE crp.channel_id = c.id
+          AND crp.can_view = true
+          AND sm.server_id = ${serverId}
+          AND sm.user_id = ${request.user.id}
+          AND sm.is_banned = false
+      )
+    )`
 
     const [summaryRows, messagesByChannel, topContributors, attachmentsByType] = await Promise.all([
       prisma.$queryRaw<
@@ -31,11 +46,11 @@ export async function analyticsRoutes(server: FastifyInstance) {
         SELECT
           (SELECT COUNT(*)::int FROM server_members sm WHERE sm.server_id = ${serverId} AND sm.is_banned = false) AS "totalMembers",
           (SELECT COUNT(*)::int FROM server_members sm JOIN users u ON u.id = sm.user_id WHERE sm.server_id = ${serverId} AND sm.is_banned = false AND u.status = 'ONLINE') AS "onlineMembers",
-          (SELECT COUNT(*)::int FROM channels c WHERE c.server_id = ${serverId}) AS "totalChannels",
-          (SELECT COUNT(*)::int FROM channels c WHERE c.server_id = ${serverId} AND c.is_private = true) AS "privateChannels",
-          (SELECT COUNT(*)::int FROM messages m JOIN channels c ON c.id = m.channel_id WHERE c.server_id = ${serverId} AND m.is_deleted = false) AS "totalMessages",
-          (SELECT COUNT(*)::int FROM attachments a JOIN messages m ON m.id = a.message_id JOIN channels c ON c.id = m.channel_id WHERE c.server_id = ${serverId} AND m.is_deleted = false) AS "totalAttachments",
-          (SELECT COALESCE(SUM(a.size), 0)::bigint::int FROM attachments a JOIN messages m ON m.id = a.message_id JOIN channels c ON c.id = m.channel_id WHERE c.server_id = ${serverId} AND m.is_deleted = false) AS "totalAttachmentBytes"
+          (SELECT COUNT(*)::int FROM channels c WHERE c.server_id = ${serverId} AND ${visibleChannelPredicate}) AS "totalChannels",
+          (SELECT COUNT(*)::int FROM channels c WHERE c.server_id = ${serverId} AND c.is_private = true AND ${visibleChannelPredicate}) AS "privateChannels",
+          (SELECT COUNT(*)::int FROM messages m JOIN channels c ON c.id = m.channel_id WHERE c.server_id = ${serverId} AND m.is_deleted = false AND ${visibleChannelPredicate}) AS "totalMessages",
+          (SELECT COUNT(*)::int FROM attachments a JOIN messages m ON m.id = a.message_id JOIN channels c ON c.id = m.channel_id WHERE c.server_id = ${serverId} AND m.is_deleted = false AND ${visibleChannelPredicate}) AS "totalAttachments",
+          (SELECT COALESCE(SUM(a.size), 0)::bigint::int FROM attachments a JOIN messages m ON m.id = a.message_id JOIN channels c ON c.id = m.channel_id WHERE c.server_id = ${serverId} AND m.is_deleted = false AND ${visibleChannelPredicate}) AS "totalAttachmentBytes"
       `,
       prisma.$queryRaw<
         Array<{
@@ -57,17 +72,7 @@ export async function analyticsRoutes(server: FastifyInstance) {
         FROM channels c
         LEFT JOIN messages m ON m.channel_id = c.id AND m.is_deleted = false
         WHERE c.server_id = ${serverId}
-          AND (
-            c.is_private = false
-            OR ${perms.isOwner} = true
-            OR ${perms.hasPermission('access_private_channels')} = true
-            OR EXISTS (
-              SELECT 1 FROM channel_role_permissions crp
-              JOIN member_roles mr ON mr.role_id = crp.role_id
-              JOIN server_members sm ON sm.id = mr.member_id
-              WHERE crp.channel_id = c.id AND crp.can_view = true AND sm.user_id = ${request.user.id}
-            )
-          )
+          AND ${visibleChannelPredicate}
         GROUP BY c.id, c.name, c.type, c.is_private
         ORDER BY "messageCount" DESC, c.position ASC
       `,
@@ -89,7 +94,9 @@ export async function analyticsRoutes(server: FastifyInstance) {
         FROM messages m
         JOIN channels c ON c.id = m.channel_id
         JOIN users u ON u.id = m.author_id
-        WHERE c.server_id = ${serverId} AND m.is_deleted = false
+        WHERE c.server_id = ${serverId}
+          AND m.is_deleted = false
+          AND ${visibleChannelPredicate}
         GROUP BY u.id, u.username, u.display_name
         HAVING COUNT(m.id) > 0
         ORDER BY "messageCount" DESC
@@ -109,7 +116,9 @@ export async function analyticsRoutes(server: FastifyInstance) {
         FROM attachments a
         JOIN messages m ON m.id = a.message_id
         JOIN channels c ON c.id = m.channel_id
-        WHERE c.server_id = ${serverId} AND m.is_deleted = false
+        WHERE c.server_id = ${serverId}
+          AND m.is_deleted = false
+          AND ${visibleChannelPredicate}
         GROUP BY a.type
         ORDER BY "totalBytes" DESC
       `,
@@ -152,7 +161,8 @@ export async function analyticsRoutes(server: FastifyInstance) {
     if (!q) {
       return reply.send({ statusCode: 200, data: { results: [] } })
     }
-    const pattern = `%${q}%`
+    const escapedQ = q.replace(/[\\%_]/g, '\\$&')
+    const pattern = `%${escapedQ}%`
     const limit = Math.min(Math.max(Number(request.query.limit) || 25, 1), 50)
     const channelFilter = request.query.channelId
       ? Prisma.sql`AND c.id = ${request.query.channelId}`
@@ -184,7 +194,7 @@ export async function analyticsRoutes(server: FastifyInstance) {
       JOIN users u ON u.id = m.author_id
       WHERE c.server_id = ${request.params.serverId}
         AND m.is_deleted = false
-        AND m.content ILIKE ${pattern}
+        AND m.content ILIKE ${pattern} ESCAPE '\'
         ${channelFilter}
         AND (
           c.is_private = false
@@ -194,7 +204,11 @@ export async function analyticsRoutes(server: FastifyInstance) {
             SELECT 1 FROM channel_role_permissions crp
             JOIN member_roles mr ON mr.role_id = crp.role_id
             JOIN server_members sm ON sm.id = mr.member_id
-            WHERE crp.channel_id = c.id AND crp.can_view = true AND sm.user_id = ${request.user.id}
+            WHERE crp.channel_id = c.id
+              AND crp.can_view = true
+              AND sm.server_id = ${request.params.serverId}
+              AND sm.user_id = ${request.user.id}
+              AND sm.is_banned = false
           )
         )
       ORDER BY m.created_at DESC
