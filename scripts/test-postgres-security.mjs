@@ -111,7 +111,12 @@ test('PostgreSQL security integration', { timeout: 60000 }, async (t) => {
     if (control) await control.createRoom({ name: `channel:${channel.id}:0` });
     const service = loadModule('services/voice-security.ts', {
       '../config/prisma': { prisma }, '../config/env': { env: livekitEnv },
-      './conversation': { fail }, 'livekit-server-sdk': control ? livekit : { ...livekit, RoomServiceClient },
+      './conversation': { fail },
+      './permissions': {
+        canMemberViewPrivateChannel: () => true,
+        getMemberPermissions: async () => ({ isOwner: true, roleIds: [], hasPermission: () => true }),
+      },
+      'livekit-server-sdk': control ? livekit : { ...livekit, RoomServiceClient },
     });
     assert.equal(await service.registerVoiceToken(channel.id, session.id, f.user.id), `channel:${channel.id}:0`);
     assert.equal(await prisma.voiceSession.count({ where: { channelId: channel.id } }), 1);

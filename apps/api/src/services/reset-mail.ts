@@ -306,7 +306,7 @@ async function deliverEmail(options: {
   })
 
   // Never send live emails to synthetic test domains used in CI / integration tests
-  if (options.to.endsWith('.test') || options.to.endsWith('.example')) {
+  if (env.NODE_ENV !== 'production' && (options.to.endsWith('.test') || options.to.endsWith('.example'))) {
     return 'development'
   }
 
@@ -339,6 +339,15 @@ async function deliverEmail(options: {
   return 'development'
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 /**
  * Clean, left-aligned editorial transactional email template.
  * Structured so Gmail automatically extracts the 6-digit one-time code into its top smart-copy card.
@@ -352,8 +361,16 @@ function buildMinimalEditorialEmailTemplate(content: {
   actionUrl?: string
   disclaimerText: string
 }): string {
-  const siteHost = env.FRONTEND_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')
-  const supportUrl = `${env.FRONTEND_URL.replace(/\/$/, '')}/docs`
+  const siteHost = escapeHtml(env.FRONTEND_URL.replace(/^https?:\/\//, '').replace(/\/$/, ''))
+  const supportUrl = escapeHtml(`${env.FRONTEND_URL.replace(/\/$/, '')}/docs`)
+  const safeFrontendUrl = escapeHtml(env.FRONTEND_URL)
+  const safeGreeting = escapeHtml(content.greeting)
+  const safeIntro = escapeHtml(content.introText)
+  const safeCode = content.codeBlock ? escapeHtml(content.codeBlock) : undefined
+  const safeActionText = content.actionText ? escapeHtml(content.actionText) : undefined
+  const safeActionLabel = content.actionLabel ? escapeHtml(content.actionLabel) : undefined
+  const safeActionUrl = content.actionUrl ? escapeHtml(content.actionUrl) : undefined
+  const safeDisclaimer = escapeHtml(content.disclaimerText)
 
   return `<!DOCTYPE html>
 <html lang="vi">
@@ -365,35 +382,35 @@ function buildMinimalEditorialEmailTemplate(content: {
 <body style="margin: 0; padding: 0; background-color: #ffffff; color: #19191c; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
   <div style="max-width: 600px; padding: 28px 20px; font-size: 14px; line-height: 22px; color: #19191c;">
     <p style="margin: 0 0 20px 0;">
-      ${content.greeting}
+      ${safeGreeting}
     </p>
 
     <p style="margin: 0 0 16px 0;">
-      ${content.introText}
+      ${safeIntro}
     </p>
 
     ${
-      content.codeBlock
-        ? `<p style="margin: 8px 0 24px 0; font-size: 24px; line-height: 32px; font-weight: 700; color: #19191c; letter-spacing: 0.5px;">${content.codeBlock}</p>`
+      safeCode
+        ? `<p style="margin: 8px 0 24px 0; font-size: 24px; line-height: 32px; font-weight: 700; color: #19191c; letter-spacing: 0.5px;">${safeCode}</p>`
         : ''
     }
 
     ${
-      content.actionUrl && content.actionLabel
+      safeActionUrl && safeActionLabel
         ? `<p style="margin: 0 0 20px 0;">
-            ${content.actionText ? `${content.actionText} ` : ''}<a href="${content.actionUrl}" target="_blank" style="color: #1a659e; text-decoration: underline;">${content.actionLabel}</a>.
+            ${safeActionText ? `${safeActionText} ` : ''}<a href="${safeActionUrl}" target="_blank" style="color: #1a659e; text-decoration: underline;">${safeActionLabel}</a>.
           </p>`
         : ''
     }
 
     <p style="margin: 0 0 28px 0; color: #19191c;">
-      ${content.disclaimerText} Nếu có bất kỳ câu hỏi nào, vui lòng <a href="${supportUrl}" target="_blank" style="color: #1a659e; text-decoration: underline;">liên hệ đội ngũ hỗ trợ</a>.
+      ${safeDisclaimer} Nếu có bất kỳ câu hỏi nào, vui lòng <a href="${supportUrl}" target="_blank" style="color: #1a659e; text-decoration: underline;">liên hệ đội ngũ hỗ trợ</a>.
     </p>
 
     <p style="margin: 0; font-style: italic; color: #19191c; line-height: 24px;">
       Trân trọng,<br>
       Đội ngũ Bravechat<br>
-      <a href="${env.FRONTEND_URL}" target="_blank" style="color: #1a659e; text-decoration: underline;">${siteHost}</a><br>
+      <a href="${safeFrontendUrl}" target="_blank" style="color: #1a659e; text-decoration: underline;">${siteHost}</a><br>
       Communicate, Freely.
     </p>
   </div>

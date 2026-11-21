@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '../config/prisma'
 import { blocked, dmInclude, fail, messageInclude, pairFilter, serializeMessage } from '../services/conversation'
 import { publishChannelEvent, publishUserEvent } from './websocket.routes'
+import { canAccessChannel, getMemberPermissions } from '../services/permissions'
 
 export async function messageActionRoutes(server: FastifyInstance) {
   // Hai loại hội thoại dùng cùng thao tác, nhưng kiểm tra quyền theo quan hệ riêng.
@@ -16,8 +17,8 @@ export async function messageActionRoutes(server: FastifyInstance) {
         if (await blocked(userId, params.userId!)) throw fail(403, 'Không thể tương tác với cuộc trò chuyện đã bị chặn.')
         return row
       }
-      const row = await prisma.message.findFirst({ where: { id: params.messageId, isDeleted: false, channel: { server: { members: { some: { userId, isBanned: false } } } } }, include: { ...messageInclude, channel: { select: { server: { select: { ownerId: true } } } } } })
-      if (!row) throw fail(404, 'Không tìm thấy tin nhắn hoặc bạn không có quyền truy cập.')
+      const row = await prisma.message.findFirst({ where: { id: params.messageId, isDeleted: false, channel: { server: { members: { some: { userId, isBanned: false } } } } }, include: { ...messageInclude, channel: { select: { serverId: true, server: { select: { ownerId: true } } } } } })
+      if (!row || !(await canAccessChannel(row.channelId, userId))) throw fail(404, 'Không tìm thấy tin nhắn hoặc bạn không có quyền truy cập.')
       return row
     }
     const emit = (row: any, payload: any) => {
@@ -38,9 +39,17 @@ export async function messageActionRoutes(server: FastifyInstance) {
     })
     server.delete<{ Params: Params }>(prefix, async (request) => {
       const row: any = await load(request.params, request.user.id)
-      // Người nhận DM không được xóa tin của đối phương; owner server được kiểm duyệt kênh.
+      // Người nhận DM không được xóa tin của đối phương; owner hoặc người có quyền manage_messages được kiểm duyệt kênh.
       const own = (row.authorId ?? row.senderId) === request.user.id
-      if (!own && (direct || row.channel.server.ownerId !== request.user.id)) throw fail(403, 'Bạn không có quyền xóa tin nhắn này.')
+      if (!own) {
+        if (direct) throw fail(403, 'Bạn không có quyền xóa tin nhắn này.')
+        const serverId = row.channel?.serverId
+        const isOwner = row.channel?.server?.ownerId === request.user.id
+        const perms = !isOwner && serverId ? await getMemberPermissions(serverId, request.user.id) : null
+        if (!isOwner && !perms?.hasPermission('manage_messages')) {
+          throw fail(403, 'Bạn không có quyền xóa tin nhắn này.')
+        }
+      }
       if (direct) await prisma.directMessage.update({ where: { id: row.id }, data: { isDeleted: true } })
       else await prisma.message.update({ where: { id: row.id }, data: { isDeleted: true, deletedAt: new Date() } })
       emit(row, { type: direct ? 'dm_delete' : 'message_delete', messageId: row.id })

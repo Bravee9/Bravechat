@@ -16,8 +16,10 @@ import { z } from 'zod'
 import { env } from '../config/env'
 import { prisma } from '../config/prisma'
 import { ASSET_RULES, IMAGE_TYPES, extensionForType, pendingKey, safeExtension, type AssetKind } from '../services/storage.service'
+import { canAccessChannel, getMemberPermissions } from '../services/permissions'
+import { blocked } from '../services/conversation'
 
-const ATTACHMENT_TYPES = new Set([
+export const ATTACHMENT_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
   'video/mp4', 'video/webm', 'audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/webm',
   'application/pdf', 'text/plain', 'application/zip', 'application/octet-stream',
@@ -38,17 +40,33 @@ export function sniffImageType(bytes: Buffer): string | null {
 
 /** Giữ để tương thích: kiểm file pending qua StorageService. */
 export async function verifyUploadedObject(fastify: FastifyInstance, key: string, userId: string, expectedType: string) {
-  return fastify.r2.storage.verifyPending(key, userId, { expectedType })
+  const normalizedType = expectedType.trim().toLowerCase()
+  if (!ATTACHMENT_TYPES.has(normalizedType)) return null
+  return fastify.r2.storage.verifyPending(key, userId, {
+    expectedType: normalizedType,
+    allowedTypes: ATTACHMENT_TYPES,
+  })
 }
 
 async function canUploadToChannel(channelId: string, userId: string) {
-  const channel = await prisma.channel.findFirst({
-    where: { id: channelId, server: { members: { some: { userId, isBanned: false } } } },
+  const accessible = await canAccessChannel(channelId, userId)
+  if (accessible) {
+    if (accessible.canSend === false) return null
+    const perms = await getMemberPermissions(accessible.serverId, userId)
+    if (!perms || !perms.hasPermission('send_messages') || !perms.hasPermission('attach_files')) {
+      return null
+    }
+    return { id: accessible.id }
+  }
+
+  const existingChannel = await prisma.channel.findFirst({
+    where: { id: channelId },
     select: { id: true },
   })
-  if (channel) return channel
+  if (existingChannel) return null
 
-  // DM recipient support: check user exists and is not banned
+  // DM recipient support: check user exists, is not self, is not banned, and has no BLOCKED relationship
+  if (channelId === userId || (await blocked(userId, channelId))) return null
   return prisma.user.findFirst({
     where: { id: channelId, isBanned: false },
     select: { id: true },
@@ -195,9 +213,13 @@ export const uploadRoutes: FastifyPluginAsync = async (fastify) => {
         id: request.params.attachmentId,
         message: { isDeleted: false, channel: { server: { members: { some: { userId: request.user.id, isBanned: false } } } } },
       },
-      select: { r2Key: true, filename: true, contentType: true },
+      select: { r2Key: true, filename: true, contentType: true, message: { select: { channelId: true } } },
     })
     if (!attachment) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy tệp.' })
+    const channelId = (attachment as { message?: { channelId?: string } }).message?.channelId
+    if (!channelId || !(await canAccessChannel(channelId, request.user.id))) {
+      return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy tệp.' })
+    }
     try {
       const url = await fastify.r2.storage.presignGet(attachment.r2Key, { filename: attachment.filename, contentType: attachment.contentType })
       return reply.redirect(url, 302)

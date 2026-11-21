@@ -119,16 +119,35 @@ export class StorageService {
 
   presignPut(key: string, contentType: string, size: number, expiresIn = 600) {
     this.ensureConfigured()
-    return getSignedUrl(this.s3, new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType, ContentLength: size }), { expiresIn })
+    return getSignedUrl(
+      this.s3,
+      new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType, ContentLength: size }),
+      { expiresIn, signableHeaders: new Set(['content-type']) }
+    )
   }
 
   presignGet(key: string, options: { expiresIn?: number; filename?: string; contentType?: string } = {}) {
     this.ensureConfigured()
+    const ct = options.contentType?.toLowerCase()
+    const safeInline = Boolean(
+      ct &&
+        (IMAGE_TYPES.has(ct) ||
+          ct.startsWith('video/') ||
+          ct.startsWith('audio/') ||
+          ct === 'application/pdf' ||
+          ct === 'text/plain')
+    )
+    const dispositionMode = safeInline ? 'inline' : 'attachment'
+    const disposition = options.filename
+      ? `${dispositionMode}; filename="${options.filename.replace(/["\\\r\n]/g, '_')}"`
+      : !safeInline
+        ? 'attachment'
+        : undefined
     return getSignedUrl(this.s3, new GetObjectCommand({
       Bucket: this.bucket,
       Key: key,
-      ...(options.filename ? { ResponseContentDisposition: `inline; filename="${options.filename.replace(/["\\\r\n]/g, '_')}"` } : {}),
-      ...(options.contentType ? { ResponseContentType: options.contentType } : {}),
+      ...(disposition ? { ResponseContentDisposition: disposition } : {}),
+      ...(ct ? { ResponseContentType: safeInline ? ct : 'application/octet-stream' } : {}),
     }), { expiresIn: options.expiresIn ?? 300 })
   }
 

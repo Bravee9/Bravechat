@@ -36,15 +36,11 @@ function QrLoginApprovalContent() {
       .then((res) => {
         setCurrentUser(res.user);
         setAuthChecked(true);
-        if (initialCode) {
-          void handleScanCode(initialCode);
-        }
       })
       .catch(() => {
         setAuthChecked(true);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialCode]);
+  }, []);
 
   async function handleScanCode(codeToScan: string) {
     if (!codeToScan.trim()) return;

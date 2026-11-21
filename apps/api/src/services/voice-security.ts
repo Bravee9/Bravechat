@@ -144,7 +144,32 @@ export async function reconcileVoiceRooms() {
       continue
     }
     for (const participant of await control(() => service.listParticipants(room.name))) {
-      if (!await access(room.name, participant)) { await invalidateChannels([channelId]); break }
+      const accessResult = await access(room.name, participant)
+      if (!accessResult) { await invalidateChannels([channelId]); break }
+      const { channel: accessChannel, permissions } = accessResult
+      const allowedSources = [] as TrackSource[]
+      if (permissions.hasPermission('speak_voice')) allowedSources.push(TrackSource.MICROPHONE)
+      if (accessChannel.type === 'VIDEO' && permissions.hasPermission('speak_voice')) allowedSources.push(TrackSource.CAMERA)
+      if (permissions.hasPermission('share_screen')) allowedSources.push(TrackSource.SCREEN_SHARE)
+      const currentPerm = (participant as ParticipantInfo & { permission?: { canPublish?: boolean; canPublishSources?: TrackSource[] } }).permission
+      if (currentPerm) {
+        const currentSources = currentPerm.canPublishSources ?? []
+        const hasDisallowedSource = currentSources.some((src) => !allowedSources.includes(src))
+        const shouldDisablePublish = Boolean(currentPerm.canPublish) && allowedSources.length === 0
+        if (hasDisallowedSource || shouldDisablePublish) {
+          await control(() =>
+            service.updateParticipant(room.name, participant.identity, {
+              permission: {
+                canPublish: allowedSources.length > 0,
+                canSubscribe: true,
+                canPublishData: false,
+                canUpdateMetadata: false,
+                canPublishSources: allowedSources,
+              },
+            })
+          )
+        }
+      }
     }
   }
 }

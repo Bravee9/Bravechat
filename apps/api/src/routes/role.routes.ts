@@ -1,13 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../config/prisma'
-import { revokeServerMembership } from './websocket.routes'
+import { revokeServerChannelAccess, revokeServerMembership } from './websocket.routes'
 import { revokeVoiceSessions } from '../services/voice-security'
 import {
   bitmaskToPermissions,
   ensureDefaultServerRoles,
   getMemberPermissions,
   hexToRgbInt,
+  invalidateServerPermissionsCache,
   permissionsToBitmask,
   rgbIntToHex,
   writeAuditLog,
@@ -200,6 +201,8 @@ export async function roleRoutes(server: FastifyInstance) {
         )
         return next
       })
+      invalidateServerPermissionsCache?.(request.params.serverId)
+      revokeServerChannelAccess?.(request.params.serverId)
 
       return reply.send({
         statusCode: 200,
@@ -255,6 +258,8 @@ export async function roleRoutes(server: FastifyInstance) {
           `Xóa vai trò "${existing.name}"`
         )
       })
+      invalidateServerPermissionsCache?.(request.params.serverId)
+      revokeServerChannelAccess?.(request.params.serverId)
       return reply.send({ statusCode: 200, data: { roleId: existing.id } })
     }
   )
@@ -327,6 +332,9 @@ export async function roleRoutes(server: FastifyInstance) {
           `Cập nhật vai trò cho thành viên`
         )
       })
+      invalidateServerPermissionsCache?.(request.params.serverId)
+      revokeServerChannelAccess?.(request.params.serverId)
+      await revokeVoiceSessions(request.params.userId, undefined, request.params.serverId)
 
       return reply.send({ statusCode: 200, data: { userId: request.params.userId, roleIds: parsed.data.roleIds } })
     }
