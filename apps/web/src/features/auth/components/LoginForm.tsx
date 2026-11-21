@@ -62,8 +62,18 @@ export function LoginForm() {
 
   function redirectAfterLogin() {
     const nextPath = new URLSearchParams(window.location.search).get("redirect");
-    window.location.href =
-      nextPath && /^\/(?!\/)/.test(nextPath) ? nextPath : "/channels/@me";
+    if (nextPath && /^\/(?![/\\])/.test(nextPath)) {
+      try {
+        const resolved = new URL(nextPath, window.location.origin);
+        if (resolved.origin === window.location.origin) {
+          window.location.href = `${resolved.pathname}${resolved.search}${resolved.hash}`;
+          return;
+        }
+      } catch {
+        // Fallback to default route
+      }
+    }
+    window.location.href = "/channels/@me";
   }
 
   function validateCredentials(): FormErrors {

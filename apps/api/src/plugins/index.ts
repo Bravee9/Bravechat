@@ -207,8 +207,23 @@ export async function registerPlugins(server: FastifyInstance) {
     ban: 3,
     keyGenerator: (req) => {
       const tokenCookie = req.cookies?.token
-      if (tokenCookie && tokenCookie.length > 24 && !req.url.startsWith('/api/auth/login') && !req.url.startsWith('/api/auth/register') && !req.url.startsWith('/api/auth/forgot-password')) {
-        return `${req.ip}:s:${tokenCookie.slice(-16)}`
+      if (
+        tokenCookie &&
+        !req.headers.authorization &&
+        !req.url.startsWith('/api/auth/login') &&
+        !req.url.startsWith('/api/auth/register') &&
+        !req.url.startsWith('/api/auth/forgot-password') &&
+        !req.url.startsWith('/api/auth/reset-password') &&
+        !req.url.startsWith('/api/auth/qr/')
+      ) {
+        try {
+          const decoded = server.jwt.verify<{ sid?: string }>(tokenCookie)
+          if (decoded && typeof decoded.sid === 'string' && decoded.sid.length > 0) {
+            return `${req.ip}:s:${decoded.sid}`
+          }
+        } catch {
+          // Invalid or expired JWT falls back to strict per-IP rate limiting
+        }
       }
       return req.ip
     },

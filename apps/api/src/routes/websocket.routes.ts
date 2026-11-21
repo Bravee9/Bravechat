@@ -40,6 +40,58 @@ export function revokeServerMembership(serverId: string, userId: string, local =
   }
   if (!local) relay({ action: 'membership_revoked', serverId, userId })
 }
+async function canSessionJoinChannel(userId: string, channelId: string) {
+  if (!channelId || typeof prisma.channel?.findFirst !== 'function') return null
+  const channel = await prisma.channel.findFirst({
+    where: { id: channelId, server: { members: { some: { userId, isBanned: false } } } },
+    select: {
+      id: true,
+      serverId: true,
+      isPrivate: true,
+      rolePermissions: { where: { canView: true }, select: { roleId: true } },
+    },
+  })
+  if (!channel) return null
+  if (channel.isPrivate) {
+    const member = await prisma.serverMember.findFirst({
+      where: { serverId: channel.serverId, userId, isBanned: false },
+      select: {
+        isOwner: true,
+        roles: { select: { roleId: true, role: { select: { permissions: true } } } },
+      },
+    })
+    if (!member) return null
+    if (!member.isOwner) {
+      const allowedByPerm = member.roles.some(
+        (mr: { role: { permissions: bigint | number } }) => (Number(mr.role.permissions) & (1 << 14)) === (1 << 14)
+      )
+      const allowedRoleIds = new Set(channel.rolePermissions.map((rp: { roleId: string }) => rp.roleId))
+      const allowedByRole = member.roles.some((mr: { roleId: string }) => allowedRoleIds.has(mr.roleId))
+      if (!allowedByPerm && !allowedByRole) {
+        return null
+      }
+    }
+  }
+  return channel
+}
+export function revokeServerChannelAccess(serverId: string, channelId?: string, local = false) {
+  for (const [socket, session] of sessions) {
+    if (session.channelServerId === serverId && session.channelId && (!channelId || session.channelId === channelId)) {
+      const targetChannelId = session.channelId
+      void canSessionJoinChannel(session.userId, targetChannelId)
+        .then((allowed) => {
+          if (!allowed && session.channelId === targetChannelId) {
+            leave('channel', targetChannelId, socket)
+            session.channelId = undefined
+            session.channelServerId = undefined
+            socket.close(1008, 'Not a channel member')
+          }
+        })
+        .catch(() => undefined)
+    }
+  }
+  if (!local) relay({ action: 'channel_access_revoked', serverId, channelId })
+}
 export function revokeSessions(userId: string, sid?: string, local = false) {
   for (const [socket, session] of sessions) if (session.userId === userId && (!sid || sid === session.sid)) socket.close(1008, 'Session expired')
   if (!local) relay({ action: 'session_revoked', userId, sid })
@@ -57,6 +109,7 @@ function ensureRedis(server: FastifyInstance) {
       const event = JSON.parse(raw)
       if (event.origin === instance) return
       if (event.action === 'membership_revoked') revokeServerMembership(event.serverId, event.userId, true)
+      else if (event.action === 'channel_access_revoked') revokeServerChannelAccess(event.serverId, event.channelId, true)
       else if (event.action === 'session_revoked') revokeSessions(event.userId, event.sid, true)
       else if (event.kind in rooms) broadcast(event.kind, event.id, event.payload)
     } catch (error) { server.log.warn(error, 'Invalid realtime payload') }
@@ -73,7 +126,27 @@ export async function websocketRoutes(server: FastifyInstance) {
     socket.send(JSON.stringify({ type: 'connected', userId: session.userId }))
     let alive = true; let queued = 0; let sequence = Promise.resolve()
     let windowStart = Date.now(); let windowEvents = 0
-    const heartbeat = setInterval(() => { if (!alive || session.expires <= Date.now()) return socket.terminate(); alive = false; socket.ping() }, 30000)
+    const heartbeat = setInterval(() => {
+      if (!alive || session.expires <= Date.now()) return socket.terminate()
+      alive = false
+      socket.ping()
+      if (typeof prisma.refreshToken?.findFirst === 'function') {
+        void prisma.refreshToken
+          .findFirst({
+            where: { id: session.sid, userId: session.userId, isRevoked: false, expiresAt: { gt: new Date() }, user: { isBanned: false } },
+            select: { id: true },
+          })
+          .then(async (valid) => {
+            if (!valid) return socket.close(1008, 'Session expired')
+            session.lastVerifiedAt = Date.now()
+            if (session.channelId && typeof prisma.channel?.findFirst === 'function') {
+              const allowed = await canSessionJoinChannel(session.userId, session.channelId)
+              if (!allowed) return socket.close(1008, 'Not a channel member')
+            }
+          })
+          .catch(() => undefined)
+      }
+    }, 30000)
     socket.on('pong', () => { alive = true })
     socket.on('message', (raw) => {
       const now = Date.now()
@@ -86,6 +159,10 @@ export async function websocketRoutes(server: FastifyInstance) {
         if (!session.lastVerifiedAt || Date.now() - session.lastVerifiedAt > 5000) {
           const valid = await prisma.refreshToken.findFirst({ where: { id: session.sid, userId: session.userId, isRevoked: false, expiresAt: { gt: new Date() }, user: { isBanned: false } }, select: { id: true } })
           if (!valid) return socket.close(1008, 'Session expired')
+          if (session.channelId && typeof prisma.channel?.findFirst === 'function') {
+            const allowed = await canSessionJoinChannel(session.userId, session.channelId)
+            if (!allowed) return socket.close(1008, 'Not a channel member')
+          }
           session.lastVerifiedAt = Date.now()
         }
         const data = JSON.parse(raw.toString())
@@ -122,36 +199,8 @@ export async function websocketRoutes(server: FastifyInstance) {
           socket.send(JSON.stringify({ type: 'servers_joined', serverIds: joinedIds, unavailableIds }))
         } else if (data.type === 'join_channel') {
           const id = String(data.channelId ?? '')
-          const channel = await prisma.channel.findFirst({
-            where: { id, server: { members: { some: { userId: session.userId, isBanned: false } } } },
-            select: {
-              id: true,
-              serverId: true,
-              isPrivate: true,
-              rolePermissions: { where: { canView: true }, select: { roleId: true } },
-            },
-          })
+          const channel = await canSessionJoinChannel(session.userId, id)
           if (!channel) return socket.close(1008, 'Not a channel member')
-          if (channel.isPrivate) {
-            const member = await prisma.serverMember.findFirst({
-              where: { serverId: channel.serverId, userId: session.userId, isBanned: false },
-              select: {
-                isOwner: true,
-                roles: { select: { roleId: true, role: { select: { permissions: true } } } },
-              },
-            })
-            if (!member) return socket.close(1008, 'Not a channel member')
-            if (!member.isOwner) {
-              const allowedByPerm = member.roles.some(
-                (mr: { role: { permissions: bigint | number } }) => (Number(mr.role.permissions) & (1 << 14)) === (1 << 14)
-              )
-              const allowedRoleIds = new Set(channel.rolePermissions.map((rp: { roleId: string }) => rp.roleId))
-              const allowedByRole = member.roles.some((mr: { roleId: string }) => allowedRoleIds.has(mr.roleId))
-              if (!allowedByPerm && !allowedByRole) {
-                return socket.close(1008, 'Not a channel member')
-              }
-            }
-          }
           leave('channel', session.channelId, socket); join('channel', id, socket)
           session.channelId = id; session.channelServerId = channel.serverId
           socket.send(JSON.stringify({ type: 'channel_joined', channelId: id, messages: [] }))

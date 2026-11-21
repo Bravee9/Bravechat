@@ -148,3 +148,23 @@ test('new LiveKit tokens have no media privileges before signed webhook admissio
   assert.equal(claims.video.canUpdateOwnMetadata, false);
   assert.equal(JSON.parse(claims.metadata).sid, 's');
 });
+
+test('reconcileVoiceRooms downgrades live participant publish sources when speak_voice is revoked', async () => {
+  const f = fixture();
+  const TrackSource = apiRequire('livekit-server-sdk').TrackSource;
+  await f.service.registerVoiceToken('c', 's', 'u');
+  f.rooms.set('channel:c:0', [
+    {
+      ...f.participant,
+      permission: {
+        canPublish: true,
+        canPublishSources: [TrackSource.MICROPHONE, TrackSource.SCREEN_SHARE],
+      },
+    },
+  ]);
+  f.permissions.speak_voice = false;
+  f.permissions.share_screen = true;
+  await f.service.reconcileVoiceRooms();
+  assert.equal(f.updated.length, 1);
+  assert.equal(f.updated[0].options.permission.canPublishSources.join(','), String(TrackSource.SCREEN_SHARE));
+});

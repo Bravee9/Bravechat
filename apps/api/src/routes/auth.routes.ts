@@ -257,6 +257,8 @@ interface QrLoginSession {
     avatarUrl: string | null
   }
   approvedUserId?: string
+  approvedSessionId?: string
+  approvedPasswordHash?: string
 }
 
 interface UserSecurityState {
@@ -407,7 +409,7 @@ export async function authRoutes(server: FastifyInstance) {
 
       const account = await prisma.user.findUnique({ where: { email: input.email } })
       if (!account || account.isBanned || !(await bcrypt.compare(input.password, account.passwordHash))) {
-        if (!input.email.endsWith('.test')) {
+        if (env.NODE_ENV === 'production' || !input.email.endsWith('.test')) {
           const prev = lockState ?? { count: 0, lockedUntil: 0, updatedAt: Date.now() }
           const nextCount = Date.now() - prev.updatedAt > 10 * 60000 ? 1 : prev.count + 1
           await loginFailures.save(lockKey, {
@@ -437,10 +439,12 @@ export async function authRoutes(server: FastifyInstance) {
       if (needsStep2) {
         const challengeToken = randomBytes(32).toString('hex')
         const otpCode = generateNumericOtp(6)
-        const methods: Array<'gmail_otp' | 'totp' | 'backup_code'> = ['gmail_otp']
+        const methods: Array<'gmail_otp' | 'totp' | 'backup_code'> = []
         if (sec.twoFactorEnabled && sec.totpSecret) {
-          methods.unshift('totp')
+          methods.push('totp')
           if (sec.backupCodes.length > 0) methods.push('backup_code')
+        } else {
+          methods.push('gmail_otp')
         }
 
         await loginChallenges.save(digest(challengeToken), {
@@ -483,7 +487,7 @@ export async function authRoutes(server: FastifyInstance) {
             methods,
             delivery,
             gmailConfigured: resetMail.getGmailStatus?.().configured ?? false,
-            ...(delivery === 'development' ? { devOtp: otpCode } : {}),
+            ...(delivery === 'development' && env.NODE_ENV !== 'production' ? { devOtp: otpCode } : {}),
           },
           message: 'Vui lòng nhập mã xác minh 6 chữ số đã gửi tới Gmail của bạn.',
         }
@@ -521,8 +525,10 @@ export async function authRoutes(server: FastifyInstance) {
     async (request) => {
       const input = z.object({ email }).parse(request.body)
       const account = await prisma.user.findUnique({ where: { email: input.email } })
-      if (!account || account.isBanned) {
-        // Prevent user enumeration: return identical 200 challenge shape with non-resolvable token
+      const sec = account ? await loadUserSecurity(account.id) : null
+      if (!account || account.isBanned || (sec?.twoFactorEnabled && sec?.totpSecret)) {
+        // Prevent user enumeration and block passwordless bypass of TOTP 2FA:
+        // return identical 200 challenge shape with non-resolvable token
         const dummyChallengeToken = randomBytes(32).toString('hex')
         return {
           statusCode: 200,
@@ -580,7 +586,7 @@ export async function authRoutes(server: FastifyInstance) {
           methods: ['gmail_otp'],
           delivery,
           gmailConfigured: resetMail.getGmailStatus?.().configured ?? false,
-          ...(delivery === 'development' ? { devOtp: otpCode } : {}),
+          ...(delivery === 'development' && env.NODE_ENV !== 'production' ? { devOtp: otpCode } : {}),
         },
         message: 'Mã xác minh đăng nhập 6 chữ số đã được gửi tới Gmail của bạn.',
       }
@@ -618,12 +624,18 @@ export async function authRoutes(server: FastifyInstance) {
 
       let verifiedMethod: 'gmail_otp' | 'totp_2fa' | null = null
 
-      // Check Gmail OTP
-      if (digitsOnly.length === 6 && digest(digitsOnly) === challenge.otpHash) {
+      // Check Gmail OTP (only if challenge permits gmail_otp and TOTP 2FA is not active)
+      if (
+        challenge.methods.includes('gmail_otp') &&
+        !(sec.twoFactorEnabled && sec.totpSecret) &&
+        digitsOnly.length === 6 &&
+        digest(digitsOnly) === challenge.otpHash
+      ) {
         verifiedMethod = 'gmail_otp'
       }
       // Check Authenticator TOTP
       else if (
+        challenge.methods.includes('totp') &&
         sec.twoFactorEnabled &&
         sec.totpSecret &&
         digitsOnly.length === 6 &&
@@ -632,7 +644,11 @@ export async function authRoutes(server: FastifyInstance) {
         verifiedMethod = 'totp_2fa'
       }
       // Check Backup Code
-      else if (sec.twoFactorEnabled && sec.backupCodes.includes(normalizedCode)) {
+      else if (
+        challenge.methods.includes('backup_code') &&
+        sec.twoFactorEnabled &&
+        sec.backupCodes.includes(normalizedCode)
+      ) {
         sec.backupCodes = sec.backupCodes.filter((c) => c !== normalizedCode)
         await userSecurityMap.save(challenge.userId, sec)
         verifiedMethod = 'totp_2fa'
@@ -722,7 +738,7 @@ export async function authRoutes(server: FastifyInstance) {
         data: {
           delivery,
           emailMasked: maskEmail(challenge.email),
-          ...(delivery === 'development' ? { devOtp: otpCode } : {}),
+          ...(delivery === 'development' && env.NODE_ENV !== 'production' ? { devOtp: otpCode } : {}),
         },
         message: 'Đã gửi lại mã xác minh mới tới Gmail của bạn.',
       }
@@ -791,20 +807,41 @@ export async function authRoutes(server: FastifyInstance) {
       await qrShortCodeMap.remove(session.shortCode)
 
       const refresh = randomBytes(48).toString('base64url')
-      const { user, dbSession } = await prisma.$transaction(async (tx) => {
+      const issued = await prisma.$transaction(async (tx) => {
+        if (session.approvedSessionId) {
+          const validApprover = await tx.refreshToken.findFirst({
+            where: {
+              id: session.approvedSessionId,
+              userId: session.approvedUserId!,
+              isRevoked: false,
+              expiresAt: { gt: new Date() },
+            },
+            select: { id: true },
+          })
+          if (!validApprover) return null
+        }
+        const unchanged = await tx.user.updateMany({
+          where: {
+            id: session.approvedUserId!,
+            isBanned: false,
+            ...(session.approvedPasswordHash ? { passwordHash: session.approvedPasswordHash } : {}),
+          },
+          data: { lastSeenAt: new Date() },
+        })
+        if (unchanged.count !== 1) return null
         const user = await tx.user.findUniqueOrThrow({
           where: { id: session.approvedUserId! },
           select: userSelect,
-        })
-        await tx.user.update({
-          where: { id: user.id },
-          data: { lastSeenAt: new Date() },
         })
         const dbSession = await tx.refreshToken.create({
           data: refreshData(user.id, refresh, request),
         })
         return { user, dbSession }
       })
+      if (!issued) {
+        return { statusCode: 200, data: { status: 'EXPIRED' } }
+      }
+      const { user, dbSession } = issued
 
       await setSession(reply, user, dbSession.id, refresh)
       recordSecurityLog(user.id, {
@@ -909,12 +946,25 @@ export async function authRoutes(server: FastifyInstance) {
     async (request) => {
       const input = z.object({ qrId: z.string().trim().min(4).max(256) }).parse(request.body)
       const session = await resolveQrSession(input.qrId)
-      if (!session || session.expiresAt <= Date.now() || session.status === 'CONSUMED') {
+      if (
+        !session ||
+        session.expiresAt <= Date.now() ||
+        session.status === 'CONSUMED' ||
+        session.status === 'REJECTED' ||
+        session.status === 'APPROVED'
+      ) {
         throw fail(400, 'Mã QR đã hết hạn hoặc đã được sử dụng.')
       }
 
+      const approver = await prisma.user.findUnique({ where: { id: request.user.id } })
+      if (!approver || approver.isBanned) {
+        throw fail(401, 'Phiên đăng nhập không hợp lệ.')
+      }
+
       session.status = 'APPROVED'
-      session.approvedUserId = request.user.id
+      session.approvedUserId = approver.id
+      session.approvedSessionId = request.user.sid
+      session.approvedPasswordHash = approver.passwordHash
       await qrSessions.save(
         session.qrId,
         session,
@@ -1243,17 +1293,30 @@ export async function authRoutes(server: FastifyInstance) {
       }
 
       const newHash = await bcrypt.hash(input.newPassword, 12)
-      await prisma.$transaction(async (tx) => {
+      const revokedSessions = await prisma.$transaction(async (tx) => {
         await tx.user.update({
           where: { id: account.id },
           data: { passwordHash: newHash },
         })
+        const others =
+          typeof tx.refreshToken.findMany === 'function'
+            ? await tx.refreshToken.findMany({
+                where: { userId: account.id, isRevoked: false, id: { not: request.user.sid } },
+                select: { id: true },
+              })
+            : []
         // Revoke all other sessions except current session
         await tx.refreshToken.updateMany({
           where: { userId: account.id, isRevoked: false, id: { not: request.user.sid } },
           data: { isRevoked: true },
         })
+        return others
       })
+
+      for (const s of revokedSessions) {
+        revokeSessions(account.id, s.id)
+        await revokeVoiceSessions(account.id, s.id)
+      }
 
       recordSecurityLog(account.id, {
         event: 'Đổi mật khẩu chủ động trong Cài đặt Bảo mật',
@@ -1324,12 +1387,46 @@ export async function authRoutes(server: FastifyInstance) {
     }
   )
 
-  server.post('/2fa/setup', { preHandler: [server.authenticate] }, async (request) => {
+  async function verifyExisting2faReauth(
+    userId: string,
+    sec: UserSecurityState,
+    creds: { password?: string; currentCode?: string }
+  ): Promise<boolean> {
+    if (!creds.password && !creds.currentCode) return false
+    const account = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
+    if (creds.password && (await bcrypt.compare(creds.password, account.passwordHash))) {
+      return true
+    }
+    if (creds.currentCode) {
+      const normalized = creds.currentCode.trim().toUpperCase()
+      const digits = normalized.replace(/\D/g, '')
+      if (sec.totpSecret && digits.length === 6 && verifyTotpCode(sec.totpSecret, digits)) {
+        return true
+      }
+      if (sec.backupCodes.includes(normalized)) {
+        return true
+      }
+    }
+    return false
+  }
+
+  server.post('/2fa/setup', { preHandler: [server.authenticate], bodyLimit: 16 * 1024 }, async (request) => {
     const user = await prisma.user.findUniqueOrThrow({
       where: { id: request.user.id },
       select: { id: true, email: true, username: true },
     })
     const sec = await loadUserSecurity(user.id)
+    if (sec.twoFactorEnabled) {
+      const creds = z
+        .object({
+          password: z.string().min(1).max(128).optional(),
+          currentCode: z.string().trim().min(6).max(16).optional(),
+        })
+        .parse(request.body ?? {})
+      if (!(await verifyExisting2faReauth(user.id, sec, creds))) {
+        throw fail(403, '2FA đã được kích hoạt. Vui lòng xác thực mật khẩu hoặc mã 2FA hiện tại trước khi thiết lập khóa mới.')
+      }
+    }
     const secret = generateBase32Secret(16)
     sec.pendingTotpSecret = secret
     await userSecurityMap.save(user.id, sec)
@@ -1351,9 +1448,18 @@ export async function authRoutes(server: FastifyInstance) {
     '/2fa/enable',
     { preHandler: [server.authenticate], bodyLimit: 16 * 1024 },
     async (request) => {
-      const input = z.object({ code: z.string().trim().regex(/^\d{6}$/) }).parse(request.body)
+      const input = z
+        .object({
+          code: z.string().trim().regex(/^\d{6}$/),
+          password: z.string().min(1).max(128).optional(),
+          currentCode: z.string().trim().min(6).max(16).optional(),
+        })
+        .parse(request.body)
       const sec = await loadUserSecurity(request.user.id)
-      const secret = sec.pendingTotpSecret || sec.totpSecret
+      if (sec.twoFactorEnabled && !(await verifyExisting2faReauth(request.user.id, sec, input))) {
+        throw fail(403, '2FA đã được kích hoạt. Vui lòng xác thực mật khẩu hoặc mã 2FA hiện tại trước khi thay đổi khóa 2FA.')
+      }
+      const secret = sec.pendingTotpSecret
       if (!secret) throw fail(400, 'Vui lòng khởi tạo mã QR 2FA trước.')
 
       if (!verifyTotpCode(secret, input.code)) {
@@ -1473,7 +1579,7 @@ export async function authRoutes(server: FastifyInstance) {
         data: {
           delivery,
           emailMasked: maskEmail(user.email),
-          ...(delivery === 'development' ? { devOtp: otpCode } : {}),
+          ...(delivery === 'development' && env.NODE_ENV !== 'production' ? { devOtp: otpCode } : {}),
         },
         message: 'Đã gửi mã xác minh 6 chữ số tới Gmail của bạn.',
       }

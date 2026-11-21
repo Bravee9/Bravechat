@@ -38,9 +38,20 @@ async function fixture(envOverrides = {}) {
         const row = sessions.find((item) => item.id === where.id && !item.isRevoked);
         return row ? { id: row.id, user: { username: user.username, email: user.email } } : null;
       },
+      findMany: async ({ where }) => {
+        return sessions.filter((item) => {
+          if (where?.userId && item.userId !== where.userId) return false;
+          if (where?.isRevoked !== undefined && item.isRevoked !== where.isRevoked) return false;
+          if (where?.id?.not && item.id === where.id.not) return false;
+          return true;
+        });
+      },
       updateMany: async ({ where }) => {
         let count = 0;
-        for (const row of sessions) if ((!where.id || row.id === where.id) && !row.isRevoked) { row.isRevoked = true; count++; }
+        for (const row of sessions) {
+          const idMatch = !where.id || (typeof where.id === 'string' ? row.id === where.id : row.id !== where.id.not);
+          if (idMatch && !row.isRevoked) { row.isRevoked = true; count++; }
+        }
         return { count };
       },
     },
@@ -327,4 +338,70 @@ test('gmail-request prevents user enumeration and responses include hardened sec
     payload: { challengeToken: unknownBody.data.challengeToken, code: '123456' },
   });
   assert.equal(verifyRes.statusCode, 401);
+});
+
+test('active 2FA blocks unauthenticated 2FA secret overwrite and blocks passwordless gmail-request bypass', async (t) => {
+  const f = await fixture();
+  t.after(() => f.app.close());
+
+  const login = await f.login();
+  const authCookie = login.cookies.find((c) => c.name === 'token').value;
+
+  const setup1 = await f.app.inject({ method: 'POST', url: '/auth/2fa/setup', cookies: { token: authCookie } });
+  assert.equal(setup1.statusCode, 200);
+  const enable1 = await f.app.inject({
+    method: 'POST',
+    url: '/auth/2fa/enable',
+    cookies: { token: authCookie },
+    payload: { code: setup1.json().data.devCurrentCode },
+  });
+  assert.equal(enable1.statusCode, 200);
+
+  // Attempting to call /2fa/setup again without password or current TOTP must be rejected (403)
+  const hijackSetup = await f.app.inject({
+    method: 'POST',
+    url: '/auth/2fa/setup',
+    cookies: { token: authCookie },
+    payload: {},
+  });
+  assert.equal(hijackSetup.statusCode, 403);
+
+  // Passwordless /login/gmail-request on a 2FA-enabled account returns an unresolvable challenge (no devOtp, cannot verify)
+  const gmailReq = await f.app.inject({
+    method: 'POST',
+    url: '/auth/login/gmail-request',
+    payload: { email: f.user.email },
+  });
+  assert.equal(gmailReq.statusCode, 200);
+  assert.equal(gmailReq.json().data.devOtp, undefined);
+});
+
+test('QR login status refuses session issuance if password changed after approval', async (t) => {
+  const f = await fixture();
+  t.after(() => f.app.close());
+
+  const login = await f.login();
+  const authCookie = login.cookies.find((c) => c.name === 'token').value;
+
+  const initRes = await f.app.inject({ method: 'POST', url: '/auth/qr/init' });
+  const qr = initRes.json().data;
+
+  const approveRes = await f.app.inject({
+    method: 'POST',
+    url: '/auth/qr/approve',
+    cookies: { token: authCookie },
+    payload: { qrId: qr.qrId },
+  });
+  assert.equal(approveRes.statusCode, 200);
+
+  // Password reset happens before QR status is polled
+  assert.equal((await f.changePassword()).statusCode, 200);
+
+  const pollRes = await f.app.inject({
+    method: 'GET',
+    url: `/auth/qr/status?qrId=${encodeURIComponent(qr.qrId)}&pollSecret=${encodeURIComponent(qr.pollSecret)}`,
+  });
+  assert.equal(pollRes.statusCode, 200);
+  assert.equal(pollRes.json().data.status, 'EXPIRED');
+  assert.equal(pollRes.cookies.find((c) => c.name === 'token'), undefined);
 });
