@@ -12,6 +12,16 @@ interface VoiceRoomProps {
   channelType: "VOICE" | "VIDEO";
 }
 
+function canPublishSource(participant: Participant | undefined, source: Track.Source | undefined): boolean {
+  const permissions = participant?.permissions;
+  if (!permissions?.canPublish) return false;
+  const allowed = permissions.canPublishSources;
+  if (!allowed || allowed.length === 0 || !source || typeof Track.sourceToProto !== "function") {
+    return true;
+  }
+  return allowed.includes(Track.sourceToProto(source));
+}
+
 export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -20,6 +30,8 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
   const [joining, setJoining] = useState(false);
   const [microphoneEnabled, setMicrophoneEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [screenShareEnabled, setScreenShareEnabled] = useState(false);
+  const [mediaGrants, setMediaGrants] = useState({ mic: true, camera: true, screen: true });
   const muted = useStore(audioStore, (state) => state.muted);
   const deafened = useStore(audioStore, (state) => state.deafened);
   const localAudioRef = useRef<HTMLDivElement>(null);
@@ -39,6 +51,7 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
     setRoom(null);
     setParticipants([]);
     setCameraEnabled(false);
+    setScreenShareEnabled(false);
     if (currentRoom) await currentRoom.disconnect();
     setStatus("Đã rời phòng");
   }, []);
@@ -53,7 +66,12 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
   useEffect(() => {
     if (!room) return;
     let active = true;
-    void room.localParticipant.setMicrophoneEnabled(!muted && !deafened).then(() => { if (active) setMicrophoneEnabled(!muted && !deafened); }).catch(() => { if (active) setError("Không thể thay đổi trạng thái micro."); });
+    const canMic = canPublishSource(room.localParticipant, Track.Source?.Microphone);
+    if (canMic) {
+      void room.localParticipant.setMicrophoneEnabled(!muted && !deafened).then(() => { if (active) setMicrophoneEnabled(!muted && !deafened); }).catch(() => { if (active) setError("Không thể thay đổi trạng thái micro."); });
+    } else {
+      setMicrophoneEnabled(false);
+    }
     localAudioRef.current?.querySelectorAll("audio").forEach((audio) => { audio.muted = deafened; });
     return () => { active = false; };
   }, [room, muted, deafened]);
@@ -66,6 +84,15 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
     videoContainerRef.current?.appendChild(element);
     return () => { track.detach(element); element.remove(); };
   }, [room, cameraEnabled]);
+  useEffect(() => {
+    if (!room || !screenShareEnabled) return;
+    const track = room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
+    if (!track) return;
+    const element = track.attach();
+    if (element instanceof HTMLMediaElement) { element.muted = true; element.autoplay = true; }
+    videoContainerRef.current?.appendChild(element);
+    return () => { track.detach(element); element.remove(); };
+  }, [room, screenShareEnabled]);
 
   const joinRoom = async () => {
     if (joiningRef.current || roomRef.current) return;
@@ -88,9 +115,18 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
       roomRef.current = nextRoom;
       const connectedRoom = nextRoom;
       const syncParticipants = () => { if (active()) setParticipants([connectedRoom.localParticipant, ...Array.from(connectedRoom.remoteParticipants.values())]); };
+      const syncMediaGrants = () => {
+        if (!active()) return;
+        setMediaGrants({
+          mic: canPublishSource(connectedRoom.localParticipant, Track.Source?.Microphone),
+          camera: canPublishSource(connectedRoom.localParticipant, Track.Source?.Camera),
+          screen: canPublishSource(connectedRoom.localParticipant, Track.Source?.ScreenShare),
+        });
+      };
       nextRoom
         .on(RoomEvent.ParticipantConnected, syncParticipants)
         .on(RoomEvent.ParticipantDisconnected, syncParticipants)
+        .on(RoomEvent.ParticipantPermissionsChanged, syncMediaGrants)
         .on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
           if (!active()) return;
           const element = track.attach();
@@ -99,6 +135,9 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
           if (track.kind === Track.Kind.Video && videoContainerRef.current) videoContainerRef.current.appendChild(element);
         })
         .on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => track.detach().forEach((element) => element.remove()))
+        .on(RoomEvent.LocalTrackUnpublished, () => {
+          if (active()) setScreenShareEnabled(Boolean(connectedRoom.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track));
+        })
         .on(RoomEvent.Reconnecting, () => { if (active()) setStatus("Đang kết nối lại..."); })
         .on(RoomEvent.Reconnected, () => { if (active()) setStatus("Đã kết nối"); })
         .on(RoomEvent.Disconnected, () => {
@@ -112,14 +151,20 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
       ensureActive();
       await waitForVoicePermission(nextRoom, controller.signal);
       ensureActive();
-      const enabled = !audioStore.get().muted && !audioStore.get().deafened;
-      await nextRoom.localParticipant.setMicrophoneEnabled(enabled);
-      ensureActive();
+      syncMediaGrants();
+      const canMic = canPublishSource(nextRoom.localParticipant, Track.Source?.Microphone);
+      const enabled = canMic && !audioStore.get().muted && !audioStore.get().deafened;
+      if (canMic) {
+        await nextRoom.localParticipant.setMicrophoneEnabled(enabled);
+        ensureActive();
+      }
       setMicrophoneEnabled(enabled);
-      if (channelType === "VIDEO") {
+      if (channelType === "VIDEO" && canPublishSource(nextRoom.localParticipant, Track.Source?.Camera)) {
         await nextRoom.localParticipant.setCameraEnabled(true);
         ensureActive();
         setCameraEnabled(true);
+      } else {
+        setCameraEnabled(false);
       }
       setRoom(nextRoom);
       setParticipants([nextRoom.localParticipant, ...Array.from(nextRoom.remoteParticipants.values())]);
@@ -145,8 +190,9 @@ export function VoiceRoom({ channelId, channelType }: VoiceRoomProps) {
         </div>
         <div className="flex gap-2">
           {!room ? <button type="button" disabled={joining} onClick={joinRoom} className="rounded bg-ocean-primary px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">{joining ? "Đang kết nối..." : "Tham gia"}</button> : <>
-            <button type="button" onClick={() => audioStore.set(microphoneEnabled ? { muted: true } : { muted: false, deafened: false })} className="rounded border border-ocean-dark-border px-3 py-1.5 text-xs text-ocean-light">{microphoneEnabled ? "Tắt mic" : "Bật mic"}</button>
-            {channelType === "VIDEO" ? <button type="button" onClick={() => { const next = !cameraEnabled; void room.localParticipant.setCameraEnabled(next).then(() => setCameraEnabled(next)).catch(() => setError("Không thể thay đổi trạng thái camera.")); }} className="rounded border border-ocean-dark-border px-3 py-1.5 text-xs text-ocean-light">{cameraEnabled ? "Tắt camera" : "Bật camera"}</button> : null}
+            <button type="button" disabled={!mediaGrants.mic} onClick={() => audioStore.set(microphoneEnabled ? { muted: true } : { muted: false, deafened: false })} className="rounded border border-ocean-dark-border px-3 py-1.5 text-xs text-ocean-light disabled:opacity-40">{microphoneEnabled ? "Tắt mic" : "Bật mic"}</button>
+            {channelType === "VIDEO" ? <button type="button" disabled={!mediaGrants.camera} onClick={() => { const next = !cameraEnabled; void room.localParticipant.setCameraEnabled(next).then(() => setCameraEnabled(next)).catch(() => setError("Không thể thay đổi trạng thái camera.")); }} className="rounded border border-ocean-dark-border px-3 py-1.5 text-xs text-ocean-light disabled:opacity-40">{cameraEnabled ? "Tắt camera" : "Bật camera"}</button> : null}
+            <button type="button" disabled={!mediaGrants.screen} onClick={() => { const next = !screenShareEnabled; void room.localParticipant.setScreenShareEnabled(next).then(() => setScreenShareEnabled(next)).catch(() => setError("Không thể chia sẻ màn hình. Kiểm tra quyền hoặc thử lại.")); }} className="rounded border border-ocean-dark-border px-3 py-1.5 text-xs text-ocean-light disabled:opacity-40">{screenShareEnabled ? "Dừng chia sẻ" : "Chia sẻ màn hình"}</button>
             <button type="button" onClick={() => void leaveRoom()} className="rounded bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white">Rời phòng</button>
           </>}
         </div>

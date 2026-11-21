@@ -127,5 +127,30 @@ describe("Message Components", () => {
       fireEvent.change(screen.getByTestId("attachment-file-input"), { target: { files: [file] } });
       expect(onFiles).toHaveBeenCalledWith([file]);
     });
+
+    it("submits on Enter, allows newline on Shift+Enter, and blocks premature submit during IME composition", () => {
+      const onSubmit = vi.fn((e) => e?.preventDefault());
+      render(
+        <ChatInput
+          value="Dòng 1"
+          placeholder="Nhắn tin..."
+          onChange={vi.fn()}
+          onSubmit={onSubmit}
+        />
+      );
+      const textarea = screen.getByTestId("chat-input-field");
+
+      // Shift+Enter does not submit
+      fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
+      expect(onSubmit).not.toHaveBeenCalled();
+
+      // Enter during IME composition (keyCode 229) does not submit
+      fireEvent.keyDown(textarea, { key: "Enter", shiftKey: false, isComposing: true, keyCode: 229 });
+      expect(onSubmit).not.toHaveBeenCalled();
+
+      // Plain Enter submits
+      fireEvent.keyDown(textarea, { key: "Enter", shiftKey: false });
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
   });
 });

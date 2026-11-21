@@ -111,7 +111,7 @@ export function ServerRail() {
   return (
     <nav
       aria-label="Danh sách máy chủ"
-      className="w-[72px] bg-[#141417] border-r border-[#2B2D30] flex flex-col items-center pt-3 pb-16 gap-2 flex-shrink-0 z-30 select-none"
+      className="w-[72px] bg-[#141417] border-r border-[#2B2D30] flex flex-col items-center pt-3 pb-3 gap-2 flex-shrink-0 z-30 select-none"
       data-testid="server-rail"
     >
       {/* 1. Nút Trang chủ / Direct Messages (@me) */}

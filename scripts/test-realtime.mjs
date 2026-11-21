@@ -31,7 +31,10 @@ test('50 acknowledged server subscriptions stay connected; unbounded bursts are 
     ioredis: class {}, '../config/env': { env: { REDIS_ENABLED: 'false' } },
     '../config/prisma': { prisma: {
       refreshToken: { findFirst: async () => ({ id: 'session' }) },
-      serverMember: { findFirst: async ({ where }) => where.serverId === 'missing' ? null : { id: 'member' } },
+      serverMember: {
+        findFirst: async ({ where }) => where.serverId === 'missing' ? null : { id: 'member' },
+        findMany: async ({ where }) => (where.serverId?.in ?? []).filter((id) => id !== 'missing').map((serverId) => ({ serverId })),
+      },
     } },
   });
   let handler;
@@ -50,6 +53,15 @@ test('50 acknowledged server subscriptions stay connected; unbounded bursts are 
     assert.equal(result.type, i === 5 ? 'server_unavailable' : 'server_joined');
     assert.equal(socket.readyState, 1);
   }
+  const batchFrame = new Promise((resolve) => socket.once('frame', resolve));
+  socket.emit('message', Buffer.from(JSON.stringify({
+    type: 'join_servers',
+    serverIds: Array.from({ length: 150 }, (_, i) => (i === 10 ? 'missing' : `batch-${i}`)),
+  })));
+  const batchResult = await batchFrame;
+  assert.equal(batchResult.type, 'servers_joined');
+  assert.equal(batchResult.serverIds.length, 149);
+  assert.deepEqual(batchResult.unavailableIds, ['missing']);
   await new Promise(setImmediate);
   for (let i = 0; i < 31; i++) socket.emit('message', Buffer.from('{"type":"join_server","serverId":"s"}'));
   assert.equal(socket.closeCode, 1008);
@@ -68,10 +80,14 @@ test('voice capacity counts users across tabs and admits an existing user to a f
   }
   const { voiceRoutes } = loadRoute('voice.routes.ts', {
     '../services/voice-security': { startVoiceSecurity() {}, admitVoiceParticipant: async () => true, registerVoiceToken: async (id) => `channel:${id}:0` },
+    '../services/permissions': {
+      canMemberViewPrivateChannel: () => true,
+      getMemberPermissions: async () => ({ isOwner: false, roleIds: [], hasPermission: () => true }),
+    },
     ioredis: Redis,
-    'livekit-server-sdk': { AccessToken, TrackSource: { MICROPHONE: 1, CAMERA: 2 } },
+    'livekit-server-sdk': { AccessToken, TrackSource: { MICROPHONE: 1, CAMERA: 2, SCREEN_SHARE: 3 } },
     '../config/env': { env: { LIVEKIT_URL: 'ws://test', LIVEKIT_API_KEY: 'key', LIVEKIT_API_SECRET: 'secret' } },
-    '../config/prisma': { prisma: { channel: { findFirst: async () => ({ id: 'c', type: 'VOICE', userLimit: limit, server: { members: [] } }) } } },
+    '../config/prisma': { prisma: { channel: { findFirst: async () => ({ id: 'c', serverId: 's', type: 'VOICE', userLimit: limit, isPrivate: false, rolePermissions: [], server: { members: [] } }) } } },
   });
   let handler;
   await voiceRoutes({ authenticate() {}, addHook() {}, post: (path, _options, callback) => { if (path.endsWith('/token')) handler = callback; } });

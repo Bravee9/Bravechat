@@ -192,21 +192,64 @@
 .discord-app [data-testid="ws-connection-badge"] { border: 1px solid #2B2D30; background: #141417; border-radius: 4px; }
 .discord-app [data-testid="friends-tab-btn"] { border: 0; border-radius: 4px; }
 .discord-app [data-testid="friends-tab-btn"][aria-current="page"] { background: #2B2D30; color: #ffffff; }
-.discord-app [data-testid="chat-input-container"] { padding: 0 16px 16px; }
-.discord-app [data-testid="chat-input-container"] form { background: #141417; border: 1px solid #393B40; border-radius: 6px; box-shadow: none; }
-.discord-app [data-testid="chat-input-container"] form:focus-within { border-color: #087CFA; box-shadow: 0 0 0 2px rgba(8, 124, 250, 0.2); }
-.discord-app [data-testid="chat-input-field"] { font-size: 13.5px; min-width: 0; padding-block: 10px; }
-.discord-app [data-testid="chat-input-field"]::placeholder { color: #7D7D7D; }
-.discord-app [data-testid="message-list"] { padding-inline: 0; }
-.discord-app .chat-welcome { padding: 0 16px 12px; margin-top: 16px; border: 0; }
-.discord-app .chat-welcome h2 { font-size: 22px; color: #F2F2F3; }
+.discord-app [data-testid="chat-input-container"] { padding: 0 16px 12px; }
+.discord-app [data-testid="chat-input-container"] form { background: #1E1F22; border: 1px solid #393B40; border-radius: 8px; box-shadow: none; }
+.discord-app [data-testid="chat-input-container"] form:focus-within { border-color: #3574F0; box-shadow: 0 0 0 1px #3574F0; }
+.discord-app [data-testid="chat-input-field"] {
+  font-size: 13.5px;
+  line-height: 1.45;
+  min-width: 0;
+  width: 100%;
+  height: auto;
+  field-sizing: content;
+  min-block-size: 2.2lh;
+  max-block-size: 8lh;
+}
+.discord-app [data-testid="chat-input-field"]::placeholder { color: #6F737A; }
+.discord-app .ide-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding-inline: 14px;
+  border-radius: 4px;
+  background: #3574F0;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition: background-color 150ms ease;
+  cursor: pointer;
+}
+.discord-app .ide-btn-primary:hover:not(:disabled) { background: #4682F5; }
+.discord-app .ide-btn-primary:disabled { background: #2B2D30; color: #6F737A; cursor: not-allowed; }
+.discord-app .ide-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding-inline: 14px;
+  border-radius: 4px;
+  background: transparent;
+  color: #DFE1E5;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #4E5157;
+  transition: background-color 150ms ease, border-color 150ms ease;
+  cursor: pointer;
+}
+.discord-app .ide-btn-secondary:hover:not(:disabled) { background: #2B2D30; border-color: #6F737A; }
+.discord-app .ide-btn-secondary:disabled { border-color: #393B40; color: #5A5D63; cursor: not-allowed; }
+.discord-app [data-testid="message-list"] { padding: 12px 0 8px; }
+.discord-app .chat-welcome { padding: 16px 20px; margin: 4px 16px 14px; border: 1px solid #2B2D30; border-radius: 6px; background: #18181B; }
+.discord-app .chat-welcome h2 { font-size: 16px; line-height: 1.35; color: #F2F2F3; }
 .discord-app .chat-welcome-icon { background: #2B2D30; color: #07C3F2; border: 1px solid #393B40; border-radius: 6px; }
 .discord-app .message-row { padding: 6px 24px 6px 16px; border-radius: 0; border-bottom: 1px solid rgba(43, 45, 48, 0.35); }
 .discord-app .message-row:hover { background: #202226; }
 .discord-app .message-avatar { background: #2B2D30; color: #DFE1E5; border: 1px solid #393B40; border-radius: 6px; width: 32px; height: 32px; font-size: 11px; font-family: "JetBrains Mono", monospace; }
 .discord-app .message-content { color: #DFE1E5; font-size: 13.5px; line-height: 1.5; }
 .discord-app .message-author { color: #F2F2F3; font-size: 13px; font-weight: 600; }
-.discord-app .profile-dock { left: 60px; width: 256px; background: #141417; border-top: 1px solid #2B2D30; border-right: 1px solid #2B2D30; }
+.discord-app .profile-dock { left: 72px; width: 240px; background: #141417; border-right: 1px solid #2B2D30; }
 .discord-app [data-testid="user-profile-bar"] { background: #141417; border-top: 1px solid #2B2D30; height: 48px; padding-inline: 10px; }
 .discord-app [data-testid="user-profile-bar"] [class*="border-[#051424]"] { border-color: #141417; }
 .discord-app [role="tooltip"] { background: #141417; border-color: #393B40; color: #F2F2F3; font-size: 11px; border-radius: 4px; }

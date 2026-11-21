@@ -1,0 +1,211 @@
+openapi: 3.1.0
+info:
+  title: Bravechat Polyglot Service Contract
+  version: 1.0.0
+  description: >
+    Language-agnostic REST contract for Bravechat services.
+    Allows individual domains (Auth/Identity, Core Guilds & RBAC, Messaging & Media)
+    to be implemented or replaced in Java (Spring Boot), Rust (Axum), or Node.js (Fastify)
+    without frontend modifications.
+servers:
+  - url: http://localhost:4000/api
+    description: Local / Gateway API base
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+  schemas:
+    ApiError:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+    UserSummary:
+      type: object
+      required: [id, username, status]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: [string, "null"]
+        avatarUrl:
+          type: [string, "null"]
+        status:
+          type: string
+          enum: [ONLINE, IDLE, DO_NOT_DISTURB, INVISIBLE, OFFLINE]
+    RoleSummary:
+      type: object
+      required: [id, serverId, name, color, position, permissions, isManaged, memberCount]
+      properties:
+        id:
+          type: string
+        serverId:
+          type: string
+        name:
+          type: string
+        color:
+          type: string
+        position:
+          type: integer
+        permissions:
+          type: object
+          additionalProperties:
+            type: boolean
+        isManaged:
+          type: boolean
+        memberCount:
+          type: integer
+    Channel:
+      type: object
+      required: [id, serverId, name, type, position]
+      properties:
+        id:
+          type: string
+        serverId:
+          type: string
+        categoryId:
+          type: [string, "null"]
+        name:
+          type: string
+        type:
+          type: string
+          enum: [TEXT, VOICE, VIDEO]
+        topic:
+          type: [string, "null"]
+        position:
+          type: integer
+        isPrivate:
+          type: boolean
+        allowedRoleIds:
+          type: array
+          items:
+            type: string
+        hasUnread:
+          type: boolean
+        mentionCount:
+          type: integer
+    ServerDetail:
+      type: object
+      required: [id, name, ownerId, categories, channels]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        iconUrl:
+          type: [string, "null"]
+        bannerUrl:
+          type: [string, "null"]
+        badgeColor:
+          type: [string, "null"]
+        isPublic:
+          type: boolean
+        description:
+          type: [string, "null"]
+        ownerId:
+          type: string
+        highestRolePosition:
+          type: integer
+        memberPermissions:
+          type: object
+          additionalProperties:
+            type: boolean
+        categories:
+          type: array
+          items:
+            type: object
+        channels:
+          type: array
+          items:
+            $ref: "#/components/schemas/Channel"
+security:
+  - cookieAuth: []
+paths:
+  /auth/me:
+    get:
+      summary: Get current authenticated user
+      tags: [Auth]
+      responses:
+        "200":
+          description: Current user profile
+  /auth/refresh:
+    post:
+      summary: Rotate refresh token and issue new access token cookie
+      tags: [Auth]
+      responses:
+        "200":
+          description: Session refreshed
+  /users/@me/servers:
+    get:
+      summary: List joined servers with unread and mention activity
+      tags: [Servers]
+      responses:
+        "200":
+          description: Server list
+  /users/@me/friends:
+    get:
+      summary: List friends, pending requests, and blocked users
+      tags: [Friends]
+      responses:
+        "200":
+          description: Grouped friendship lists
+  /servers/{serverId}:
+    get:
+      summary: Get server detail, filtered channels, and effective member permissions
+      tags: [Servers]
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Server detail envelope
+  /servers/{serverId}/roles:
+    get:
+      summary: List roles ordered by hierarchy position descending
+      tags: [RBAC]
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Role list
+  /channels/{channelId}/messages:
+    get:
+      summary: Paginate channel messages by cursor
+      tags: [Messages]
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Message page
+    post:
+      summary: Send channel message with idempotent client nonce
+      tags: [Messages]
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Persisted message

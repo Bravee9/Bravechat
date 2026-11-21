@@ -9,6 +9,7 @@ import { i18nStore, type Language } from "@/stores/i18n.store";
 import { workspaceStore } from "@/stores/workspace.store";
 import { QrCodeSvg } from "@/components/ui/QrCodeSvg";
 import { GmailSmtpModal } from "@/features/auth/components/GmailSmtpModal";
+import { PowerIcon, SparkIcon } from "@/components/ui/Icons";
 
 interface UserSession {
   id: string;
@@ -530,7 +531,7 @@ export function UserSettingsModal({
             }}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
           >
-            <span>⏻</span>
+            <PowerIcon className="w-4 h-4" />
             <span>{t.logout}</span>
           </button>
         </div>
@@ -1300,7 +1301,7 @@ export function UserSettingsModal({
             <div className="rounded-3xl bg-gradient-to-br from-purple-900/60 via-[#071A2C] to-ocean-dark-surface border border-purple-500/30 p-8 shadow-2xl relative overflow-hidden">
               <div className="max-w-md relative z-10 space-y-4">
                 <div className="inline-flex items-center gap-2 bg-purple-500/20 border border-purple-400/40 px-3 py-1 rounded-full text-purple-300 text-xs font-bold">
-                  <span>✦</span>
+                  <SparkIcon className="w-3.5 h-3.5" />
                   <span>BRAVE NITRO</span>
                 </div>
                 <h2 className="text-2xl lg:text-3xl font-extrabold text-white tracking-tight leading-tight">
@@ -1322,8 +1323,8 @@ export function UserSettingsModal({
               </div>
 
               {/* Decorative elements */}
-              <div className="absolute right-6 top-6 opacity-20 text-9xl pointer-events-none">
-                ✦
+              <div className="absolute right-6 top-6 opacity-15 text-purple-300 pointer-events-none">
+                <SparkIcon className="w-28 h-28" />
               </div>
             </div>
 
@@ -1332,7 +1333,7 @@ export function UserSettingsModal({
               {[
                 { title: "Dung lượng tải 500MB", desc: t.nitroUploadPerk },
                 { title: "Huy hiệu MATH VIP", desc: t.nitroBadgePerk },
-                { title: "LiveKit SFU 1080p 60FPS", desc: t.nitroHdPerk },
+                { title: "Video & Thoại 1080p 60FPS", desc: t.nitroHdPerk },
                 { title: "Tùy biến Banner & Avatar", desc: t.nitroBannerPerk },
               ].map((perk) => (
                 <div
@@ -1360,8 +1361,8 @@ export function UserSettingsModal({
             <div className="grid grid-cols-2 gap-4">
               {(
                 [
-                  { code: "vi", label: "Tiếng Việt (Mặc định)", flag: "🇻🇳", desc: "Giao diện đầy đủ tiếng Việt" },
-                  { code: "en", label: "English (US)", flag: "🇺🇸", desc: "Full English professional interface" },
+                  { code: "vi", label: "Tiếng Việt (Mặc định)", tag: "VI", desc: "Giao diện đầy đủ tiếng Việt" },
+                  { code: "en", label: "English (US)", tag: "EN", desc: "Full English professional interface" },
                 ] as const
               ).map((l) => (
                 <button
@@ -1375,7 +1376,9 @@ export function UserSettingsModal({
                       : "bg-[#051424] border-ocean-dark-border hover:bg-white/5"
                   )}
                 >
-                  <span className="text-2xl">{l.flag}</span>
+                  <span className="inline-flex items-center justify-center px-2 py-1 rounded bg-white/10 font-mono text-xs font-bold text-ocean-secondary">
+                    {l.tag}
+                  </span>
                   <p className="font-bold text-sm text-ocean-light mt-3">{l.label}</p>
                   <p className="text-xs text-ocean-light/50 mt-1">{l.desc}</p>
                 </button>
