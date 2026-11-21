@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Channel } from "@discord-clone/shared";
 import { cn } from "@/lib/utils";
 import { useServerWorkspaceConfig } from "@/stores/ide-workspace.store";
+import { LockIcon } from "@/components/ui/Icons";
 
 interface ChannelItemProps {
   channel: Channel;
@@ -24,10 +25,10 @@ export function ChannelItem({ channel, serverId, isActive }: ChannelItemProps) {
       data-testid={`channel-item-${channel.id}`}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2 px-2.5 py-1.5 rounded-[4px] transition-colors group cursor-pointer text-[13px] font-medium border-l-2",
+        "flex items-center gap-2 px-2 py-1 rounded-[4px] transition-colors group cursor-pointer text-[13px] font-medium",
         isActive
-          ? "bg-ocean-dark-hover border-[#087CFA] text-white font-semibold"
-          : "border-transparent text-[#A8A8B0] hover:bg-[#24262B] hover:text-[#E6EDF3]"
+          ? "bg-[#2E436E] text-white font-semibold"
+          : "text-[#BCBEC4] hover:bg-[#2B2D30]/60 hover:text-[#E6EDF3]"
       )}
     >
       {isVoice ? (
@@ -58,9 +59,9 @@ export function ChannelItem({ channel, serverId, isActive }: ChannelItemProps) {
         <span
           title="Kênh riêng tư — giới hạn vai trò"
           data-testid={`channel-lock-${channel.id}`}
-          className="text-[10px] font-mono text-[#FDB60D] bg-[#FDB60D]/15 border border-[#FDB60D]/30 px-1 rounded-[2px] flex-shrink-0"
+          className="text-[#FDB60D] bg-[#FDB60D]/15 border border-[#FDB60D]/30 p-0.5 rounded-[2px] flex items-center justify-center flex-shrink-0"
         >
-          🔒
+          <LockIcon className="w-3 h-3" />
         </span>
       )}
 

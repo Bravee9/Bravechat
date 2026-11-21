@@ -27,7 +27,7 @@ The included LiveKit config uses UDP mux port `7882` plus TURN/UDP `3478`; expos
 - `POST /api/uploads/presign` accepts `channelId`, `filename`, `contentType`, and `size`; current default maximum is 50 MiB.
 - `POST /api/channels/:channelId/messages` accepts text and up to ten uploaded attachment descriptors (`filename`, `contentType`, `key`). The API checks object ownership, existence, size and MIME type before committing.
 - `GET /api/channels/:channelId/messages` returns up to 100 messages and accepts `before` (message ID) and `limit` cursor parameters.
-- `POST /api/voice/channels/:channelId/token` issues a short-lived, channel-scoped LiveKit token. `VOICE` channels can publish microphone only; `VIDEO` channels can publish microphone and camera.
+- `POST /api/voice/channels/:channelId/token` issues a short-lived, channel-scoped LiveKit token. The signed webhook grants media only after rechecking `connect_voice`; microphone/camera require `speak_voice`, and screen sharing requires `share_screen`.
 - LiveKit webhooks are signature-verified and update Redis participant presence used for configured channel user limits.
 
 The browser needs microphone/camera permission and a secure context (HTTPS, or localhost). R2 credentials and LiveKit API secrets are server-only; expose only `LIVEKIT_URL` to clients through the token response.

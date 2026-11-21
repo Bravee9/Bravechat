@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { MemberItem } from "./MemberItem";
 import type { Member } from "./MemberItem";
-import { serverService } from "@/services/server.service";
 import { UserCard } from "./UserCard";
+import { loadServerMembers, useServerMembers } from "@/stores/workspace.store";
 import {
   openWorkspaceModal,
   useServerWorkspaceConfig,
@@ -20,28 +20,17 @@ export function MemberList({
   const [inspected, setInspected] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
-  const [members, setMembers] = useState<Member[]>([]);
+  const cachedMembers = useServerMembers(isVisible && serverId ? serverId : "");
   const [loadError, setLoadError] = useState("");
   const config = useServerWorkspaceConfig(serverId ?? "default");
 
   useEffect(() => {
     if (!isVisible || !serverId) return;
     let active = true;
-    const load = async () => {
+    const sync = async (force = false) => {
       try {
-        const rows = await serverService.getServerMembers(serverId);
-        if (!active) return;
-        setMembers(
-          rows.map((row) => ({
-            id: row.id,
-            name: row.displayName || row.username,
-            role: row.role,
-            status: row.status,
-            customStatus: row.customStatus ?? undefined,
-            avatarUrl: row.avatarUrl,
-          }))
-        );
-        setLoadError("");
+        await loadServerMembers(serverId, force);
+        if (active) setLoadError("");
       } catch (error) {
         if (active)
           setLoadError(
@@ -51,13 +40,22 @@ export function MemberList({
           );
       }
     };
-    void load();
-    const timer = window.setInterval(() => void load(), 30_000);
+    void sync(false);
+    const timer = window.setInterval(() => void sync(true), 30_000);
     return () => {
       active = false;
       window.clearInterval(timer);
     };
   }, [isVisible, serverId]);
+
+  const members: Member[] = cachedMembers.map((row) => ({
+    id: row.id,
+    name: row.displayName || row.username,
+    role: row.role,
+    status: row.status,
+    customStatus: row.customStatus ?? undefined,
+    avatarUrl: row.avatarUrl,
+  }));
 
   const effectiveMembers: Member[] = members
     .filter((m) => !config.kickedMemberIds.includes(m.id))
@@ -112,11 +110,11 @@ export function MemberList({
   return (
     <aside
       aria-label="Danh sách thành viên"
-      className="w-60 bg-[#18181B] border-l border-[#2B2D30] flex flex-col h-full select-none flex-shrink-0 animate-fade-in"
+      className="w-60 bg-[#18181B] border-l border-[#2B2D30] flex flex-col h-full select-none flex-shrink-0"
       data-testid="member-list"
     >
       {serverId && (
-        <div className="px-3 py-2 border-b border-[#2B2D30] flex items-center justify-between bg-[#141417]/60">
+        <div className="h-[44px] px-3 border-b border-[#2B2D30] flex items-center justify-between bg-[#1E1F22] flex-shrink-0">
           <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#7D7D7D]">
             Thành viên ({effectiveMembers.length})
           </span>

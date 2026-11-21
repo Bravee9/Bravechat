@@ -78,7 +78,7 @@ export async function websocketRoutes(server: FastifyInstance) {
     socket.on('message', (raw) => {
       const now = Date.now()
       if (now - windowStart > 10000) { windowStart = now; windowEvents = 0 }
-      if (++windowEvents > 45 || ++queued > 30) return socket.close(1008, 'Too many events')
+      if (++windowEvents > 250 || ++queued > 30) return socket.close(1008, 'Too many events')
       // Xử lý tuần tự để một join chậm không ghi đè kênh được chọn sau đó.
       sequence = sequence.then(async () => {
         if (socket.readyState !== 1) return
@@ -96,10 +96,62 @@ export async function websocketRoutes(server: FastifyInstance) {
           if (!member) return socket.send(JSON.stringify({ type: 'server_unavailable', serverId: id }))
           join('server', id, socket); session.servers.add(id)
           socket.send(JSON.stringify({ type: 'server_joined', serverId: id }))
+        } else if (data.type === 'join_servers' && Array.isArray(data.serverIds)) {
+          const rawIds: string[] = data.serverIds
+            .map((v: unknown) => String(v ?? ''))
+            .filter((v: string) => v.length > 0)
+          const ids: string[] = Array.from(new Set<string>(rawIds)).slice(0, 200)
+          const joinedIds: string[] = []
+          const unavailableIds: string[] = []
+          if (typeof prisma.serverMember.findMany === 'function') {
+            const rows = await prisma.serverMember.findMany({
+              where: { userId: session.userId, serverId: { in: ids }, isBanned: false },
+              select: { serverId: true },
+            })
+            const allowed = new Set(rows.map((r: { serverId: string }) => r.serverId))
+            for (const id of ids) {
+              if (allowed.has(id)) {
+                join('server', id, socket)
+                session.servers.add(id)
+                joinedIds.push(id)
+              } else {
+                unavailableIds.push(id)
+              }
+            }
+          }
+          socket.send(JSON.stringify({ type: 'servers_joined', serverIds: joinedIds, unavailableIds }))
         } else if (data.type === 'join_channel') {
           const id = String(data.channelId ?? '')
-          const channel = await prisma.channel.findFirst({ where: { id, server: { members: { some: { userId: session.userId, isBanned: false } } } }, select: { id: true, serverId: true } })
+          const channel = await prisma.channel.findFirst({
+            where: { id, server: { members: { some: { userId: session.userId, isBanned: false } } } },
+            select: {
+              id: true,
+              serverId: true,
+              isPrivate: true,
+              rolePermissions: { where: { canView: true }, select: { roleId: true } },
+            },
+          })
           if (!channel) return socket.close(1008, 'Not a channel member')
+          if (channel.isPrivate) {
+            const member = await prisma.serverMember.findFirst({
+              where: { serverId: channel.serverId, userId: session.userId, isBanned: false },
+              select: {
+                isOwner: true,
+                roles: { select: { roleId: true, role: { select: { permissions: true } } } },
+              },
+            })
+            if (!member) return socket.close(1008, 'Not a channel member')
+            if (!member.isOwner) {
+              const allowedByPerm = member.roles.some(
+                (mr: { role: { permissions: bigint | number } }) => (Number(mr.role.permissions) & (1 << 14)) === (1 << 14)
+              )
+              const allowedRoleIds = new Set(channel.rolePermissions.map((rp: { roleId: string }) => rp.roleId))
+              const allowedByRole = member.roles.some((mr: { roleId: string }) => allowedRoleIds.has(mr.roleId))
+              if (!allowedByPerm && !allowedByRole) {
+                return socket.close(1008, 'Not a channel member')
+              }
+            }
+          }
           leave('channel', session.channelId, socket); join('channel', id, socket)
           session.channelId = id; session.channelServerId = channel.serverId
           socket.send(JSON.stringify({ type: 'channel_joined', channelId: id, messages: [] }))

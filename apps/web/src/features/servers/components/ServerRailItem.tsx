@@ -5,6 +5,8 @@ import Link from "next/link";
 import type { ServerListItem } from "@discord-clone/shared";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import { useStore } from "@/lib/store";
+import { loadServerDetail, loadServerMembers, workspaceStore } from "@/stores/workspace.store";
 import {
   getDeterministicJetBrainsColor,
   useServerWorkspaceConfig,
@@ -27,12 +29,21 @@ function ServerRailItemBase({
   const [localHovered, setLocalHovered] = useState(false);
   const isHovered = isHoveredProp ?? localHovered;
   const config = useServerWorkspaceConfig(server.id);
+  const cachedFirstChannelId = useStore(workspaceStore, (state) => {
+    const channels = state.serverDetails[server.id]?.channels;
+    if (!channels?.length) return null;
+    return channels.slice().sort((a, b) => a.position - b.position)[0]?.id ?? null;
+  });
   const badgeColor =
     server.badgeColor || config.badgeColor || getDeterministicJetBrainsColor(server.id || server.name);
 
   const onHover = (hovered: boolean) => {
     setLocalHovered(hovered);
     onHoverProp?.(hovered);
+    if (hovered) {
+      void loadServerDetail(server.id);
+      void loadServerMembers(server.id);
+    }
   };
 
   const initials = server.name
@@ -67,8 +78,16 @@ function ServerRailItemBase({
 
       <Tooltip content={server.name} side="right">
         <Link
-          href={`/channels/${server.id}`}
+          href={
+            cachedFirstChannelId
+              ? `/channels/${encodeURIComponent(server.id)}/${encodeURIComponent(cachedFirstChannelId)}`
+              : `/channels/${encodeURIComponent(server.id)}`
+          }
           scroll={false}
+          onFocus={() => {
+            void loadServerDetail(server.id);
+            void loadServerMembers(server.id);
+          }}
           className={cn(
             "w-11 h-11 flex items-center justify-center font-mono font-bold text-xs transition-all duration-200 cursor-pointer relative rounded-[8px] border",
             isActive

@@ -1,7 +1,6 @@
 import type { DirectConversation } from "@discord-clone/shared";
-import { API_ROUTES } from "@discord-clone/shared";
 import { env } from "@/config/env";
-import { http } from "@/services/http";
+import { channelAdapter } from "@/services/adapters";
 import { MOCK_DIRECT_CONVERSATIONS } from "@/services/mock/mockData";
 
 export const channelService = {
@@ -12,6 +11,6 @@ export const channelService = {
     if (env.useMocks) {
       return MOCK_DIRECT_CONVERSATIONS;
     }
-    return http.get<DirectConversation[]>(API_ROUTES.users.myConversations);
+    return channelAdapter.listDirectConversations();
   },
 };

@@ -4,17 +4,17 @@ import { act,render,screen,fireEvent,waitFor } from '@testing-library/react';
 import { VoiceRoom } from '@/features/messages/components/VoiceRoom';
 import { audioStore } from '@/stores/audio.store';
 import { http } from '@/services/http';
-const sdk=vi.hoisted(()=>({permissions:{canPublish:true,canSubscribe:true},mic:vi.fn().mockResolvedValue(undefined),connect:vi.fn().mockResolvedValue(undefined),disconnect:vi.fn().mockResolvedValue(undefined),logLevel:vi.fn(),handlers:{} as Record<string,(...args:unknown[])=>void>}));
+const sdk=vi.hoisted(()=>({permissions:{canPublish:true,canSubscribe:true},mic:vi.fn().mockResolvedValue(undefined),screen:vi.fn().mockResolvedValue(undefined),connect:vi.fn().mockResolvedValue(undefined),disconnect:vi.fn().mockResolvedValue(undefined),logLevel:vi.fn(),handlers:{} as Record<string,(...args:unknown[])=>void>}));
 vi.mock('@/services/http',()=>({http:{post:vi.fn()}}));
 vi.mock('livekit-client',()=>({
  Room:class {
-  localParticipant={identity:'u1',name:'Alice',permissions:sdk.permissions,setMicrophoneEnabled:sdk.mic,setCameraEnabled:vi.fn().mockResolvedValue(undefined),getTrackPublication:()=>undefined};remoteParticipants=new Map();
+  localParticipant={identity:'u1',name:'Alice',permissions:sdk.permissions,setMicrophoneEnabled:sdk.mic,setCameraEnabled:vi.fn().mockResolvedValue(undefined),setScreenShareEnabled:sdk.screen,getTrackPublication:()=>undefined};remoteParticipants=new Map();
   on(event:string,handler:(...args:unknown[])=>void){sdk.handlers[event]=handler;return this} connect=sdk.connect; disconnect=sdk.disconnect;
   off(event:string){delete sdk.handlers[event];return this}
  },
  setLogLevel:sdk.logLevel,
- RoomEvent:{ParticipantConnected:'join',ParticipantDisconnected:'leave',TrackSubscribed:'track',TrackUnsubscribed:'untrack',Reconnecting:'reconnecting',Reconnected:'reconnected',Disconnected:'disconnected',ParticipantPermissionsChanged:'permissions'},
- Track:{Kind:{Audio:'audio',Video:'video'},Source:{Camera:'camera'}},
+ RoomEvent:{ParticipantConnected:'join',ParticipantDisconnected:'leave',TrackSubscribed:'track',TrackUnsubscribed:'untrack',LocalTrackUnpublished:'local-unpublished',Reconnecting:'reconnecting',Reconnected:'reconnected',Disconnected:'disconnected',ParticipantPermissionsChanged:'permissions'},
+ Track:{Kind:{Audio:'audio',Video:'video'},Source:{Microphone:'microphone',Camera:'camera',ScreenShare:'screen'}},
 }));
 beforeEach(()=>{vi.clearAllMocks();sdk.permissions.canPublish=true;sdk.permissions.canSubscribe=true;sdk.connect.mockResolvedValue(undefined);audioStore.set({muted:false,deafened:false});vi.mocked(http.post).mockResolvedValue({serverUrl:'ws://localhost:7880',token:'test'})});
 describe('Shared voice controls',()=>{
@@ -51,5 +51,18 @@ describe('Shared voice controls',()=>{
   const audio=document.createElement('audio');act(()=>sdk.handlers.track({kind:'audio',attach:()=>audio},{},{identity:'u2'}));
   act(()=>audioStore.set({deafened:true}));await waitFor(()=>expect(audio.muted).toBe(true));
   fireEvent.click(screen.getByRole('button',{name:'Bật mic'}));await waitFor(()=>expect(sdk.mic).toHaveBeenLastCalledWith(true));expect(audioStore.get().deafened).toBe(false);
+ });
+ it('publishes and stops a screen-share track from the shared room controls',async()=>{
+  render(<VoiceRoom channelId="voice1" channelType="VOICE"/>);fireEvent.click(screen.getByRole('button',{name:'Tham gia'}));await screen.findByText(/Đã kết nối/);
+  fireEvent.click(screen.getByRole('button',{name:'Chia sẻ màn hình'}));await waitFor(()=>expect(sdk.screen).toHaveBeenLastCalledWith(true));
+  fireEvent.click(screen.getByRole('button',{name:'Dừng chia sẻ'}));await waitFor(()=>expect(sdk.screen).toHaveBeenLastCalledWith(false));
+ });
+ it('allows listen-only members (canSubscribe=true, canPublish=false) to join without attempting mic publish',async()=>{
+  sdk.permissions.canPublish=false;sdk.permissions.canSubscribe=true;
+  render(<VoiceRoom channelId="voice1" channelType="VOICE"/>);
+  fireEvent.click(screen.getByRole('button',{name:'Tham gia'}));
+  await screen.findByText(/Đã kết nối/);
+  expect(sdk.mic).not.toHaveBeenCalled();
+  expect(screen.getByRole('button',{name:'Chia sẻ màn hình'})).toBeDisabled();
  });
 });

@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bravechat.dev/contracts/realtime-events.schema.json",
+  "title": "Bravechat Multiplexed WebSocket and Redis Pub/Sub Protocol",
+  "description": "Language-agnostic JSON frame contract between Next.js client, WebSocket Gateway (Node.js or Rust Axum/Tokio), and Core Services (Node.js or Java Spring Boot) via Redis topic 'bravechat:realtime'.",
+  "defs": {
+    "ClientToGatewayFrame": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "serverId"],
+          "properties": {
+            "type": { "const": "join_server" },
+            "serverId": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "serverIds"],
+          "properties": {
+            "type": { "const": "join_servers" },
+            "serverIds": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "maxItems": 200
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "channelId"],
+          "properties": {
+            "type": { "enum": ["join_channel", "leave_channel", "typing_start", "typing_stop"] },
+            "channelId": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "GatewayToClientFrame": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": [
+            "connected",
+            "server_joined",
+            "servers_joined",
+            "server_unavailable",
+            "channel_joined",
+            "message_create",
+            "message_update",
+            "message_delete",
+            "dm_create",
+            "dm_update",
+            "dm_delete",
+            "typing_start",
+            "typing_stop",
+            "channel_read",
+            "friends_update",
+            "conversations_update",
+            "user_update",
+            "error"
+          ]
+        },
+        "userId": { "type": "string" },
+        "serverId": { "type": "string" },
+        "serverIds": { "type": "array", "items": { "type": "string" } },
+        "unavailableIds": { "type": "array", "items": { "type": "string" } },
+        "channelId": { "type": "string" },
+        "channelKey": { "type": "string" },
+        "messageId": { "type": ["string", "number"] },
+        "username": { "type": "string" },
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "message": { "type": ["object", "string"] }
+      }
+    },
+    "RedisPubSubRelayEnvelope": {
+      "type": "object",
+      "required": ["origin"],
+      "properties": {
+        "origin": {
+          "type": "string",
+          "description": "UUID of the publishing service instance to prevent echo loops."
+        },
+        "kind": {
+          "enum": ["user", "server", "channel"]
+        },
+        "id": {
+          "type": "string",
+          "description": "Target room identifier (userId, serverId, or channelId)."
+        },
+        "action": {
+          "enum": ["membership_revoked", "session_revoked"]
+        },
+        "userId": { "type": "string" },
+        "serverId": { "type": "string" },
+        "sid": { "type": "string" },
+        "payload": {
+          "$ref": "#/defs/GatewayToClientFrame"
+        }
+      }
+    }
+  }
+}
