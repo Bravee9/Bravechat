@@ -9,6 +9,7 @@ import { unreadActivity, serverActivity, type ChannelActivity } from '../service
 import {
   ensureDefaultServerRoles,
   getMemberPermissions,
+  invalidateServerPermissionsCache,
   writeAuditLog,
 } from '../services/permissions'
 
@@ -31,7 +32,13 @@ type ServerDetailRecord = Prisma.ServerGetPayload<{
 function toServerDetail(
   server: ServerDetailRecord,
   activity: ChannelActivity[] = [],
-  userPerms?: { isOwner: boolean; roleIds: string[]; canAccessPrivateByPerm: boolean }
+  userPerms?: {
+    isOwner: boolean
+    roleIds: string[]
+    canAccessPrivateByPerm: boolean
+    permissions?: Record<import('../services/permissions').PermissionKey, boolean>
+    highestRolePosition?: number
+  }
 ) {
   const visibleChannels = server.channels.filter((channel) => {
     if (!channel.isPrivate || !userPerms || userPerms.isOwner) return true
@@ -48,6 +55,10 @@ function toServerDetail(
     isPublic: server.isPublic,
     description: server.description,
     ownerId: server.ownerId,
+    ...(userPerms?.permissions ? { memberPermissions: userPerms.permissions } : {}),
+    ...(userPerms?.highestRolePosition !== undefined
+      ? { highestRolePosition: userPerms.highestRolePosition }
+      : {}),
     categories: server.categories.map((category) => ({
       id: category.id,
       serverId: category.serverId,
@@ -191,6 +202,8 @@ export async function serverRoutes(server: FastifyInstance) {
         isOwner: perms.isOwner,
         roleIds: perms.roleIds,
         canAccessPrivateByPerm: perms.hasPermission('access_private_channels'),
+        permissions: perms.permissions,
+        highestRolePosition: perms.highestRolePosition,
       }),
     })
   })
@@ -242,7 +255,15 @@ export async function serverRoutes(server: FastifyInstance) {
     })
     return reply.send({
       statusCode: 200,
-      data: { server: toServerDetail(updated, await unreadActivity(request.user.id, serverId)) },
+      data: {
+        server: toServerDetail(updated, await unreadActivity(request.user.id, serverId), {
+          isOwner: perms.isOwner,
+          roleIds: perms.roleIds,
+          canAccessPrivateByPerm: perms.hasPermission('access_private_channels'),
+          permissions: perms.permissions,
+          highestRolePosition: perms.highestRolePosition,
+        }),
+      },
     })
   })
 
@@ -263,6 +284,7 @@ export async function serverRoutes(server: FastifyInstance) {
       select: { userId: true },
     })
     await prisma.server.delete({ where: { id: request.params.serverId } })
+    invalidateServerPermissionsCache(request.params.serverId)
     for (const m of members) {
       revokeServerMembership(request.params.serverId, m.userId)
       await revokeVoiceSessions(m.userId, undefined, request.params.serverId)
@@ -333,6 +355,7 @@ export async function serverRoutes(server: FastifyInstance) {
       return reply.status(409).send({ statusCode: 409, message: 'Chủ server cần chuyển quyền sở hữu trước khi rời server.' })
     }
     await prisma.serverMember.delete({ where: { id: membership.id } })
+    invalidateServerPermissionsCache(request.params.serverId)
     revokeServerMembership(request.params.serverId, request.user.id)
     await revokeVoiceSessions(request.user.id, undefined, request.params.serverId)
     return reply.send({ statusCode: 200, data: { serverId: request.params.serverId } })

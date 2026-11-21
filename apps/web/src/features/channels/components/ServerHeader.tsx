@@ -3,12 +3,16 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { getDeterministicJetBrainsColor } from "@/stores/ide-workspace.store";
+import { PowerIcon, SettingsIcon, ShieldIcon, UsersIcon } from "@/components/ui/Icons";
 
 interface ServerHeaderProps {
   serverName: string;
   badgeColor?: string;
   isMe: boolean;
   isOpen: boolean;
+  canInvite?: boolean;
+  canManageServer?: boolean;
+  canManageChannels?: boolean;
   onToggle: () => void;
   onClose: () => void;
   onInvite?: () => void;
@@ -24,6 +28,9 @@ export function ServerHeader({
   badgeColor,
   isMe,
   isOpen,
+  canInvite = true,
+  canManageServer = true,
+  canManageChannels = true,
   onToggle,
   onClose,
   onInvite,
@@ -94,28 +101,32 @@ export function ServerHeader({
           data-testid="server-dropdown-menu"
           className="absolute top-[46px] left-2 right-2 bg-[#1E1F22] border border-[#2B2D30] rounded-[4px] shadow-[0_16px_40px_rgba(0,0,0,0.75)] p-1.5 z-40 animate-fade-in text-xs font-medium"
         >
-          <button
-            type="button"
-            onClick={() => {
-              onInvite?.();
-              onClose();
-            }}
-            className="w-full flex items-center justify-between px-2.5 py-2 text-[#07C3F2] hover:bg-[#214283] hover:text-white rounded-[3px] transition-colors cursor-pointer"
-          >
-            <span>Mời mọi người</span>
-            <span className="font-mono">+</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              onSettings?.();
-              onClose();
-            }}
-            className="w-full flex items-center justify-between px-2.5 py-2 text-[#E6EDF3] hover:bg-[#2B2D30] rounded-[3px] transition-colors cursor-pointer"
-          >
-            <span>Cài đặt máy chủ</span>
-            <span className="font-mono text-[10px] text-[#7D7D7D]">CFG</span>
-          </button>
+          {canInvite && (
+            <button
+              type="button"
+              onClick={() => {
+                onInvite?.();
+                onClose();
+              }}
+              className="w-full flex items-center justify-between px-2.5 py-2 text-[#07C3F2] hover:bg-[#2E436E] hover:text-white rounded-[3px] transition-colors cursor-pointer"
+            >
+              <span>Mời mọi người</span>
+              <span className="font-mono">+</span>
+            </button>
+          )}
+          {canManageServer && (
+            <button
+              type="button"
+              onClick={() => {
+                onSettings?.();
+                onClose();
+              }}
+              className="w-full flex items-center justify-between px-2.5 py-2 text-[#E6EDF3] hover:bg-[#2B2D30] rounded-[3px] transition-colors cursor-pointer"
+            >
+              <span>Cài đặt máy chủ</span>
+              <SettingsIcon className="w-3.5 h-3.5 text-[#7D7D7D]" />
+            </button>
+          )}
           {onRoles && (
             <button
               type="button"
@@ -126,7 +137,7 @@ export function ServerHeader({
               className="w-full flex items-center justify-between px-2.5 py-2 text-[#E6EDF3] hover:bg-[#2B2D30] rounded-[3px] transition-colors cursor-pointer"
             >
               <span>Vai trò & Phân quyền</span>
-              <span className="font-mono text-[10px] text-[#21D789]">RBAC</span>
+              <ShieldIcon className="w-3.5 h-3.5 text-[#21D789]" />
             </button>
           )}
           {onMembers && (
@@ -139,20 +150,22 @@ export function ServerHeader({
               className="w-full flex items-center justify-between px-2.5 py-2 text-[#E6EDF3] hover:bg-[#2B2D30] rounded-[3px] transition-colors cursor-pointer"
             >
               <span>Quản lý thành viên</span>
-              <span className="font-mono text-[10px] text-[#7D7D7D]">USR</span>
+              <UsersIcon className="w-3.5 h-3.5 text-[#7D7D7D]" />
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => {
-              onCreateChannel?.();
-              onClose();
-            }}
-            className="w-full flex items-center justify-between px-2.5 py-2 text-[#E6EDF3] hover:bg-[#2B2D30] rounded-[3px] transition-colors cursor-pointer"
-          >
-            <span>Tạo kênh</span>
-            <span className="font-mono text-[#7D7D7D]">#</span>
-          </button>
+          {canManageChannels && (
+            <button
+              type="button"
+              onClick={() => {
+                onCreateChannel?.();
+                onClose();
+              }}
+              className="w-full flex items-center justify-between px-2.5 py-2 text-[#E6EDF3] hover:bg-[#2B2D30] rounded-[3px] transition-colors cursor-pointer"
+            >
+              <span>Tạo kênh</span>
+              <span className="font-mono text-[#7D7D7D]">#</span>
+            </button>
+          )}
           <div className="h-px bg-[#2B2D30] my-1" />
           <button
             type="button"
@@ -163,7 +176,7 @@ export function ServerHeader({
             className="w-full flex items-center justify-between px-2.5 py-2 text-[#FE2857] hover:bg-[#FE2857] hover:text-white rounded-[3px] transition-colors cursor-pointer"
           >
             <span>Rời khỏi máy chủ</span>
-            <span className="font-mono text-[10px]">EXIT</span>
+            <PowerIcon className="w-3.5 h-3.5" />
           </button>
         </div>
       )}

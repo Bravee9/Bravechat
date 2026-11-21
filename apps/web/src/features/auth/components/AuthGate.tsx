@@ -17,7 +17,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     }).catch((reason) => {
       if (!active) return;
       if (reason instanceof ApiError && reason.status === 401) window.location.replace("/login");
-      else setError("Không thể kết nối máy chủ. Kiểm tra API và database rồi thử lại.");
+      else setError("Không thể kết nối tới máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.");
     });
     return () => { active = false; };
   }, [retry]);

@@ -6,6 +6,7 @@ import type {
   DirectConversation,
   ServerDetail,
   ServerListItem,
+  ServerMemberSummary,
 } from "@discord-clone/shared";
 import { createStore, useStore } from "@/lib/store";
 import { serverService } from "@/services/server.service";
@@ -23,6 +24,7 @@ interface WorkspaceState {
   conversations: DirectConversation[] | null;
   currentUser: CurrentUser | null;
   serverDetails: Record<string, ServerDetail>;
+  serverMembers: Record<string, ServerMemberSummary[]>;
   error: string | null;
 }
 
@@ -33,12 +35,14 @@ export const workspaceStore = createStore<WorkspaceState>({
   conversations: null,
   currentUser: null,
   serverDetails: {},
+  serverMembers: {},
   error: null,
 });
 
 // Chống gọi trùng (dedupe in-flight) và theo dõi độ tươi của cache.
 const inflight = new Map<string, Promise<void>>();
 const detailFetchedAt = new Map<string, number>();
+const membersFetchedAt = new Map<string, number>();
 
 function once(key: string, task: () => Promise<void>): Promise<void> {
   const existing = inflight.get(key);
@@ -93,6 +97,49 @@ export function loadServerDetail(serverId: string, force = false): Promise<void>
       serverDetails: { ...state.serverDetails, [serverId]: detail },
     }));
   });
+}
+
+export function loadServerMembers(serverId: string, force = false): Promise<void> {
+  if (!serverId || serverId === "@me") return Promise.resolve();
+  const cached = workspaceStore.get().serverMembers[serverId];
+  const fetchedAt = membersFetchedAt.get(serverId) ?? 0;
+  if (!force && cached && Date.now() - fetchedAt < DETAIL_STALE_MS) {
+    return Promise.resolve();
+  }
+  return once(`members:${serverId}`, async () => {
+    const members = await serverService.getServerMembers(serverId);
+    membersFetchedAt.set(serverId, Date.now());
+    workspaceStore.set((state) => ({
+      serverMembers: { ...state.serverMembers, [serverId]: members },
+    }));
+  });
+}
+
+export function getFirstCachedChannelId(serverId: string): string | null {
+  const detail = workspaceStore.get().serverDetails[serverId];
+  if (!detail?.channels?.length) return null;
+  const first = detail.channels
+    .slice()
+    .sort((left, right) => left.position - right.position)[0];
+  return first?.id ?? null;
+}
+
+export function getCachedChannelName(serverId: string, channelId: string): string | null {
+  const state = workspaceStore.get();
+  if (serverId === "@me") {
+    const conv = state.conversations?.find(
+      (item) => item.id === channelId || item.recipient.id === channelId
+    );
+    return conv ? conv.recipient.displayName || conv.recipient.username : null;
+  }
+  const detail = state.serverDetails[serverId];
+  const channel = detail?.channels.find((item) => item.id === channelId);
+  return channel?.name ?? null;
+}
+
+export function getCachedServerDetail(serverId: string): ServerDetail | null {
+  if (!serverId || serverId === "@me") return null;
+  return workspaceStore.get().serverDetails[serverId] ?? null;
 }
 
 export function applyChannelActivity(serverId: string, channelId: string, mention: boolean) {
@@ -174,6 +221,17 @@ export function useServerDetail(serverId: string): ServerDetail | null {
   return detail;
 }
 
+export function useServerMembers(serverId: string): ServerMemberSummary[] {
+  const members = useStore(workspaceStore, (s) => s.serverMembers[serverId]);
+  useEffect(() => {
+    if (serverId && serverId !== "@me") {
+      void loadServerMembers(serverId);
+    }
+  }, [serverId]);
+  return members ?? EMPTY_MEMBERS;
+}
+
 // Tham chiếu rỗng ổn định để tránh re-render thừa.
 const EMPTY_SERVERS: ServerListItem[] = [];
 const EMPTY_CONVERSATIONS: DirectConversation[] = [];
+const EMPTY_MEMBERS: ServerMemberSummary[] = [];

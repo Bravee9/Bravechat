@@ -71,4 +71,13 @@ describe("Session refresh coordination", () => {
     await Promise.all([initial, next]);
     expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/auth/refresh"))).toHaveLength(1);
   });
+
+  it("routes /auth/* requests to authApiUrl and domain requests to coreApiUrl when polyglot service URLs are configured", async () => {
+    const { resolveServiceBaseUrl } = await import("@/services/http");
+    expect(resolveServiceBaseUrl("/auth/me")).toBe("http://localhost:4000/api");
+    expect(resolveServiceBaseUrl("/servers/s1")).toBe("http://localhost:4000/api");
+    expect(resolveServiceBaseUrl("/custom", "http://rust-gateway:5000/api")).toBe(
+      "http://rust-gateway:5000/api"
+    );
+  });
 });

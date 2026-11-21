@@ -10,6 +10,7 @@ import { workspaceStore } from "@/stores/workspace.store";
 import { http } from "@/services/http";
 import { audioStore } from "@/stores/audio.store";
 import { useStore } from "@/lib/store";
+import { PowerIcon } from "@/components/ui/Icons";
 
 interface UserProfileBarProps {
   currentUser: CurrentUser | null;
@@ -152,9 +153,9 @@ export function UserProfileBar({ currentUser }: UserProfileBarProps) {
                 setLoggingOut(false);
               }
             }}
-            className="rounded p-1.5 text-ocean-light/60 hover:bg-white/10 hover:text-rose-300"
+            className="rounded p-1.5 text-ocean-light/60 hover:bg-white/10 hover:text-rose-300 transition-colors cursor-pointer"
           >
-            ⏻
+            <PowerIcon className="w-4 h-4" />
           </button>
         ) : null}
       </div>

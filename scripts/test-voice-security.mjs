@@ -2,10 +2,15 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { apiRequire, loadModule } from './security-test-support.mjs';
 
+const checkPrivateChannel = (perms, ch) =>
+  !ch.isPrivate || Boolean(perms.isOwner) || Boolean(perms.hasPermission('access_private_channels')) || Boolean(ch.rolePermissions?.some((rp) => perms.roleIds?.includes(rp.roleId)));
+
 function fixture() {
-  const channel = { id: 'c', type: 'VOICE', voiceEpoch: 0 };
+  const channel = { id: 'c', serverId: 'server', type: 'VOICE', voiceEpoch: 0, isPrivate: false, rolePermissions: [] };
   const sessions = new Map([['s', { userId: 'u', isRevoked: false }], ['next', { userId: 'u', isRevoked: false }]]);
   const leases = []; const removed = []; const deleted = []; const updated = [];
+  const permissions = { connect_voice: true, speak_voice: true, share_screen: true, access_private_channels: false };
+  const roleIds = [];
   let failDeletion = false; let afterGrant = () => {};
   const participant = { identity: 'u:tab', metadata: JSON.stringify({ sid: 's', channelId: 'c' }) };
   const rooms = new Map([['channel:c:0', []]]);
@@ -40,9 +45,13 @@ function fixture() {
   const service = loadModule('services/voice-security.ts', {
     '../config/env': { env }, '../config/prisma': { prisma },
     './conversation': { fail: (statusCode, message) => Object.assign(new Error(message), { statusCode }) },
+    './permissions': {
+      canMemberViewPrivateChannel: checkPrivateChannel,
+      getMemberPermissions: async () => ({ isOwner: false, roleIds, hasPermission: (key) => Boolean(permissions[key]) }),
+    },
     'livekit-server-sdk': { ...apiRequire('livekit-server-sdk'), RoomServiceClient },
   });
-  return { service, channel, sessions, leases, participant, rooms, removed, deleted, updated, setFailDeletion: (value) => { failDeletion = value; }, onGrant: (callback) => { afterGrant = callback; } };
+  return { service, channel, sessions, leases, participant, rooms, removed, deleted, updated, permissions, roleIds, setFailDeletion: (value) => { failDeletion = value; }, onGrant: (callback) => { afterGrant = callback; } };
 }
 
 test('revoked sessions and old room generations never receive admission privileges', async () => {
@@ -53,6 +62,23 @@ test('revoked sessions and old room generations never receive admission privileg
   assert.equal(await f.service.admitVoiceParticipant('channel:c:0', f.participant), false);
   assert.equal(f.updated.length, 1);
   assert.equal(f.removed.length, 1);
+});
+
+test('voice admission restricts published media to the member role permissions', async () => {
+  const f = fixture();
+  f.permissions.speak_voice = false;
+  f.permissions.share_screen = true;
+  await f.service.registerVoiceToken('c', 's', 'u');
+  assert.equal(await f.service.admitVoiceParticipant('channel:c:0', f.participant), true);
+  assert.equal(f.updated[0].options.permission.canPublish, true);
+  assert.equal(f.updated[0].options.permission.canPublishSources.join(','), String(apiRequire('livekit-server-sdk').TrackSource.SCREEN_SHARE));
+  f.permissions.connect_voice = false;
+  assert.equal(await f.service.admitVoiceParticipant('channel:c:0', f.participant), false);
+  assert.equal(f.removed.length, 1);
+  f.permissions.connect_voice = true;
+  f.channel.isPrivate = true;
+  assert.equal(await f.service.admitVoiceParticipant('channel:c:0', f.participant), false);
+  assert.equal(f.removed.length, 2);
 });
 
 test('revocation closes the old room even when the token holder has disconnected', async () => {
@@ -97,18 +123,23 @@ test('refresh transfers issued-room leases and participant metadata to the new s
   assert.deepEqual(f.deleted, ['channel:c:0']);
 });
 
-test('new LiveKit tokens have no media privileges before signed webhook admission', async (t) => {
+test('new LiveKit tokens have no media privileges before signed webhook admission and block unauthorized private voice channels', async (t) => {
   const sdk = apiRequire('livekit-server-sdk');
   const env = { LIVEKIT_URL: 'ws://test', LIVEKIT_API_KEY: 'key', LIVEKIT_API_SECRET: 'secret', LIVEKIT_TOKEN_TTL_SECONDS: 300 };
+  let isPrivate = false;
   const { voiceRoutes } = loadModule('routes/voice.routes.ts', {
-    '../config/env': { env }, '../config/prisma': { prisma: { channel: { findFirst: async () => ({ id: 'c', type: 'VOICE', userLimit: null, server: { members: [] } }) } } },
+    '../config/env': { env }, '../config/prisma': { prisma: { channel: { findFirst: async () => ({ id: 'c', serverId: 'server', type: 'VOICE', userLimit: null, isPrivate, rolePermissions: [], server: { members: [] } }) } } },
     '../services/voice-security': { startVoiceSecurity() {}, registerVoiceToken: async () => 'channel:c:2', admitVoiceParticipant: async () => false },
+    '../services/permissions': { canMemberViewPrivateChannel: checkPrivateChannel, getMemberPermissions: async () => ({ isOwner: false, roleIds: [], hasPermission: (key) => key !== 'access_private_channels' }) },
   });
   const app = apiRequire('fastify')(); t.after(() => app.close());
   app.decorate('authenticate', async (request) => { request.user = { id: 'u', sid: 's', username: 'u' }; });
   await app.register(voiceRoutes);
   const response = await app.inject({ method: 'POST', url: '/channels/c/token' });
   assert.equal(response.statusCode, 200);
+  isPrivate = true;
+  const privateBlocked = await app.inject({ method: 'POST', url: '/channels/c/token' });
+  assert.equal(privateBlocked.statusCode, 403);
   const claims = await new sdk.TokenVerifier(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET).verify(response.json().data.token);
   assert.equal(claims.video.room, 'channel:c:2');
   assert.equal(claims.video.canPublish, false);

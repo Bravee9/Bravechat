@@ -123,6 +123,7 @@ model ServerMember {
   roles  MemberRole[]
 
   @@unique([userId, serverId])
+  @@index([serverId, isBanned])
   @@map("server_members")
 }
 
@@ -147,6 +148,7 @@ model Role {
   members            MemberRole[]
   channelPermissions ChannelRolePermission[]
 
+  @@index([serverId, position])
   @@map("roles")
 }
 
@@ -174,6 +176,7 @@ model ChannelCategory {
   server   Server    @relation(fields: [serverId], references: [id], onDelete: Cascade)
   channels Channel[]
 
+  @@index([serverId, position])
   @@map("channel_categories")
 }
 
@@ -207,6 +210,7 @@ model Channel {
   voiceSessions   VoiceSession[]
   rolePermissions ChannelRolePermission[]
 
+  @@index([serverId, position])
   @@map("channels")
 }
 
@@ -415,6 +419,7 @@ model Friendship {
   friend User @relation("FriendshipFriend", fields: [friendId], references: [id])
 
   @@unique([userId, friendId])
+  @@index([friendId, status])
   @@map("friendships")
 }
 

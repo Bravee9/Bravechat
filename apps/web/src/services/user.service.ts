@@ -1,7 +1,6 @@
 import type { CurrentUser } from "@discord-clone/shared";
-import { API_ROUTES } from "@discord-clone/shared";
 import { env } from "@/config/env";
-import { http } from "@/services/http";
+import { authAdapter } from "@/services/adapters";
 import { MOCK_CURRENT_USER } from "@/services/mock/mockData";
 
 export const userService = {
@@ -12,7 +11,7 @@ export const userService = {
     if (env.useMocks) {
       return MOCK_CURRENT_USER;
     }
-    const response = await http.get<{ user: CurrentUser }>(API_ROUTES.auth.me);
+    const response = await authAdapter.getCurrentUser();
     return response.user;
   },
 };

@@ -74,9 +74,16 @@ export async function roleRoutes(server: FastifyInstance) {
       return reply.status(403).send({ statusCode: 403, message: 'Bạn không có quyền tạo vai trò.' })
     }
 
-    const mask = BigInt(
+    const rawMask = Number(
       permissionsToBitmask((parsed.data.permissions ?? {}) as Partial<Record<PermissionKey, boolean>>)
     )
+    if (!perms.isOwner && (perms.mask & rawMask) !== rawMask) {
+      return reply.status(403).send({
+        statusCode: 403,
+        message: 'Bạn không thể cấp quyền hạn mà vai trò của bạn không có.',
+      })
+    }
+    const mask = BigInt(rawMask)
     const role = await prisma.$transaction(async (tx) => {
       const created = await tx.role.create({
         data: {
@@ -142,6 +149,27 @@ export async function roleRoutes(server: FastifyInstance) {
         where: { id: request.params.roleId, serverId: request.params.serverId },
       })
       if (!existing) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy vai trò.' })
+      if (!perms.isOwner && existing.position >= perms.highestRolePosition) {
+        return reply.status(403).send({
+          statusCode: 403,
+          message: 'Bạn không thể chỉnh sửa vai trò có cấp bậc ngang bằng hoặc cao hơn vai trò của bạn.',
+        })
+      }
+      if (!perms.isOwner && parsed.data.permissions !== undefined) {
+        const nextMask = Number(
+          permissionsToBitmask(
+            parsed.data.permissions as Partial<Record<PermissionKey, boolean>>
+          )
+        )
+        const currentMask = Number(existing.permissions)
+        const addedBits = nextMask & ~currentMask
+        if ((perms.mask & addedBits) !== addedBits) {
+          return reply.status(403).send({
+            statusCode: 403,
+            message: 'Bạn không thể cấp thêm quyền hạn mà vai trò của bạn không có.',
+          })
+        }
+      }
 
       const updated = await prisma.$transaction(async (tx) => {
         const next = await tx.role.update({
@@ -205,6 +233,12 @@ export async function roleRoutes(server: FastifyInstance) {
         where: { id: request.params.roleId, serverId: request.params.serverId },
       })
       if (!existing) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy vai trò.' })
+      if (!perms.isOwner && existing.position >= perms.highestRolePosition) {
+        return reply.status(403).send({
+          statusCode: 403,
+          message: 'Bạn không thể chỉnh sửa vai trò có cấp bậc ngang bằng hoặc cao hơn vai trò của bạn.',
+        })
+      }
       if (existing.isManaged) {
         return reply.status(409).send({ statusCode: 409, message: 'Không thể xóa vai trò hệ thống mặc định.' })
       }
@@ -242,9 +276,32 @@ export async function roleRoutes(server: FastifyInstance) {
 
       const targetMember = await prisma.serverMember.findFirst({
         where: { serverId: request.params.serverId, userId: request.params.userId, isBanned: false },
+        include: { roles: { include: { role: { select: { position: true } } } } },
       })
       if (!targetMember) {
         return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy thành viên.' })
+      }
+      const targetHighest = targetMember.isOwner
+        ? 1000
+        : Math.max(0, ...targetMember.roles.map((mr) => mr.role.position))
+      if (!perms.isOwner && targetHighest >= perms.highestRolePosition) {
+        return reply.status(403).send({
+          statusCode: 403,
+          message: 'Bạn không thể thay đổi vai trò của thành viên có cấp bậc ngang bằng hoặc cao hơn bạn.',
+        })
+      }
+
+      if (!perms.isOwner && parsed.data.roleIds.length > 0) {
+        const requestedRoles = await prisma.role.findMany({
+          where: { serverId: request.params.serverId, id: { in: parsed.data.roleIds } },
+          select: { position: true },
+        })
+        if (requestedRoles.some((r) => r.position >= perms.highestRolePosition)) {
+          return reply.status(403).send({
+            statusCode: 403,
+            message: 'Bạn không thể gán vai trò có cấp bậc ngang bằng hoặc cao hơn vai trò của bạn.',
+          })
+        }
       }
 
       await prisma.$transaction(async (tx) => {
@@ -287,9 +344,17 @@ export async function roleRoutes(server: FastifyInstance) {
 
       const target = await prisma.serverMember.findFirst({
         where: { serverId: request.params.serverId, userId: request.params.userId, isBanned: false },
+        include: { roles: { include: { role: { select: { position: true } } } } },
       })
       if (!target) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy thành viên.' })
       if (target.isOwner) return reply.status(409).send({ statusCode: 409, message: 'Không thể kick chủ sở hữu máy chủ.' })
+      const targetKickHighest = Math.max(0, ...target.roles.map((mr) => mr.role.position))
+      if (!perms.isOwner && targetKickHighest >= perms.highestRolePosition) {
+        return reply.status(403).send({
+          statusCode: 403,
+          message: 'Bạn không thể mời thành viên có cấp bậc ngang bằng hoặc cao hơn bạn ra khỏi máy chủ.',
+        })
+      }
 
       await prisma.$transaction(async (tx) => {
         await tx.serverMember.delete({ where: { id: target.id } })
@@ -322,9 +387,17 @@ export async function roleRoutes(server: FastifyInstance) {
 
       const target = await prisma.serverMember.findFirst({
         where: { serverId: request.params.serverId, userId: request.params.userId },
+        include: { roles: { include: { role: { select: { position: true } } } } },
       })
       if (!target) return reply.status(404).send({ statusCode: 404, message: 'Không tìm thấy thành viên.' })
       if (target.isOwner) return reply.status(409).send({ statusCode: 409, message: 'Không thể chặn chủ sở hữu máy chủ.' })
+      const targetBanHighest = Math.max(0, ...target.roles.map((mr) => mr.role.position))
+      if (!perms.isOwner && targetBanHighest >= perms.highestRolePosition) {
+        return reply.status(403).send({
+          statusCode: 403,
+          message: 'Bạn không thể chặn thành viên có cấp bậc ngang bằng hoặc cao hơn bạn.',
+        })
+      }
 
       await prisma.$transaction(async (tx) => {
         await tx.serverMember.update({

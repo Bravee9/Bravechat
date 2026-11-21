@@ -5,10 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import {
   loadServerDetail,
   loadServers,
+  useCurrentUser,
   useServerDetail,
+  useServers,
 } from "@/stores/workspace.store";
+import { SettingsIcon } from "@/components/ui/Icons";
 import {
   openWorkspaceModal,
+  usePreviewAsRoleId,
   useServerWorkspaceConfig,
 } from "@/stores/ide-workspace.store";
 import { ServerHeader } from "./ServerHeader";
@@ -27,7 +31,36 @@ export function ServerChannelSidebar({ serverId }: { serverId: string }) {
   const currentChannelId = (params?.channelId as string) || "general";
 
   const serverDetail = useServerDetail(serverId);
+  const currentUser = useCurrentUser();
+  const previewAsRoleId = usePreviewAsRoleId();
+  const servers = useServers();
+  const serverSummary = servers.find((s) => s.id === serverId);
   const config = useServerWorkspaceConfig(serverId);
+
+  const isOwner = Boolean(
+    currentUser?.id && serverDetail?.ownerId && currentUser.id === serverDetail.ownerId
+  );
+  const basePerms = serverDetail?.memberPermissions;
+  const previewRole = previewAsRoleId
+    ? config.roles.find((r) => r.id === previewAsRoleId)
+    : null;
+
+  const hasPerm = (key: import("@discord-clone/shared").PermissionKey) => {
+    if (previewAsRoleId) {
+      if (previewAsRoleId === "GUEST") return false;
+      if (previewRole) return Boolean(previewRole.permissions[key]);
+      return false;
+    }
+    if (isOwner) return true;
+    if (basePerms) return Boolean(basePerms[key]);
+    return true;
+  };
+
+  const canManageServer = hasPerm("manage_server");
+  const canManageChannels = hasPerm("manage_channels");
+  const canManageRoles = hasPerm("manage_roles");
+  const canManageMembers = hasPerm("kick_members") || hasPerm("ban_members") || hasPerm("manage_roles");
+  const canInvite = hasPerm("invite_members");
   const [isServerMenuOpen, setIsServerMenuOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<
     "invite" | "channel" | "leave" | "settings" | null
@@ -130,20 +163,32 @@ export function ServerChannelSidebar({ serverId }: { serverId: string }) {
     }
   }
 
-  // Nhóm kênh theo category một lần (O(n)) thay vì filter lặp cho từng category.
+  // Nhóm kênh theo category một lần (O(n)) và ẩn kênh riêng tư đối với vai trò không có quyền xem.
   const channelsByCategory = useMemo(() => {
     const map = new Map<
       string,
       NonNullable<typeof serverDetail>["channels"]
     >();
     for (const channel of serverDetail?.channels ?? []) {
+      const policy = config.channelPolicies[channel.id];
+      const isPrivate = Boolean(channel.isPrivate || policy?.isPrivate);
+      if (isPrivate && previewAsRoleId) {
+        const allowedIds = channel.allowedRoleIds?.length
+          ? channel.allowedRoleIds
+          : policy?.allowedRoleIds ?? ["OWNER", "ADMIN"];
+        const canViewByPreview =
+          previewAsRoleId !== "GUEST" &&
+          (allowedIds.includes(previewAsRoleId) ||
+            Boolean(previewRole?.permissions.access_private_channels));
+        if (!canViewByPreview) continue;
+      }
       const key = channel.categoryId ?? "";
       const list = map.get(key);
       if (list) list.push(channel);
       else map.set(key, [channel]);
     }
     return map;
-  }, [serverDetail]);
+  }, [serverDetail, config.channelPolicies, previewAsRoleId, previewRole]);
 
   return (
     <aside
@@ -152,64 +197,90 @@ export function ServerChannelSidebar({ serverId }: { serverId: string }) {
       data-testid="channel-sidebar"
     >
       <ServerHeader
-        serverName={serverDetail?.name || "Đang tải server..."}
+        serverName={serverDetail?.name ?? serverSummary?.name ?? "Máy chủ"}
         badgeColor={config.badgeColor}
         isMe={false}
         isOpen={isServerMenuOpen}
+        canInvite={canInvite}
+        canManageServer={canManageServer}
+        canManageChannels={canManageChannels}
         onToggle={() => setIsServerMenuOpen((prev) => !prev)}
         onClose={() => setIsServerMenuOpen(false)}
-        onInvite={() => void createInvite()}
-        onSettings={() => openWorkspaceModal(serverId, "overview")}
-        onRoles={() => openWorkspaceModal(serverId, "roles")}
-        onMembers={() => openWorkspaceModal(serverId, "members")}
-        onCreateChannel={() => {
-          setCategoryId(undefined);
-          setDialogMode("channel");
-          setActionError("");
-        }}
+        onInvite={canInvite ? () => void createInvite() : undefined}
+        onSettings={canManageServer ? () => openWorkspaceModal(serverId, "overview") : undefined}
+        onRoles={canManageRoles ? () => openWorkspaceModal(serverId, "roles") : undefined}
+        onMembers={canManageMembers ? () => openWorkspaceModal(serverId, "members") : undefined}
+        onCreateChannel={
+          canManageChannels
+            ? () => {
+                setCategoryId(undefined);
+                setDialogMode("channel");
+                setActionError("");
+              }
+            : undefined
+        }
         onLeave={() => {
           setDialogMode("leave");
           setActionError("");
         }}
       />
 
-      {/* JetBrains IDE Quick Action Bar (như New Session / Add Project trong Fleet / IntelliJ) */}
-      <div className="px-2.5 py-2 border-b border-[#2B2D30] bg-[#141417]/60 flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => openWorkspaceModal(serverId, "channels")}
-          data-testid="sidebar-new-channel-btn"
-          className="flex-1 h-7 px-2 rounded-[4px] bg-[#1E1F22] hover:bg-[#2B2D30] border border-[#2B2D30] hover:border-[#393B40] text-[11px] font-medium text-[#E6EDF3] flex items-center justify-center gap-1 transition-colors cursor-pointer"
-        >
-          <span className="text-[#07C3F2] font-mono font-bold">+</span>
-          <span className="truncate">Kênh & Khóa</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => openWorkspaceModal(serverId, "roles")}
-          data-testid="sidebar-rbac-btn"
-          className="flex-1 h-7 px-2 rounded-[4px] bg-[#1E1F22] hover:bg-[#2B2D30] border border-[#2B2D30] hover:border-[#393B40] text-[11px] font-medium text-[#E6EDF3] flex items-center justify-center gap-1 transition-colors cursor-pointer"
-        >
-          <span className="text-[#21D789] font-mono text-[10px]">⚙</span>
-          <span className="truncate">Phân quyền</span>
-        </button>
-      </div>
+      {/* Thanh thao tác nhanh chỉ hiển thị với thành viên có quyền Quản lý kênh hoặc Phân quyền */}
+      {(canManageChannels || canManageRoles) && (
+        <div className="px-2.5 py-2 border-b border-[#2B2D30] bg-[#141417]/60 flex items-center gap-1.5">
+          {canManageChannels && (
+            <button
+              type="button"
+              onClick={() => openWorkspaceModal(serverId, "channels")}
+              data-testid="sidebar-new-channel-btn"
+              className="flex-1 h-7 px-2 rounded-[4px] bg-[#1E1F22] hover:bg-[#2B2D30] border border-[#2B2D30] hover:border-[#393B40] text-[11px] font-medium text-[#E6EDF3] flex items-center justify-center gap-1 transition-colors cursor-pointer"
+            >
+              <span className="text-[#07C3F2] font-mono font-bold">+</span>
+              <span className="truncate">Kênh & Khóa</span>
+            </button>
+          )}
+          {canManageRoles && (
+            <button
+              type="button"
+              onClick={() => openWorkspaceModal(serverId, "roles")}
+              data-testid="sidebar-rbac-btn"
+              className="flex-1 h-7 px-2 rounded-[4px] bg-[#1E1F22] hover:bg-[#2B2D30] border border-[#2B2D30] hover:border-[#393B40] text-[11px] font-medium text-[#E6EDF3] flex items-center justify-center gap-1 transition-colors cursor-pointer"
+            >
+              <SettingsIcon className="w-3.5 h-3.5 text-[#21D789] shrink-0" />
+              <span className="truncate">Phân quyền</span>
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden pt-3 pb-16 px-2 custom-scrollbar space-y-4">
-        {serverDetail?.categories.map((category) => (
-          <CategorySection
-            key={category.id}
-            category={category}
-            channels={channelsByCategory.get(category.id) ?? []}
-            serverId={serverId}
-            currentChannelId={currentChannelId}
-            onCreateChannel={() => {
-              setCategoryId(category.id);
-              setDialogMode("channel");
-              setActionError("");
-            }}
-          />
-        ))}
+        {serverDetail ? (
+          serverDetail.categories.map((category) => (
+            <CategorySection
+              key={category.id}
+              category={category}
+              channels={channelsByCategory.get(category.id) ?? []}
+              serverId={serverId}
+              currentChannelId={currentChannelId}
+              onCreateChannel={
+                canManageChannels
+                  ? () => {
+                      setCategoryId(category.id);
+                      setDialogMode("channel");
+                      setActionError("");
+                    }
+                  : undefined
+              }
+            />
+          ))
+        ) : (
+          <div className="space-y-2 px-1 pt-1" aria-hidden="true">
+            <div className="h-3 w-20 rounded bg-[#2B2D30]/60" />
+            <div className="h-7 w-full rounded-[4px] bg-[#24262B]/60" />
+            <div className="h-7 w-full rounded-[4px] bg-[#24262B]/40" />
+            <div className="h-7 w-full rounded-[4px] bg-[#24262B]/30" />
+          </div>
+        )}
       </div>
 
       {dialogMode === "invite" ? (

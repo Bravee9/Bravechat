@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { LockIcon, RefreshIcon, SettingsIcon, UnlockIcon } from "@/components/ui/Icons";
 import { cn } from "@/lib/utils";
 
 interface ChatHeaderProps {
@@ -46,8 +47,8 @@ export function ChatHeader({
           {isMe ? (
             <span className="text-[#07C3F2] font-mono text-sm">@</span>
           ) : isPrivateChannel ? (
-            <span className="text-[#FDB60D] font-mono text-xs" title="Kênh riêng tư">
-              🔒
+            <span className="text-[#FDB60D] flex items-center" title="Kênh riêng tư">
+              <LockIcon className="w-3.5 h-3.5" />
             </span>
           ) : (
             <span className="text-[#07C3F2] font-mono text-sm">#</span>
@@ -90,7 +91,8 @@ export function ChatHeader({
                 : "border-[#2B2D30] bg-[#1E1F22] text-[#A8A8B0] hover:text-white hover:border-[#393B40]"
             )}
           >
-            <span>{isPrivateChannel ? "🔒 Riêng tư" : "🔓 Công khai"}</span>
+            <span>{isPrivateChannel ? <LockIcon className="w-3.5 h-3.5" /> : <UnlockIcon className="w-3.5 h-3.5" />}</span>
+            <span>{isPrivateChannel ? "Riêng tư" : "Công khai"}</span>
           </button>
         )}
 
@@ -99,10 +101,10 @@ export function ChatHeader({
             type="button"
             onClick={onOpenWorkspaceSettings}
             data-testid="header-open-settings-btn"
-            title="Mở Quản trị máy chủ & Phân quyền (RBAC)"
+            title="Mở cài đặt máy chủ và phân quyền"
             className="hidden md:flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded-[4px] border border-[#2B2D30] bg-[#1E1F22] hover:bg-[#2B2D30] text-[#E6EDF3] transition-colors cursor-pointer"
           >
-            <span className="text-[#07C3F2]">⚙</span>
+            <SettingsIcon className="w-3.5 h-3.5 text-[#07C3F2]" />
             <span>Quản trị</span>
           </button>
         )}
@@ -122,17 +124,17 @@ export function ChatHeader({
         {/* Trạng thái WS */}
         <div
           data-testid="ws-connection-badge"
-          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded-[4px] border border-[#2B2D30] bg-[#141417]"
+          className="flex items-center justify-center gap-1.5 min-w-[92px] px-2.5 py-1 text-xs font-mono rounded-[4px] border border-[#2B2D30] bg-[#141417]"
         >
           {connectionStatus === "connected" && (
             <>
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
               <span className="text-[#21D789] font-medium">Live</span>
             </>
           )}
           {connectionStatus === "connecting" && (
             <>
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
               <span className="text-[#FDB60D] font-medium">Kết nối...</span>
             </>
           )}
@@ -143,8 +145,9 @@ export function ChatHeader({
               className="flex items-center gap-1 text-[#FE2857] hover:underline font-medium cursor-pointer"
               title="Nhấn để kết nối lại"
             >
-              <span className="w-2 h-2 rounded-full bg-[#FE2857]" />
-              <span>Mất kết nối ↺</span>
+              <span className="w-2 h-2 rounded-full bg-[#FE2857] shrink-0" />
+              <span>Mất kết nối</span>
+              <RefreshIcon className="w-3 h-3" />
             </button>
           )}
         </div>
