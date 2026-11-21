@@ -55,6 +55,46 @@ export function bitmaskToPermissions(maskInput: string | number | bigint): Recor
 
 type DbClient = Prisma.TransactionClient | typeof prisma
 
+const PERM_CACHE_TTL_MS = 5_000
+const MAX_PERM_CACHE_ENTRIES = 2_000
+
+type MemberPermissionResult = NonNullable<
+  Awaited<ReturnType<typeof fetchMemberPermissionsFromDb>>
+>
+type ChannelAccessResult = NonNullable<
+  Awaited<ReturnType<typeof fetchChannelAccessFromDb>>
+>
+
+const memberPermCache = new Map<
+  string,
+  { expiresAt: number; value: MemberPermissionResult | null }
+>()
+const channelAccessCache = new Map<
+  string,
+  { expiresAt: number; serverId: string; value: ChannelAccessResult | null }
+>()
+
+export function invalidateServerPermissionsCache(serverId?: string) {
+  if (!serverId) {
+    memberPermCache.clear()
+    channelAccessCache.clear()
+    return
+  }
+  const prefix = `${serverId}:`
+  for (const key of memberPermCache.keys()) {
+    if (key.startsWith(prefix)) memberPermCache.delete(key)
+  }
+  for (const [key, entry] of channelAccessCache.entries()) {
+    if (entry.serverId === serverId) channelAccessCache.delete(key)
+  }
+}
+
+function pruneCache<T>(map: Map<string, T>) {
+  if (map.size <= MAX_PERM_CACHE_ENTRIES) return
+  const firstKey = map.keys().next().value
+  if (firstKey !== undefined) map.delete(firstKey)
+}
+
 export function hexToRgbInt(hex: string): number {
   const clean = hex.replace('#', '')
   const parsed = Number.parseInt(clean, 16)
@@ -175,12 +215,29 @@ export async function ensureDefaultServerRoles(
 }
 
 export async function getMemberPermissions(serverId: string, userId: string) {
+  const cacheKey = `${serverId}:${userId}`
+  const now = Date.now()
+  const cached = memberPermCache.get(cacheKey)
+  if (cached && cached.expiresAt > now) {
+    return cached.value
+  }
+  const value = await fetchMemberPermissionsFromDb(serverId, userId)
+  if (value) {
+    pruneCache(memberPermCache)
+    memberPermCache.set(cacheKey, { expiresAt: now + PERM_CACHE_TTL_MS, value })
+  } else {
+    memberPermCache.delete(cacheKey)
+  }
+  return value
+}
+
+async function fetchMemberPermissionsFromDb(serverId: string, userId: string) {
   const member = await prisma.serverMember.findFirst({
     where: { serverId, userId, isBanned: false },
     include: {
       roles: {
         include: {
-          role: { select: { id: true, name: true, permissions: true } },
+          role: { select: { id: true, name: true, position: true, permissions: true } },
         },
       },
     },
@@ -188,11 +245,18 @@ export async function getMemberPermissions(serverId: string, userId: string) {
   if (!member) return null
 
   let mask = 0
+  let highestRolePosition = member.isOwner ? 1000 : 0
   const roleIds: string[] = []
   for (const mr of member.roles) {
     roleIds.push(mr.role.id)
     mask |= Number(mr.role.permissions)
+    if (!member.isOwner && mr.role.position > highestRolePosition) {
+      highestRolePosition = mr.role.position
+    }
   }
+
+  const effectiveMask = member.isOwner ? 0x7fff : mask
+  const permissions = bitmaskToPermissions(effectiveMask)
 
   const hasPermission = (key: PermissionKey) => {
     if (member.isOwner) return true
@@ -204,12 +268,51 @@ export async function getMemberPermissions(serverId: string, userId: string) {
     member,
     isOwner: member.isOwner,
     roleIds,
-    mask,
+    mask: effectiveMask,
+    highestRolePosition,
+    permissions,
     hasPermission,
   }
 }
 
 export async function canAccessChannel(channelId: string, userId: string) {
+  const cacheKey = `${channelId}:${userId}`
+  const now = Date.now()
+  const cached = channelAccessCache.get(cacheKey)
+  if (cached && cached.expiresAt > now) {
+    return cached.value
+  }
+  const result = await fetchChannelAccessFromDb(channelId, userId)
+  if (result) {
+    pruneCache(channelAccessCache)
+    channelAccessCache.set(cacheKey, {
+      expiresAt: now + PERM_CACHE_TTL_MS,
+      serverId: result.serverId,
+      value: result,
+    })
+  } else {
+    channelAccessCache.delete(cacheKey)
+  }
+  return result
+}
+
+export function canMemberViewPrivateChannel(
+  perms: {
+    isOwner: boolean
+    roleIds: string[]
+    hasPermission: (key: PermissionKey) => boolean
+  },
+  channel: {
+    isPrivate?: boolean
+    rolePermissions?: Array<{ roleId: string }>
+  }
+) {
+  if (!channel.isPrivate || perms.isOwner) return true
+  if (perms.hasPermission('access_private_channels')) return true
+  return Boolean(channel.rolePermissions?.some((rp) => perms.roleIds.includes(rp.roleId)))
+}
+
+async function fetchChannelAccessFromDb(channelId: string, userId: string) {
   const channel = await prisma.channel.findUnique({
     where: { id: channelId },
     select: {
@@ -230,14 +333,8 @@ export async function canAccessChannel(channelId: string, userId: string) {
   const perms = await getMemberPermissions(channel.serverId, userId)
   if (!perms) return null
 
-  if (channel.isPrivate && !perms.isOwner) {
-    const allowedByRole = channel.rolePermissions.some((rp) =>
-      perms.roleIds.includes(rp.roleId)
-    )
-    const allowedByPerm = perms.hasPermission('access_private_channels')
-    if (!allowedByRole && !allowedByPerm) {
-      return null
-    }
+  if (!canMemberViewPrivateChannel(perms, channel)) {
+    return null
   }
 
   return {
@@ -259,6 +356,7 @@ export async function writeAuditLog(
   targetId?: string | null,
   detail?: string | null
 ) {
+  invalidateServerPermissionsCache(serverId)
   await db.auditLog.create({
     data: {
       serverId,

@@ -181,4 +181,26 @@ describe("Channel Sidebar Components", () => {
       expect(audioBtn).toHaveClass("text-rose-400");
     });
   });
+
+  describe("ServerHeader RBAC visibility", () => {
+    it("hides administrative menu actions when member lacks server and channel management permissions", () => {
+      render(
+        <ServerHeader
+          serverName="Bravechat HQ"
+          isMe={false}
+          isOpen={true}
+          canInvite={true}
+          canManageServer={false}
+          canManageChannels={false}
+          onToggle={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText("Mời mọi người")).toBeInTheDocument();
+      expect(screen.queryByText("Cài đặt máy chủ")).not.toBeInTheDocument();
+      expect(screen.queryByText("Tạo kênh")).not.toBeInTheDocument();
+      expect(screen.getByText("Rời khỏi máy chủ")).toBeInTheDocument();
+    });
+  });
 });

@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ChatView } from '@/features/messages/components/ChatView';
 import { http } from '@/services/http';
 vi.mock('next/navigation', () => ({ useParams: () => ({}) }));
-vi.mock('@/stores/workspace.store', () => ({ useCurrentUser: () => ({ id:'u1', username:'alice', displayName:'Alice' }), loadConversations: vi.fn() }));
+vi.mock('@/stores/workspace.store', () => ({ useCurrentUser: () => ({ id:'u1', username:'alice', displayName:'Alice' }), loadConversations: vi.fn(), loadServerDetail: vi.fn(), getCachedChannelName: () => null, getCachedServerDetail: () => null }));
 vi.mock('@/services/http', () => ({ http: { get:vi.fn(), post:vi.fn(), patch:vi.fn(), delete:vi.fn() }, ApiError: class extends Error {} }));
 vi.mock('@/features/members/components/MemberList', () => ({ MemberList: () => null }));
 vi.mock('@/features/members/components/UserCard', () => ({ UserCard: () => null }));

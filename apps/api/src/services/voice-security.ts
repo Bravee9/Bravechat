@@ -3,6 +3,7 @@ import { prisma } from '../config/prisma'
 import { env } from '../config/env'
 import type { FastifyInstance } from 'fastify'
 import { fail } from './conversation'
+import { canMemberViewPrivateChannel, getMemberPermissions } from './permissions'
 
 export const voiceRoomName = (channelId: string, epoch: number) => `channel:${channelId}:${epoch}`
 
@@ -48,23 +49,34 @@ async function access(room: string, participant: Pick<ParticipantInfo, 'identity
   if (!value) return null
   const session = await prisma.refreshToken.findFirst({ where: { id: value.sid, userId: value.userId, isRevoked: false, expiresAt: { gt: new Date() }, user: { isBanned: false } }, select: { id: true } })
   if (!session) return null
-  const channel = await prisma.channel.findFirst({ where: { id: value.channelId, type: { in: ['VOICE', 'VIDEO'] }, server: { members: { some: { userId: value.userId, isBanned: false } } } }, select: { type: true, voiceEpoch: true } })
+  const channel = await prisma.channel.findFirst({
+    where: { id: value.channelId, type: { in: ['VOICE', 'VIDEO'] }, server: { members: { some: { userId: value.userId, isBanned: false } } } },
+    select: { type: true, voiceEpoch: true, serverId: true, isPrivate: true, rolePermissions: { where: { canView: true }, select: { roleId: true } } },
+  })
   if (!channel || room !== voiceRoomName(value.channelId, channel.voiceEpoch)) return null
   const lease = await prisma.voiceSession.findUnique({ where: { channelId_sessionId_epoch: { channelId: value.channelId, sessionId: value.sid, epoch: channel.voiceEpoch } } })
-  return lease ? channel : null
+  const permissions = await getMemberPermissions(channel.serverId, value.userId)
+  return lease && permissions && canMemberViewPrivateChannel(permissions, channel) && permissions.hasPermission('connect_voice')
+    ? { channel, permissions }
+    : null
 }
 
 // Tokens join with no media/data privileges. A signed webhook may grant them
 // only after current DB authorization. Room generations additionally isolate
 // cached privileged tokens refreshed by self-hosted LiveKit after admission.
 export async function admitVoiceParticipant(room: string, participant: Pick<ParticipantInfo, 'identity' | 'metadata'>) {
-  const channel = await access(room, participant)
-  if (!channel) { await remove(room, participant.identity); return false }
+  const accessResult = await access(room, participant)
+  if (!accessResult) { await remove(room, participant.identity); return false }
+  const { channel, permissions } = accessResult
+  const sources = [] as TrackSource[]
+  if (permissions.hasPermission('speak_voice')) sources.push(TrackSource.MICROPHONE)
+  if (channel.type === 'VIDEO' && permissions.hasPermission('speak_voice')) sources.push(TrackSource.CAMERA)
+  if (permissions.hasPermission('share_screen')) sources.push(TrackSource.SCREEN_SHARE)
   const service = roomService()
   if (!service) return false
   await control(() => service.updateParticipant(room, participant.identity, { permission: {
-    canPublish: true, canSubscribe: true, canPublishData: true, canUpdateMetadata: false,
-    canPublishSources: channel.type === 'VIDEO' ? [TrackSource.MICROPHONE, TrackSource.CAMERA] : [TrackSource.MICROPHONE],
+    canPublish: sources.length > 0, canSubscribe: true, canPublishData: false, canUpdateMetadata: false,
+    canPublishSources: sources,
   } }))
   // Cover a reset/membership change while the remote permission call was pending.
   if (!await access(room, participant)) { await remove(room, participant.identity); return false }

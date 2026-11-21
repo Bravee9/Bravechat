@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { CurrentUser } from "@discord-clone/shared";
 import { http } from "@/services/http";
+import { CloseIcon } from "@/components/ui/Icons";
 
 export function ProfileSettingsModal({ user, onClose, onSaved }: { user: CurrentUser; onClose: () => void; onSaved: (user: CurrentUser) => void }) {
   const [username, setUsername] = useState(user.username);
@@ -43,7 +44,7 @@ export function ProfileSettingsModal({ user, onClose, onSaved }: { user: Current
 
   return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <form onSubmit={save} className="w-full max-w-lg rounded-xl border border-ocean-dark-border bg-[#0b1c2d] p-6 shadow-2xl" aria-labelledby="profile-settings-title">
-      <div className="mb-5 flex items-center justify-between"><h2 id="profile-settings-title" className="text-lg font-bold text-ocean-light">Hồ sơ người dùng</h2><button type="button" onClick={onClose} className="text-ocean-light/70 hover:text-white" aria-label="Đóng">✕</button></div>
+      <div className="mb-5 flex items-center justify-between"><h2 id="profile-settings-title" className="text-lg font-bold text-ocean-light">Hồ sơ người dùng</h2><button type="button" onClick={onClose} className="text-ocean-light/70 hover:text-white p-1" aria-label="Đóng"><CloseIcon className="w-4 h-4" /></button></div>
       <div className="mb-5 grid grid-cols-2 gap-3">
         <label className="cursor-pointer rounded-lg border border-ocean-dark-border p-3 text-sm text-ocean-light hover:bg-white/5">Ảnh đại diện<input className="mt-2 block w-full text-xs" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif" onChange={(event) => void upload("avatar", event.target.files?.[0])} /></label>
         <label className="cursor-pointer rounded-lg border border-ocean-dark-border p-3 text-sm text-ocean-light hover:bg-white/5">Ảnh nền hồ sơ<input className="mt-2 block w-full text-xs" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif" onChange={(event) => void upload("banner", event.target.files?.[0])} /></label>

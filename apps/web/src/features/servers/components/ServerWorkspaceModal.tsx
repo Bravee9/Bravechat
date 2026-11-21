@@ -11,9 +11,11 @@ import {
 } from "@discord-clone/shared";
 import { http } from "@/services/http";
 import { serverService } from "@/services/server.service";
+import { CheckIcon, CloseIcon, LockIcon, SearchIcon, VolumeIcon } from "@/components/ui/Icons";
 import {
   loadServerDetail,
   loadServers,
+  useCurrentUser,
   useServerDetail,
 } from "@/stores/workspace.store";
 import {
@@ -145,14 +147,23 @@ function ServerWorkspaceDialogContent({
   initialTab: WorkspaceModalTab;
 }) {
   const router = useRouter();
+  const currentUser = useCurrentUser();
   const serverDetail = useServerDetail(serverId);
   const config = useServerWorkspaceConfig(serverId);
   const previewAsRoleId = usePreviewAsRoleId();
 
   const [activeTab, setActiveTab] = useState<WorkspaceModalTab>(initialTab);
+  const [settingsSearch, setSettingsSearch] = useState("");
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  const isOwner = Boolean(
+    currentUser?.id && serverDetail?.ownerId && currentUser.id === serverDetail.ownerId
+  );
+  const actorHighestPosition = isOwner
+    ? 1000
+    : serverDetail?.highestRolePosition ?? 1000;
 
   // Overview state
   const [serverName, setServerName] = useState(serverDetail?.name ?? "");
@@ -258,7 +269,7 @@ function ServerWorkspaceDialogContent({
       .catch((err) => {
         if (active) {
           setErrorMsg(
-            err instanceof Error ? err.message : "Không thể tải thống kê CSDL."
+            err instanceof Error ? err.message : "Không thể tải thống kê máy chủ."
           );
         }
       })
@@ -275,8 +286,14 @@ function ServerWorkspaceDialogContent({
     [dbRoles, selectedRoleId]
   );
 
-  const handleSaveOverview = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const isOverviewDirty =
+    serverName.trim() !== (serverDetail?.name ?? "").trim() ||
+    serverDesc.trim() !== (serverDetail?.description ?? config.description ?? "").trim() ||
+    selectedColor !== (serverDetail?.badgeColor ?? config.badgeColor ?? "#087CFA") ||
+    isPublic !== Boolean(serverDetail?.isPublic);
+
+  const persistOverviewChanges = async (): Promise<boolean> => {
+    if (!serverName.trim()) return false;
     setBusy(true);
     setErrorMsg("");
     setStatusMsg("");
@@ -293,14 +310,29 @@ function ServerWorkspaceDialogContent({
         description: serverDesc.trim(),
       }));
       await Promise.all([loadServerDetail(serverId, true), loadServers(true)]);
-      setStatusMsg("Đã lưu cấu hình máy chủ vào PostgreSQL.");
+      setStatusMsg("Đã lưu thay đổi máy chủ.");
+      return true;
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : "Không thể cập nhật máy chủ."
       );
+      return false;
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleSaveOverview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await persistOverviewChanges();
+  };
+
+  const handleDialogOk = async () => {
+    if (isOverviewDirty) {
+      const ok = await persistOverviewChanges();
+      if (!ok) return;
+    }
+    closeWorkspaceModal();
   };
 
   const handleDeleteServer = async () => {
@@ -348,7 +380,7 @@ function ServerWorkspaceDialogContent({
       await loadServerDetail(serverId, true);
       setNewChannelName("");
       setNewChannelPrivate(false);
-      setStatusMsg(`Đã tạo kênh #${cleanName} trong CSDL.`);
+      setStatusMsg(`Đã tạo kênh #${cleanName}.`);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Không thể tạo kênh.");
     } finally {
@@ -442,7 +474,7 @@ function ServerWorkspaceDialogContent({
       await loadRoles();
       setSelectedRoleId(res.role.id);
       setNewRoleName("");
-      setStatusMsg(`Đã tạo vai trò "${trimmed}" trong PostgreSQL.`);
+      setStatusMsg(`Đã tạo vai trò "${trimmed}".`);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Không thể tạo vai trò.");
     }
@@ -506,7 +538,7 @@ function ServerWorkspaceDialogContent({
         roleIds: [roleId],
       });
       await Promise.all([loadMembers(), loadRoles()]);
-      setStatusMsg("Đã cập nhật vai trò thành viên trong CSDL.");
+      setStatusMsg("Đã cập nhật vai trò thành viên.");
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : "Không thể gán vai trò."
@@ -613,7 +645,7 @@ function ServerWorkspaceDialogContent({
             >
               {(serverDetail?.name || "SV").slice(0, 2).toUpperCase()}
             </span>
-            <span className="text-xs font-mono text-[#7D7D7D]">Settings /</span>
+            <span className="text-xs font-mono text-[#7D7D7D]">Cài đặt /</span>
             <span className="text-xs font-semibold text-white truncate">
               {serverDetail?.name || "Máy chủ"}
             </span>
@@ -657,52 +689,72 @@ function ServerWorkspaceDialogContent({
               type="button"
               onClick={closeWorkspaceModal}
               data-testid="close-workspace-modal-btn"
-              className="px-2.5 py-1 rounded-[4px] border border-[#2B2D30] bg-[#2B2D30]/50 hover:bg-[#393B40] text-xs font-mono text-[#CDCDCD] hover:text-white transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] border border-[#2B2D30] bg-[#2B2D30]/50 hover:bg-[#393B40] text-xs font-mono text-[#CDCDCD] hover:text-white transition-colors cursor-pointer"
             >
-              ESC ✕
+              <span>ESC</span>
+              <CloseIcon className="w-3 h-3" />
             </button>
           </div>
         </div>
 
-        {/* Main IDE Split Layout */}
+        {/* Main IDE Split Layout (Reference Image 5) */}
         <div className="flex-1 flex min-h-0 overflow-hidden">
-          {/* Left Navigation Tree */}
-          <aside className="w-56 bg-[#18181B] border-r border-[#2B2D30] p-3 flex flex-col justify-between shrink-0 select-none overflow-y-auto">
-            <div className="space-y-5">
-              <div>
-                <p className="px-2.5 pb-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-[#7D7D7D]">
-                  Cấu trúc máy chủ
-                </p>
-                <div className="space-y-0.5">
-                  {(
-                    [
-                      {
-                        id: "overview",
-                        label: "Tổng quan & Máy chủ",
-                        badge: "CFG",
-                      },
-                      {
-                        id: "channels",
-                        label: "Kênh & Quyền riêng tư",
-                        badge: `${serverDetail?.channels.length ?? 0}`,
-                      },
-                      {
-                        id: "members",
-                        label: "Thành viên",
-                        badge: `${visibleMembers.length}`,
-                      },
-                      {
-                        id: "roles",
-                        label: "Vai trò & Phân quyền",
-                        badge: `${dbRoles.length}`,
-                      },
-                      {
-                        id: "analytics",
-                        label: "Thống kê & Truy vấn",
-                        badge: "SQL",
-                      },
-                    ] as const
-                  ).map((item) => {
+          {/* Left Navigation Tree with Search Box */}
+          <aside className="w-56 bg-[#1E1F22] border-r border-[#2B2D30] p-2.5 flex flex-col justify-between shrink-0 select-none overflow-y-auto">
+            <div className="space-y-3">
+              {/* IDE Settings Search Bar */}
+              <div className="relative flex items-center">
+                <SearchIcon className="w-3.5 h-3.5 text-[#6F737A] absolute left-2.5 pointer-events-none" />
+                <input
+                  type="text"
+                  value={settingsSearch}
+                  onChange={(e) => setSettingsSearch(e.target.value)}
+                  placeholder="Tìm cài đặt..."
+                  aria-label="Tìm mục cài đặt"
+                  data-testid="workspace-settings-search"
+                  className="w-full h-7 pl-7 pr-2 rounded-[4px] bg-[#1E1F22] border border-[#4E5157] focus:border-[#3574F0] focus:outline-none text-xs text-[#DFE1E5] placeholder:text-[#6F737A]"
+                />
+              </div>
+
+              <div className="space-y-0.5">
+                {(
+                  [
+                    {
+                      id: "overview",
+                      label: "Tổng quan",
+                      keywords: "tong quan ten may chu mau",
+                    },
+                    {
+                      id: "channels",
+                      label: "Kênh & Quyền riêng tư",
+                      keywords: "kenh rieng tu khoa voice text",
+                    },
+                    {
+                      id: "members",
+                      label: "Thành viên",
+                      keywords: "thanh vien moi kick ban",
+                    },
+                    {
+                      id: "roles",
+                      label: "Vai trò & Phân quyền",
+                      keywords: "vai tro phan quyen role",
+                    },
+                    {
+                      id: "analytics",
+                      label: "Thống kê & Tìm kiếm",
+                      keywords: "thong ke tim kiem nhat ky",
+                    },
+                  ] as const
+                )
+                  .filter((item) => {
+                    const q = settingsSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return (
+                      item.label.toLowerCase().includes(q) ||
+                      item.keywords.includes(q)
+                    );
+                  })
+                  .map((item) => {
                     const active = activeTab === item.id;
                     return (
                       <button
@@ -715,41 +767,22 @@ function ServerWorkspaceDialogContent({
                           setErrorMsg("");
                         }}
                         data-testid={`workspace-tab-${item.id}`}
-                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-[4px] text-xs font-medium transition-colors cursor-pointer ${
+                        className={`w-full flex items-center justify-between px-3 py-1.5 rounded-[4px] text-xs font-medium transition-colors cursor-pointer text-left ${
                           active
-                            ? "bg-[#214283] text-white font-semibold"
-                            : "text-[#A8A8B0] hover:bg-[#2B2D30]/50 hover:text-white"
+                            ? "bg-[#2E436E] text-white font-semibold"
+                            : "text-[#DFE1E5] hover:bg-[#2B2D30]/60"
                         }`}
                       >
                         <span className="truncate">{item.label}</span>
-                        <span
-                          className={`text-[10px] font-mono px-1.5 py-0.2 rounded-[2px] ${
-                            active
-                              ? "bg-[#087CFA] text-white"
-                              : "bg-[#2B2D30] text-[#CDCDCD]"
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
                       </button>
                     );
                   })}
-                </div>
-              </div>
-
-              <div className="p-3 rounded-[4px] bg-[#141417] border border-[#2B2D30] space-y-2">
-                <p className="text-[11px] font-mono font-semibold text-[#07C3F2]">
-                  PostgreSQL Sync
-                </p>
-                <p className="text-[11px] text-[#A8A8B0] leading-relaxed">
-                  Mọi thay đổi về máy chủ, kênh riêng tư, vai trò và thành viên được lưu trực tiếp vào cơ sở dữ liệu.
-                </p>
               </div>
             </div>
 
-            <div className="pt-3 border-t border-[#2B2D30] flex items-center justify-between text-[11px] font-mono text-[#7D7D7D]">
-              <span>ID: {serverId.slice(0, 8)}</span>
-              <span className="text-[#21D789]">● DB Live</span>
+            <div className="pt-2.5 px-1 border-t border-[#2B2D30] flex items-center justify-between text-[11px] text-[#7D7D7D]">
+              <span className="truncate">{serverDetail?.name || "Máy chủ"}</span>
+              <span className="text-[#21D789] font-medium">Đang hoạt động</span>
             </div>
           </aside>
 
@@ -764,9 +797,10 @@ function ServerWorkspaceDialogContent({
                 <button
                   type="button"
                   onClick={() => setStatusMsg("")}
-                  className="text-xs opacity-70 hover:opacity-100"
+                  aria-label="Đóng thông báo"
+                  className="text-xs opacity-70 hover:opacity-100 cursor-pointer"
                 >
-                  ✕
+                  <CloseIcon className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
@@ -894,7 +928,7 @@ function ServerWorkspaceDialogContent({
                     Vùng nguy hiểm · Xóa máy chủ
                   </h3>
                   <p className="text-xs text-[#A8A8B0] mb-3">
-                    Nhập tên máy chủ ({serverDetail?.name}) để xác nhận xóa vĩnh viễn máy chủ này khỏi PostgreSQL.
+                    Nhập tên máy chủ ({serverDetail?.name}) để xác nhận xóa vĩnh viễn máy chủ và toàn bộ nội dung bên trong.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2.5">
                     <input
@@ -929,7 +963,7 @@ function ServerWorkspaceDialogContent({
                     Quản lý Kênh & Quyền riêng tư
                   </h2>
                   <p className="text-xs text-[#A8A8B0] mt-1">
-                    Tạo kênh mới, xóa kênh hoặc bật khóa Kênh riêng tư lưu trực tiếp trong bảng `channels` và `channel_role_permissions`.
+                    Tạo kênh mới, xóa kênh hoặc giới hạn quyền xem cho từng vai trò trong máy chủ.
                   </p>
                 </div>
 
@@ -958,7 +992,7 @@ function ServerWorkspaceDialogContent({
                       className="h-9 px-2.5 rounded-[4px] bg-[#141417] border border-[#393B40] text-xs text-white"
                     >
                       <option value="TEXT"># Kênh văn bản</option>
-                      <option value="VOICE">🔊 Phòng thoại</option>
+                      <option value="VOICE">Phòng thoại (Voice)</option>
                     </select>
                     <select
                       value={newChannelCategory}
@@ -1004,15 +1038,16 @@ function ServerWorkspaceDialogContent({
                       >
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex items-center gap-2.5">
-                            <span className="font-mono text-sm text-[#7D7D7D]">
-                              {ch.type === "VOICE" ? "🔊" : "#"}
+                            <span className="font-mono text-sm text-[#7D7D7D] flex items-center">
+                              {ch.type === "VOICE" ? <VolumeIcon className="w-3.5 h-3.5" /> : "#"}
                             </span>
                             <span className="text-sm font-semibold text-white">
                               {ch.name}
                             </span>
                             {isPrivate ? (
-                              <span className="px-2 py-0.5 rounded-[2px] bg-[#FDB60D]/15 border border-[#FDB60D]/40 text-[#FDB60D] text-[10px] font-mono font-semibold">
-                                🔒 Kênh riêng tư
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[2px] bg-[#FDB60D]/15 border border-[#FDB60D]/40 text-[#FDB60D] text-[10px] font-mono font-semibold">
+                                <LockIcon className="w-3 h-3" />
+                                <span>Kênh riêng tư</span>
                               </span>
                             ) : (
                               <span className="px-2 py-0.5 rounded-[2px] bg-[#2B2D30] text-[#A8A8B0] text-[10px] font-mono">
@@ -1084,7 +1119,7 @@ function ServerWorkspaceDialogContent({
                                     style={{ backgroundColor: role.color }}
                                   />
                                   <span>{role.name}</span>
-                                  <span>{allowed ? "✓" : "+"}</span>
+                                  <span>{allowed ? <CheckIcon className="w-3 h-3" /> : "+"}</span>
                                 </button>
                               );
                             })}
@@ -1106,7 +1141,7 @@ function ServerWorkspaceDialogContent({
                       Quản lý Thành viên ({visibleMembers.length})
                     </h2>
                     <p className="text-xs text-[#A8A8B0] mt-1">
-                      Gán vai trò (`member_roles`), tạo liên kết mời hoặc thu hồi quyền truy cập.
+                      Gán vai trò, tạo liên kết mời hoặc thu hồi quyền truy cập của thành viên.
                     </p>
                   </div>
                   <button
@@ -1203,42 +1238,59 @@ function ServerWorkspaceDialogContent({
                           </div>
 
                           <div className="flex items-center gap-2.5">
-                            <select
-                              aria-label={`Vai trò của ${member.name}`}
-                              value={assignedRoleId}
-                              onChange={(e) =>
-                                void handleAssignMemberRole(
-                                  member.id,
-                                  e.target.value
-                                )
-                              }
-                              className="h-8 px-2.5 rounded-[4px] bg-[#141417] border border-[#393B40] text-xs font-mono text-white"
-                            >
-                              {dbRoles.map((r) => (
-                                <option key={r.id} value={r.id}>
-                                  {r.name}
-                                </option>
-                              ))}
-                            </select>
+                            {(() => {
+                              const targetPosition =
+                                member.role === "OWNER"
+                                  ? 1000
+                                  : roleObj?.position ?? 0;
+                              const cannotActOnTarget =
+                                !isOwner && targetPosition >= actorHighestPosition;
+                              return (
+                                <>
+                                  <select
+                                    aria-label={`Vai trò của ${member.name}`}
+                                    value={assignedRoleId}
+                                    disabled={cannotActOnTarget}
+                                    onChange={(e) =>
+                                      void handleAssignMemberRole(
+                                        member.id,
+                                        e.target.value
+                                      )
+                                    }
+                                    className="h-8 px-2.5 rounded-[4px] bg-[#141417] border border-[#393B40] text-xs font-mono text-white disabled:opacity-40"
+                                  >
+                                    {dbRoles.map((r) => (
+                                      <option
+                                        key={r.id}
+                                        value={r.id}
+                                        disabled={!isOwner && r.position >= actorHighestPosition}
+                                      >
+                                        {r.name}
+                                      </option>
+                                    ))}
+                                  </select>
 
-                            {member.role !== "OWNER" && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleKickMember(member)}
-                                  className="px-2.5 py-1 rounded-[4px] border border-[#FDB60D]/40 text-[#FDB60D] hover:bg-[#FDB60D] hover:text-[#0B0B0D] text-xs transition-colors cursor-pointer"
-                                >
-                                  Kick
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleBanMember(member)}
-                                  className="px-2.5 py-1 rounded-[4px] border border-[#FE2857]/40 text-[#FE2857] hover:bg-[#FE2857] hover:text-white text-xs transition-colors cursor-pointer"
-                                >
-                                  Ban
-                                </button>
-                              </>
-                            )}
+                                  {member.role !== "OWNER" && !cannotActOnTarget && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleKickMember(member)}
+                                        className="px-2.5 py-1 rounded-[4px] border border-[#FDB60D]/40 text-[#FDB60D] hover:bg-[#FDB60D] hover:text-[#0B0B0D] text-xs transition-colors cursor-pointer"
+                                      >
+                                        Kick
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => void handleBanMember(member)}
+                                        className="px-2.5 py-1 rounded-[4px] border border-[#FE2857]/40 text-[#FE2857] hover:bg-[#FE2857] hover:text-white text-xs transition-colors cursor-pointer"
+                                      >
+                                        Ban
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                       );
@@ -1248,15 +1300,15 @@ function ServerWorkspaceDialogContent({
               </div>
             )}
 
-            {/* TAB 4: ROLES & RBAC MATRIX */}
+            {/* TAB 4: ROLES & PERMISSIONS */}
             {activeTab === "roles" && (
               <div className="space-y-6">
                 <div className="pb-4 border-b border-[#2B2D30]">
                   <h2 className="text-lg font-bold text-white">
-                    Vai trò & Ma trận Phân quyền (RBAC)
+                    Vai trò & Phân quyền
                   </h2>
                   <p className="text-xs text-[#A8A8B0] mt-1">
-                    Dữ liệu vai trò và bitmask quyền hạn được lưu trực tiếp trong bảng `roles` trên PostgreSQL.
+                    Tạo vai trò mới và thiết lập quyền hạn cho từng nhóm thành viên trong máy chủ.
                   </p>
                 </div>
 
@@ -1427,21 +1479,21 @@ function ServerWorkspaceDialogContent({
               </div>
             )}
 
-            {/* TAB 5: ANALYTICS & SQL QUERIES */}
+            {/* TAB 5: ANALYTICS & SEARCH */}
             {activeTab === "analytics" && (
               <div className="space-y-6">
                 <div className="pb-4 border-b border-[#2B2D30]">
                   <h2 className="text-lg font-bold text-white">
-                    Thống kê Máy chủ & Tìm kiếm Tin nhắn (PostgreSQL)
+                    Thống kê & Tìm kiếm tin nhắn
                   </h2>
                   <p className="text-xs text-[#A8A8B0] mt-1">
-                    Tổng hợp dữ liệu trực tiếp từ CSDL bằng các truy vấn JOIN, GROUP BY, HAVING, Window Function RANK() và tìm kiếm ILIKE có kiểm tra quyền kênh riêng tư.
+                    Theo dõi mức độ hoạt động và tìm kiếm tin nhắn trong các kênh bạn có quyền truy cập.
                   </p>
                 </div>
 
                 {analyticsLoading ? (
-                  <p className="text-xs font-mono text-[#7D7D7D]">
-                    Đang thực thi truy vấn thống kê trên PostgreSQL...
+                  <p className="text-xs text-[#7D7D7D]">
+                    Đang tải thống kê máy chủ...
                   </p>
                 ) : analytics ? (
                   <>
@@ -1455,7 +1507,7 @@ function ServerWorkspaceDialogContent({
                         },
                         {
                           label: "Kênh (Riêng tư)",
-                          value: `${analytics.summary.totalChannels} (${analytics.summary.privateChannels} 🔒)`,
+                          value: `${analytics.summary.totalChannels} (${analytics.summary.privateChannels} riêng tư)`,
                           color: "#FDB60D",
                         },
                         {
@@ -1488,8 +1540,8 @@ function ServerWorkspaceDialogContent({
 
                     {/* Search Messages */}
                     <div className="p-4 rounded-[4px] bg-[#18181B] border border-[#2B2D30] space-y-3">
-                      <p className="text-xs font-mono font-semibold text-[#07C3F2]">
-                        Tìm kiếm nội dung tin nhắn (ILIKE + Kiểm tra quyền kênh)
+                      <p className="text-xs font-semibold text-[#07C3F2]">
+                        Tìm kiếm nội dung tin nhắn
                       </p>
                       <form onSubmit={handleSearchMessages} className="flex gap-2">
                         <input
@@ -1531,8 +1583,8 @@ function ServerWorkspaceDialogContent({
                     {/* Two-column breakdown: Channels & Top Contributors */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       <div className="p-4 rounded-[4px] bg-[#18181B] border border-[#2B2D30] space-y-3">
-                        <p className="text-xs font-mono font-semibold text-[#07C3F2]">
-                          Tin nhắn theo từng kênh (LEFT JOIN + GROUP BY)
+                        <p className="text-xs font-semibold text-[#07C3F2]">
+                          Hoạt động theo từng kênh
                         </p>
                         <div className="divide-y divide-[#2B2D30] text-xs">
                           {analytics.messagesByChannel.map((ch) => (
@@ -1540,10 +1592,10 @@ function ServerWorkspaceDialogContent({
                               key={ch.channelId}
                               className="py-2 flex items-center justify-between"
                             >
-                              <span className="text-[#E6EDF3] font-mono">
-                                #{ch.channelName}{" "}
+                              <span className="text-[#E6EDF3] font-mono inline-flex items-center gap-1.5">
+                                <span>#{ch.channelName}</span>
                                 {ch.isPrivate && (
-                                  <span className="text-[#FDB60D]">🔒</span>
+                                  <LockIcon className="w-3 h-3 text-[#FDB60D]" />
                                 )}
                               </span>
                               <span className="font-mono text-[#21D789]">
@@ -1555,8 +1607,8 @@ function ServerWorkspaceDialogContent({
                       </div>
 
                       <div className="p-4 rounded-[4px] bg-[#18181B] border border-[#2B2D30] space-y-3">
-                        <p className="text-xs font-mono font-semibold text-[#07C3F2]">
-                          Top thành viên tích cực (GROUP BY + RANK())
+                        <p className="text-xs font-semibold text-[#07C3F2]">
+                          Thành viên tích cực
                         </p>
                         {analytics.topContributors.length === 0 ? (
                           <p className="text-xs text-[#7D7D7D]">
@@ -1587,8 +1639,8 @@ function ServerWorkspaceDialogContent({
 
                     {/* Audit Logs */}
                     <div className="p-4 rounded-[4px] bg-[#18181B] border border-[#2B2D30] space-y-3">
-                      <p className="text-xs font-mono font-semibold text-[#07C3F2]">
-                        Nhật ký quản trị (Bảng audit_logs)
+                      <p className="text-xs font-semibold text-[#07C3F2]">
+                        Nhật ký hoạt động
                       </p>
                       {auditLogs.length === 0 ? (
                         <p className="text-xs text-[#7D7D7D]">
@@ -1626,6 +1678,47 @@ function ServerWorkspaceDialogContent({
             )}
           </div>
         </div>
+
+        {/* Sticky Bottom IDE Dialog Footer: OK / Cancel / Apply (Reference Image 5) */}
+        <footer
+          data-testid="workspace-modal-footer"
+          className="h-12 bg-[#1E1F22] border-t border-[#2B2D30] px-4 flex items-center justify-between shrink-0 select-none"
+        >
+          <span className="text-[11px] text-[#7D7D7D] truncate">
+            {isOverviewDirty
+              ? "Có thay đổi chưa lưu trong mục Tổng quan."
+              : "Cài đặt máy chủ đã được đồng bộ."}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void handleDialogOk()}
+              data-testid="workspace-modal-ok-btn"
+              className="ide-btn-primary min-w-[72px]"
+            >
+              OK
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={closeWorkspaceModal}
+              data-testid="workspace-modal-cancel-btn"
+              className="ide-btn-secondary min-w-[72px]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!isOverviewDirty || busy}
+              onClick={() => void persistOverviewChanges()}
+              data-testid="workspace-modal-apply-btn"
+              className="ide-btn-secondary min-w-[72px]"
+            >
+              Apply
+            </button>
+          </div>
+        </footer>
       </div>
     </div>
   );

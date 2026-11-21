@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { prisma } from '../config/prisma'
 import { env } from '../config/env'
 import { admitVoiceParticipant, registerVoiceToken, startVoiceSecurity } from '../services/voice-security'
+import { canMemberViewPrivateChannel, getMemberPermissions } from '../services/permissions'
 
 let presenceRedis: Redis | undefined
 const getPresenceRedis = () => presenceRedis ??= new Redis(env.REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 })
@@ -23,9 +24,21 @@ export async function voiceRoutes(server: FastifyInstance) {
         type: { in: ['VOICE', 'VIDEO'] },
         server: { members: { some: { userId: request.user.id, isBanned: false } } },
       },
-      select: { id: true, type: true, userLimit: true, server: { select: { members: { where: { userId: request.user.id }, select: { user: { select: { username: true, displayName: true } } } } } } },
+      select: {
+        id: true,
+        type: true,
+        userLimit: true,
+        serverId: true,
+        isPrivate: true,
+        rolePermissions: { where: { canView: true }, select: { roleId: true } },
+        server: { select: { members: { where: { userId: request.user.id }, select: { user: { select: { username: true, displayName: true } } } } } },
+      },
     })
     if (!channel) return reply.status(404).send({ statusCode: 404, message: 'Voice/video channel không tồn tại hoặc bạn không có quyền tham gia.' })
+    const permissions = await getMemberPermissions(channel.serverId, request.user.id)
+    if (!permissions || !canMemberViewPrivateChannel(permissions, channel) || !permissions.hasPermission('connect_voice')) {
+      return reply.status(403).send({ statusCode: 403, message: 'Bạn không có quyền tham gia phòng thoại này.' })
+    }
     const roomName = await registerVoiceToken(channel.id, request.user.sid, request.user.id)
     if (channel.userLimit && channel.userLimit > 0) {
       try {
@@ -52,7 +65,7 @@ export async function voiceRoutes(server: FastifyInstance) {
     token.addGrant({
       roomJoin: true,
       room: roomName,
-      canPublishSources: channel.type === 'VIDEO' ? [TrackSource.MICROPHONE, TrackSource.CAMERA] : [TrackSource.MICROPHONE],
+      canPublishSources: [TrackSource.MICROPHONE, TrackSource.CAMERA, TrackSource.SCREEN_SHARE],
       canPublish: false,
       canSubscribe: false,
       canPublishData: false,

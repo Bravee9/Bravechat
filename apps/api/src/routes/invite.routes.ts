@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '../config/prisma'
+import { invalidateServerPermissionsCache } from '../services/permissions'
 
 export async function inviteRoutes(server: FastifyInstance) {
   server.addHook('preHandler', server.authenticate)
@@ -18,13 +19,18 @@ export async function inviteRoutes(server: FastifyInstance) {
         data: { uses: { increment: 1 } },
       })
       if (consumed.count !== 1) return { error: 'Mã mời vừa được sử dụng hết. Vui lòng thử lại.', status: 409 as const }
-      await transaction.serverMember.create({ data: { userId: request.user.id, serverId: invite.serverId } })
+      const createdMember = await transaction.serverMember.create({ data: { userId: request.user.id, serverId: invite.serverId } })
+      const defaultRole = await transaction.role.findFirst({ where: { serverId: invite.serverId, name: 'Member' }, select: { id: true } })
+      if (defaultRole) {
+        await transaction.memberRole.create({ data: { memberId: createdMember.id, roleId: defaultRole.id } })
+      }
       return { serverId: invite.serverId }
     })
     if ('error' in result) {
       const statusCode = result.status ?? 400
       return reply.status(statusCode).send({ statusCode, message: result.error })
     }
+    invalidateServerPermissionsCache(result.serverId)
     return reply.send({ statusCode: 200, data: result })
   })
 }

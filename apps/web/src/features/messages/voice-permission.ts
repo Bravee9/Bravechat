@@ -1,7 +1,7 @@
 import { RoomEvent, type Room } from 'livekit-client';
 
 export async function waitForVoicePermission(room: Room, signal: AbortSignal) {
-  const admitted = () => room.localParticipant.permissions?.canPublish && room.localParticipant.permissions?.canSubscribe;
+  const admitted = () => Boolean(room.localParticipant.permissions?.canSubscribe);
   if (signal.aborted) throw new Error('Connection cancelled');
   if (admitted()) return;
   await new Promise<void>((resolve, reject) => {

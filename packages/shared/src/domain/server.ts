@@ -23,6 +23,8 @@ export interface ServerDetail {
   isPublic?: boolean;
   description: string | null;
   ownerId: string;
+  memberPermissions?: Record<import("../permissions").PermissionKey, boolean>;
+  highestRolePosition?: number;
   categories: ChannelCategory[];
   channels: Channel[];
 }

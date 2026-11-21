@@ -2,10 +2,11 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { env } from "@/config/env";
+import { CloseIcon, ReplyIcon, SmileIcon } from "@/components/ui/Icons";
 
 export interface ChatMessage {
   id: string | number; avatar: string; user: string; time: string; content: string;
-  createdAt?: string | Date; isHighlighted?: boolean; isEdited?: boolean;
+  createdAt?: string | Date; isHighlighted?: boolean; isEdited?: boolean; isPending?: boolean;
   author?: { id: string; username: string; displayName?: string | null };
   senderId?: string; receiverId?: string;
   replyTo?: { id: string; content: string; user: string } | null;
@@ -30,14 +31,14 @@ export function MessageItem({ message, isCurrentUser, currentUserId, onReply, on
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
-  return <div data-testid={`chat-message-${message.id}`} className={cn("message-row flex gap-4 group relative px-3 py-2 transition-colors", message.isHighlighted && "bg-ocean-primary/10 border-l-2 border-ocean-secondary")}>
+  return <div data-testid={`chat-message-${message.id}`} className={cn("message-row flex gap-4 group relative px-3 py-2 transition-colors", message.isHighlighted && "bg-ocean-primary/10 border-l-2 border-ocean-secondary", message.isPending && "opacity-70")}>
     <div className="absolute right-2 -top-3 z-20 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity bg-ocean-dark-surface border border-ocean-dark-border flex items-center shadow-lg rounded">
-      <button type="button" className="p-1.5 text-xs hover:bg-white/10" title="Thêm emoji" aria-label="Thêm emoji" onClick={() => setPicker((value) => !value)}>☺</button>
-      <button type="button" className="p-1.5 text-xs hover:bg-white/10" title="Trả lời" aria-label="Trả lời" onClick={() => onReply?.(message)}>↩</button>
+      <button type="button" className="p-1.5 text-xs text-[#A8A8B0] hover:text-white hover:bg-white/10" title="Thêm emoji" aria-label="Thêm emoji" onClick={() => setPicker((value) => !value)}><SmileIcon className="w-3.5 h-3.5" /></button>
+      <button type="button" className="p-1.5 text-xs text-[#A8A8B0] hover:text-white hover:bg-white/10" title="Trả lời" aria-label="Trả lời" onClick={() => onReply?.(message)}><ReplyIcon className="w-3.5 h-3.5" /></button>
       {isCurrentUser && onEdit && <button type="button" className="p-1.5 text-xs hover:bg-white/10" onClick={() => onEdit(message)}>Sửa</button>}
       {isCurrentUser && onDelete && <button type="button" className="p-1.5 text-xs text-rose-300 hover:bg-white/10" onClick={() => onDelete(message)}>Xóa</button>}
     </div>
-    {picker && <div role="group" aria-label="Chọn emoji" className="absolute right-0 top-4 z-30 flex rounded border border-ocean-dark-border bg-ocean-dark-surface p-2 shadow-xl">{["👍", "❤️", "😂", "😮", "😢", "🎉"].map((emoji) => <button key={emoji} className="p-2 hover:bg-white/10" onClick={() => react(emoji)} aria-label={emoji}>{emoji}</button>)}<button className="p-1 text-xs" onClick={() => setPicker(false)} aria-label="Đóng emoji">✕</button></div>}
+    {picker && <div role="group" aria-label="Chọn emoji" className="absolute right-0 top-4 z-30 flex items-center rounded border border-ocean-dark-border bg-ocean-dark-surface p-2 shadow-xl">{["👍", "❤️", "😂", "😮", "😢", "🎉"].map((emoji) => <button key={emoji} className="p-2 hover:bg-white/10" onClick={() => react(emoji)} aria-label={emoji}>{emoji}</button>)}<button className="p-1.5 text-[#A8A8B0] hover:text-white" onClick={() => setPicker(false)} aria-label="Đóng emoji"><CloseIcon className="w-3.5 h-3.5" /></button></div>}
     <div className="message-avatar w-10 h-10 rounded-full bg-ocean-dark-surface border border-ocean-dark-border flex-shrink-0 flex items-center justify-center text-ocean-secondary font-bold">{message.avatar || message.user.slice(0, 2).toUpperCase()}</div>
     <div className="flex-1 min-w-0">
       {message.replyTo && <blockquote className="mb-2 truncate border-l-2 border-ocean-secondary/50 pl-2 text-xs text-ocean-light/60">↩ {message.replyTo.user}: {message.replyTo.content}</blockquote>}
@@ -79,8 +80,9 @@ export function MessageItem({ message, isCurrentUser, currentUserId, onReply, on
     {lightboxImg && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn" onClick={() => setLightboxImg(null)}>
         <div className="relative max-w-5xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
-          <button type="button" onClick={() => setLightboxImg(null)} className="absolute -top-10 right-0 text-white/80 hover:text-white text-lg font-bold p-1">
-            ✕ Đóng
+          <button type="button" onClick={() => setLightboxImg(null)} className="absolute -top-10 right-0 flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-semibold p-1">
+            <CloseIcon className="w-4 h-4" />
+            <span>Đóng</span>
           </button>
           <img src={lightboxImg.url} alt={lightboxImg.filename} className="max-h-[82vh] max-w-full object-contain rounded-lg shadow-2xl" />
           <div className="mt-2 flex items-center gap-4 text-xs text-white/70">

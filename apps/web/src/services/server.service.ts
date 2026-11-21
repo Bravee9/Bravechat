@@ -1,7 +1,6 @@
 import type { ServerDetail, ServerListItem, ServerMemberSummary } from "@discord-clone/shared";
-import { API_ROUTES } from "@discord-clone/shared";
 import { env } from "@/config/env";
-import { http } from "@/services/http";
+import { serverAdapter } from "@/services/adapters";
 import { MOCK_SERVER_DETAILS, MOCK_SERVER_LIST } from "@/services/mock/mockData";
 
 export const serverService = {
@@ -12,7 +11,7 @@ export const serverService = {
     if (env.useMocks) {
       return MOCK_SERVER_LIST;
     }
-    return http.get<ServerListItem[]>(API_ROUTES.users.myServers);
+    return serverAdapter.listMyServers();
   },
 
   /**
@@ -48,11 +47,11 @@ export const serverService = {
       );
     }
 
-    return http.get<ServerDetail>(API_ROUTES.servers.detail(serverId));
+    return serverAdapter.getDetail(serverId);
   },
 
   async getServerMembers(serverId: string): Promise<ServerMemberSummary[]> {
-    const response = await http.get<{ members: ServerMemberSummary[] }>(API_ROUTES.servers.members(serverId));
+    const response = await serverAdapter.listMembers(serverId);
     return response.members;
   },
 };

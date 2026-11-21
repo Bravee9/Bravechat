@@ -24,10 +24,25 @@ type Query = Record<string, string | number | undefined>;
 interface RequestOptions extends Omit<RequestInit, "body" | "method"> {
   query?: Query;
   body?: unknown;
+  baseUrl?: string;
 }
 
-function buildUrl(path: string, query?: Query): string {
-  const raw = env.apiUrl.replace(/\/$/, "") + path;
+export function resolveServiceBaseUrl(path: string, customBaseUrl?: string): string {
+  if (customBaseUrl) return customBaseUrl;
+  const runtimeEnv = env as {
+    apiUrl: string;
+    authApiUrl?: string;
+    coreApiUrl?: string;
+  };
+  if (path.startsWith("/auth/")) {
+    return runtimeEnv.authApiUrl ?? runtimeEnv.apiUrl;
+  }
+  return runtimeEnv.coreApiUrl ?? runtimeEnv.apiUrl;
+}
+
+function buildUrl(path: string, query?: Query, customBaseUrl?: string): string {
+  const base = resolveServiceBaseUrl(path, customBaseUrl);
+  const raw = base.replace(/\/$/, "") + path;
   const url = /^https?:\/\//i.test(raw)
     ? new URL(raw)
     : new URL(
@@ -46,13 +61,13 @@ let refreshInFlight: Promise<boolean> | null = null;
 let sessionVersion = 0;
 
 async function request<T>(method: string, path: string, options: RequestOptions = {}, retryAuth = true): Promise<T> {
-  const { query, body, headers, ...init } = options;
+  const { query, body, headers, baseUrl, ...init } = options;
   const multipart = typeof FormData !== "undefined" && body instanceof FormData;
 
   // Request mới chờ cookie được xoay vòng, không gửi bằng phiên vừa hết hạn.
   if (refreshInFlight && !path.startsWith("/auth/")) await refreshInFlight;
   const sentVersion = sessionVersion;
-  const response = await fetch(buildUrl(path, query), {
+  const response = await fetch(buildUrl(path, query, baseUrl), {
     ...init,
     method,
     credentials: "include",

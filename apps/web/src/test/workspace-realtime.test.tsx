@@ -1,7 +1,12 @@
 import React from "react";
 import { act, render } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { WorkspaceRealtime } from "@/stores/WorkspaceRealtime";
+import {
+  WorkspaceRealtime,
+  hasActiveWorkspaceRealtime,
+  joinWorkspaceRealtimeChannel,
+  leaveWorkspaceRealtimeChannel,
+} from "@/stores/WorkspaceRealtime";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/channels/@me" }));
 vi.mock("@/config/env", () => ({ env: { wsUrl: "ws://localhost/api/ws", useMocks: false } }));
@@ -17,7 +22,8 @@ class Socket {
   onopen?: () => void;
   onmessage?: (event: { data: string }) => void;
   onclose?: () => void;
-  sent: Array<{ type: string; serverId: string }> = [];
+  sent: Array<{ type: string; serverId?: string; channelId?: string }> = [];
+  readyState = 1;
   constructor() { Socket.current = this; }
   send(raw: string) { this.sent.push(JSON.parse(raw)); }
   close() {}
@@ -41,4 +47,35 @@ it("subscribes to 50 servers one at a time, skips unavailable membership, and re
   expect(socket.sent).toHaveLength(51);
   expect(socket.sent[50]).toEqual(socket.sent[0]);
   view.unmount();
+});
+
+it("multiplexes channel join and leave frames over the single shared workspace socket and rejoins active channel on reconnect", () => {
+  vi.stubGlobal("WebSocket", Socket);
+  const view = render(<WorkspaceRealtime />);
+  const socket = Socket.current;
+  expect(hasActiveWorkspaceRealtime()).toBe(true);
+  act(() => socket.onopen?.());
+
+  act(() => joinWorkspaceRealtimeChannel("ch-general"));
+  expect(socket.sent[socket.sent.length - 1]).toEqual({
+    type: "join_channel",
+    channelId: "ch-general",
+  });
+
+  // Reconnect automatically re-subscribes to the active channel
+  act(() => socket.onopen?.());
+  expect(
+    socket.sent.some(
+      (f, idx) => idx > 1 && f.type === "join_channel" && f.channelId === "ch-general"
+    )
+  ).toBe(true);
+
+  act(() => leaveWorkspaceRealtimeChannel("ch-general"));
+  expect(socket.sent[socket.sent.length - 1]).toEqual({
+    type: "leave_channel",
+    channelId: "ch-general",
+  });
+
+  view.unmount();
+  expect(hasActiveWorkspaceRealtime()).toBe(false);
 });
